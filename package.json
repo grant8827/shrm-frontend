@@ -26,13 +26,14 @@
     "crypto-js": "^4.2.0",
     "@types/crypto-js": "^4.2.1",
     "react-signature-canvas": "^1.0.6",
-    "@types/react-signature-canvas": "^1.0.5"
+    "@types/react-signature-canvas": "^1.0.5",
+    "serve": "^14.2.1"
   },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "start": "vite",
+    "start": "serve -s build -l 3000",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix"
