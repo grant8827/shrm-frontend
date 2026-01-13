@@ -81,11 +81,11 @@ interface SOAPNote {
 
 const StaffDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [, setSelectedDate] = useState(new Date());
+  const [, _setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [, setSoapNotes] = useState<SOAPNote[]>([]);
-  const [, setLoading] = useState(false);
+  const [, _setSoapNotes] = useState<SOAPNote[]>([]);
+  const [, _setLoading] = useState(false);
   const [, setSelectedPatient] = useState<Patient | null>(null);
   const [, setDialogOpen] = useState<'patient' | 'appointment' | 'notes' | null>(null);
 

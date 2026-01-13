@@ -15,8 +15,6 @@ import {
   Switch,
   FormControlLabel,
   Grid,
-  Card,
-  CardContent,
   Alert,
   Tooltip,
   Dialog,
@@ -93,8 +91,8 @@ const VideoSession: React.FC = () => {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [, setIsFullscreen] = useState(false);
-  const [, setVolume] = useState(100);
+  const [, _setIsFullscreen] = useState(false);
+  const [, _setVolume] = useState(100);
 
   // Features
   const [showChat, setShowChat] = useState(false);

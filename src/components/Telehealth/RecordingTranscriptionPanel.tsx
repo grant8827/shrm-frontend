@@ -48,7 +48,6 @@ import {
   TranscriptionProvider
 } from '../../types';
 import { telehealthService } from '../../services/telehealthService';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface RecordingTranscriptionPanelProps {
   sessionId: string;
@@ -61,8 +60,6 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
   onRecordingStateChange,
   onTranscriptionUpdate
 }) => {
-  const { state } = useAuth();
-  const user = state.user;
 
   // Recording state
   const [recordingState, setRecordingState] = useState<RecordingState | null>(null);
@@ -74,6 +71,7 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
   // Transcription state
   const [transcriptionSettings, setTranscriptionSettings] = useState<TranscriptionSettings>({
     enabled: true,
+    autoStart: true,
     language: 'en-US',
     realTimeTranscription: true,
     speakerIdentification: true,

@@ -53,7 +53,6 @@ import {
   TrendingUp,
   People,
   LocalHospital,
-  AttachMoney,
   Schedule,
   Security,
   Visibility,
@@ -555,7 +554,6 @@ const Reports: React.FC = () => {
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [reportParameters, setReportParameters] = useState<Record<string, any>>({});
   const [generatedReports, setGeneratedReports] = useState<GeneratedReport[]>(mockGeneratedReports);
-  const [, setLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [page, setPage] = useState(0);

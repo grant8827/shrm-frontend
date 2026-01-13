@@ -76,40 +76,6 @@ interface SystemSettings {
 
 class SystemService {
   /**
-   * Get authorization headers with current token
-   */
-  private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('access_token');
-    return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    };
-  }
-
-  /**
-   * Make authenticated API request
-   */
-  private async _apiRequest<T>(
-    endpoint: string, 
-    options: RequestInit = {}
-  ): Promise<T> {
-    const response = await fetch(`/api/v1${endpoint}`, {
-      ...options,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  /**
    * Get system statistics (admin only)
    */
   async getSystemStats(): Promise<SystemStats> {
