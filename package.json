@@ -1,0 +1,67 @@
+{
+  "name": "theracare-frontend",
+  "version": "1.0.0",
+  "description": "TheraCare Frontend - React TypeScript EHR Application",
+  "private": true,
+  "dependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.17",
+    "@types/react-router-dom": "^5.3.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.1",
+    "typescript": "^5.3.3",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.0",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/x-date-pickers": "^6.18.1",
+    "axios": "^1.6.2",
+    "date-fns": "^2.30.0",
+    "formik": "^2.4.5",
+    "yup": "^1.4.0",
+    "jwt-decode": "^4.0.0",
+    "socket.io-client": "^4.7.4",
+    "crypto-js": "^4.2.0",
+    "@types/crypto-js": "^4.2.1",
+    "react-signature-canvas": "^1.0.6",
+    "@types/react-signature-canvas": "^1.0.5"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "start": "vite",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix"
+  },
+
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/jest": "^29.5.8",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.54.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "jsdom": "^23.0.1",
+    "vite": "^5.0.10",
+    "vitest": "^1.1.0"
+  }
+}
