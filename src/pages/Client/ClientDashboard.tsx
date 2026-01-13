@@ -10,10 +10,7 @@ import {
   Avatar,
   Chip,
   Divider,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemText
+  CircularProgress
 } from '@mui/material';
 import { 
   Event, 

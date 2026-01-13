@@ -41,8 +41,6 @@ import {
   Edit,
   Delete,
   ContentCopy,
-  Phone,
-  VideocamOff,
   AccessTime,
   CalendarMonth,
   Person,
@@ -342,7 +340,7 @@ const TelehealthDashboard: React.FC = () => {
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
+        <Tabs value={tabValue} onChange={(_e, v) => setTabValue(v)}>
           <Tab icon={<Schedule />} label="Upcoming" iconPosition="start" />
           <Tab icon={<History />} label="Past Sessions" iconPosition="start" />
           <Tab icon={<People />} label="All Sessions" iconPosition="start" />

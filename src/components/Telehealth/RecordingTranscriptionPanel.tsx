@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -19,11 +19,6 @@ import {
   Switch,
   FormControlLabel,
   Alert,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Tooltip,
   Paper,
   CircularProgress,
@@ -37,22 +32,10 @@ import {
   Settings,
   Download,
   Delete,
-  Mic,
-  MicOff,
-  VolumeUp,
-  VolumeOff,
   Transcribe,
   SaveAlt,
-  Share,
   PictureAsPdf,
-  Description,
-  DataObject,
-  AccessTime,
-  Storage,
-  CloudDownload,
-  Warning,
-  CheckCircle,
-  Cancel
+  Description
 } from '@mui/icons-material';
 import {
   RecordingState,
@@ -91,7 +74,6 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
   // Transcription state
   const [transcriptionSettings, setTranscriptionSettings] = useState<TranscriptionSettings>({
     enabled: true,
-    autoStart: true,
     language: 'en-US',
     realTimeTranscription: true,
     speakerIdentification: true,

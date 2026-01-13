@@ -32,8 +32,6 @@ import {
   Security as AuditIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
-  TrendingUp,
-  TrendingDown,
   PersonAdd,
   Event,
   Payment,
@@ -56,10 +54,6 @@ const ReportsSection: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<ReportData[]>([]);
   const [selectedReportType, setSelectedReportType] = useState<string>('users');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-    end: new Date(),
-  });
   const [error, setError] = useState<string | null>(null);
 
   const reportTypes = [
@@ -453,7 +447,7 @@ const ReportsSection: React.FC = () => {
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs 
             value={activeTab} 
-            onChange={(event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}
+            onChange={(_event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}
           >
             {tabPanels.map((panel, index) => (
               <Tab key={index} label={panel.label} />

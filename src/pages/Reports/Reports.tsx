@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -24,9 +24,7 @@ import {
   DialogActions,
   TextField,
   IconButton,
-  Menu,
-  ListItemIcon,
-  Divider,
+
   Alert,
   AlertTitle,
   Tabs,
@@ -36,13 +34,10 @@ import {
   CircularProgress,
   Snackbar,
   InputAdornment,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+
   List,
   ListItem,
   ListItemText,
-  Avatar,
   Tooltip,
   TablePagination,
   Switch,
@@ -52,13 +47,10 @@ import {
 } from '@mui/material';
 import {
   Assessment,
-  PictureAsPdf,
-  GetApp,
+
   FilterList,
   Search,
-  DateRange,
   TrendingUp,
-  TrendingDown,
   People,
   LocalHospital,
   AttachMoney,
@@ -67,23 +59,15 @@ import {
   Visibility,
   Download,
   Share,
-  Print,
-  Email,
+
   Refresh,
   Settings,
   Help,
-  ExpandMore,
-  BarChart,
-  PieChart,
-  ShowChart,
-  Timeline,
+
   Dashboard,
-  InsertChart,
-  TableChart,
-  DonutLarge,
+
   Analytics,
   Business,
-  GroupWork,
   MonetizationOn,
   EventNote,
   HealthAndSafety,
@@ -99,7 +83,6 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useAuth } from '../../contexts/AuthContext';
-import { systemService } from '../../services/systemService';
 
 // Report interfaces
 interface ReportTemplate {
@@ -572,7 +555,7 @@ const Reports: React.FC = () => {
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [reportParameters, setReportParameters] = useState<Record<string, any>>({});
   const [generatedReports, setGeneratedReports] = useState<GeneratedReport[]>(mockGeneratedReports);
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [page, setPage] = useState(0);
@@ -1172,7 +1155,7 @@ const Reports: React.FC = () => {
                     Most Popular Report Categories
                   </Typography>
                   <List>
-                    {reportAnalytics.popularCategories.map((category, index) => (
+                    {reportAnalytics.popularCategories.map((category) => (
                       <ListItem key={category.category}>
                         <ListItemText
                           primary={

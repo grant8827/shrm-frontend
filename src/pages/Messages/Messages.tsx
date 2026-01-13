@@ -356,7 +356,7 @@ const Messages: React.FC = () => {
     }
   };
 
-  const filteredMessages = getFilteredMessages();
+  getFilteredMessages();
   
   // Dialog states
   const [composeDialogOpen, setComposeDialogOpen] = useState(false);

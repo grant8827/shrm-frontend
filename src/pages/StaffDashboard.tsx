@@ -6,7 +6,6 @@ import {
   Typography,
   Card,
   CardContent,
-  Button,
   Chip,
   Avatar,
   List,
@@ -20,21 +19,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Fab,
-  Badge,
   Tabs,
   Tab,
-  Alert,
-  LinearProgress,
+  Alert
 } from '@mui/material';
 import {
   Schedule as ScheduleIcon,
@@ -45,14 +33,8 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Visibility as ViewIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
   AccessTime,
-  CheckCircle,
-  Warning,
-  Today,
-  EventNote,
-  Psychology,
+  Today
 } from '@mui/icons-material';
 
 interface Patient {
@@ -99,13 +81,13 @@ interface SOAPNote {
 
 const StaffDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [, setSelectedDate] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [soapNotes, setSoapNotes] = useState<SOAPNote[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [dialogOpen, setDialogOpen] = useState<'patient' | 'appointment' | 'notes' | null>(null);
+  const [, setSoapNotes] = useState<SOAPNote[]>([]);
+  const [, setLoading] = useState(false);
+  const [, setSelectedPatient] = useState<Patient | null>(null);
+  const [, setDialogOpen] = useState<'patient' | 'appointment' | 'notes' | null>(null);
 
   // Mock data - replace with actual API calls
   useEffect(() => {
@@ -500,7 +482,7 @@ const StaffDashboard: React.FC = () => {
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs 
             value={activeTab} 
-            onChange={(event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}
+            onChange={(_event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}
             variant="scrollable"
             scrollButtons="auto"
           >

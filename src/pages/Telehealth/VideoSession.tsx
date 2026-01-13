@@ -6,14 +6,12 @@ import {
   Button,
   Typography,
   Chip,
-  Drawer,
   List,
   ListItem,
   ListItemText,
   TextField,
   Badge,
   Avatar,
-  Divider,
   Switch,
   FormControlLabel,
   Grid,
@@ -42,13 +40,7 @@ import {
   Send,
   People,
   Settings,
-  Fullscreen,
-  FullscreenExit,
-  MoreVert,
-  VolumeUp,
-  VolumeOff,
-  Download,
-  ContentCopy,
+  Download
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -92,7 +84,7 @@ const VideoSession: React.FC = () => {
   const localStreamRef = useRef<MediaStream | null>(null);
 
   // Session state
-  const [isConnected, setIsConnected] = useState(false);
+  const [, setIsConnected] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
 
@@ -101,8 +93,8 @@ const VideoSession: React.FC = () => {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [volume, setVolume] = useState(100);
+  const [, setIsFullscreen] = useState(false);
+  const [, setVolume] = useState(100);
 
   // Features
   const [showChat, setShowChat] = useState(false);
@@ -112,7 +104,7 @@ const VideoSession: React.FC = () => {
   const [autoTranscribe, setAutoTranscribe] = useState(true);
 
   // Data
-  const [participants, setParticipants] = useState<Participant[]>([
+  const [participants] = useState<Participant[]>([
     {
       id: '1',
       name: 'Dr. Sarah Smith',
@@ -134,7 +126,7 @@ const VideoSession: React.FC = () => {
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [, setShowSettingsDialog] = useState(false);
 
   // Initialize session
   useEffect(() => {

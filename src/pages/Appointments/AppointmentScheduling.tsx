@@ -124,7 +124,6 @@ interface AppointmentFormData {
 const AppointmentScheduling: React.FC = () => {
   const { state } = useAuth();
   const isPatient = state.user?.role === 'client';
-  const isTherapist = state.user?.role === 'therapist';
   
   // Store all appointments in state, filter for display
   const [appointments, setAppointments] = useState<Appointment[]>([]);

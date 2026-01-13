@@ -87,7 +87,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     dispatch({ type: 'HIDE' });
   };
 
-  const handleClose = (event?: React.SyntheticEvent | Event, reason?: string) => {
+  const handleClose = (_event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') {
       return;
     }

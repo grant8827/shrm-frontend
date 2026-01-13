@@ -89,7 +89,7 @@ class SystemService {
   /**
    * Make authenticated API request
    */
-  private async apiRequest<T>(
+  private async _apiRequest<T>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<T> {
@@ -173,7 +173,7 @@ class SystemService {
   /**
    * Get audit log entries (admin only)
    */
-  async getAuditLog(params?: {
+  async getAuditLog(_params?: {
     user_id?: string;
     action?: string;
     resource?: string;
