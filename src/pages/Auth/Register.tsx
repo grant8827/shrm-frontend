@@ -16,6 +16,7 @@ import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserRole } from '../../types';
+import { apiClient } from '../../services/apiClient';
 
 interface RegisterFormData {
   username: string;
@@ -78,37 +79,26 @@ const Register: React.FC = () => {
         setError('');
         setSuccess('');
 
-        // Make API call to register using proxy
-        const response = await fetch('/api/auth/register/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: values.username,
-            email: values.email,
-            password: values.password,
-            password_confirm: values.confirmPassword,
-            first_name: values.firstName,
-            last_name: values.lastName,
-            role: values.role,
-            phone: values.phoneNumber || undefined,
-          }),
+        // Make API call to register using apiClient
+        await apiClient.post('/auth/register/', {
+          username: values.username,
+          email: values.email,
+          password: values.password,
+          password_confirm: values.confirmPassword,
+          first_name: values.firstName,
+          last_name: values.lastName,
+          role: values.role,
+          phone: values.phoneNumber || undefined,
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-          setSuccess('Account created successfully! You can now login.');
-          setTimeout(() => {
-            navigate('/login');
-          }, 2000);
-        } else {
-          setError(data.message || 'Registration failed. Please try again.');
-        }
-      } catch (err) {
+        setSuccess('Account created successfully! You can now login.');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } catch (err: any) {
         console.error('Registration error:', err);
-        setError('An error occurred during registration. Please try again.');
+        const errorMessage = err.response?.data?.message || err.response?.data?.detail || 'An error occurred during registration. Please try again.';
+        setError(errorMessage);
       }
     },
   });
