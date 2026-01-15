@@ -138,14 +138,6 @@ interface BillingFormData {
   notes: string;
 }
 
-// Mock data
-const mockPatients = [
-  { id: '1', name: 'John Doe', insurance: 'Blue Cross Blue Shield' },
-  { id: '2', name: 'Jane Smith', insurance: 'Aetna' },
-  { id: '3', name: 'Michael Johnson', insurance: 'UnitedHealth' },
-  { id: '4', name: 'Sarah Wilson', insurance: 'Cigna' },
-];
-
 const cptCodes = [
   { code: '90834', description: 'Psychotherapy 45 minutes', price: 150 },
   { code: '90837', description: 'Psychotherapy 60 minutes', price: 200 },
@@ -154,134 +146,19 @@ const cptCodes = [
   { code: '96116', description: 'Neurobehavioral status exam', price: 300 },
 ];
 
-const mockInvoices: Invoice[] = [
-  {
-    id: 'INV-001',
-    patientId: '1',
-    patientName: 'John Doe',
-    serviceDate: '2025-11-01',
-    dueDate: '2025-11-30',
-    amount: 350,
-    paidAmount: 350,
-    status: 'paid',
-    services: [
-      {
-        id: 'svc-1',
-        cptCode: '90837',
-        description: 'Psychotherapy 60 minutes',
-        quantity: 1,
-        unitPrice: 200,
-        total: 200,
-        therapistId: '1',
-        therapistName: 'Dr. Sarah Wilson',
-      },
-      {
-        id: 'svc-2',
-        cptCode: '90834',
-        description: 'Psychotherapy 45 minutes',
-        quantity: 1,
-        unitPrice: 150,
-        total: 150,
-        therapistId: '1',
-        therapistName: 'Dr. Sarah Wilson',
-      },
-    ],
-    paymentHistory: [
-      {
-        id: 'pay-1',
-        amount: 350,
-        method: 'insurance',
-        reference: 'BCBS-12345',
-        date: '2025-11-15',
-        notes: 'Insurance payment - claim approved',
-      },
-    ],
-    createdAt: '2025-11-01T10:00:00Z',
-    updatedAt: '2025-11-15T14:30:00Z',
-  },
-  {
-    id: 'INV-002',
-    patientId: '2',
-    patientName: 'Jane Smith',
-    serviceDate: '2025-11-03',
-    dueDate: '2025-12-03',
-    amount: 250,
-    paidAmount: 0,
-    status: 'sent',
-    services: [
-      {
-        id: 'svc-3',
-        cptCode: '90791',
-        description: 'Initial psychiatric evaluation',
-        quantity: 1,
-        unitPrice: 250,
-        total: 250,
-        therapistId: '2',
-        therapistName: 'Dr. Michael Johnson',
-      },
-    ],
-    insuranceClaim: {
-      id: 'claim-1',
-      insuranceProvider: 'Aetna',
-      policyNumber: 'AET-789456',
-      status: 'submitted',
-      submittedAmount: 250,
-      submittedDate: '2025-11-05',
-    },
-    paymentHistory: [],
-    createdAt: '2025-11-03T09:15:00Z',
-    updatedAt: '2025-11-05T11:20:00Z',
-  },
-  {
-    id: 'INV-003',
-    patientId: '3',
-    patientName: 'Michael Johnson',
-    serviceDate: '2025-10-25',
-    dueDate: '2025-11-25',
-    amount: 175,
-    paidAmount: 50,
-    status: 'partially_paid',
-    services: [
-      {
-        id: 'svc-4',
-        cptCode: '90834',
-        description: 'Family psychotherapy with patient',
-        quantity: 1,
-        unitPrice: 175,
-        total: 175,
-        therapistId: '3',
-        therapistName: 'Dr. Emily Davis',
-      },
-    ],
-    paymentHistory: [
-      {
-        id: 'pay-2',
-        amount: 50,
-        method: 'credit_card',
-        reference: 'CC-98765',
-        date: '2025-11-01',
-        notes: 'Partial payment - patient copay',
-      },
-    ],
-    createdAt: '2025-10-25T16:20:00Z',
-    updatedAt: '2025-11-01T10:45:00Z',
-  },
-];
-
-const billingStats = {
-  monthlyRevenue: 125430,
-  pendingClaims: 15,
-  overdueClaims: 3,
-  completedClaims: 142,
-  totalOutstanding: 45200,
-  averageCollectionTime: 28,
-  claimsApprovalRate: 89.5,
-  patientSatisfactionScore: 4.7,
-};
-
 const Billing: React.FC = () => {
   const { state } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [billingStats, setBillingStats] = useState({
+    monthlyRevenue: 0,
+    totalOutstanding: 0,
+    averageCollectionTime: 0,
+    claimsApprovalRate: 0,
+    pendingClaims: 0,
+    completedClaims: 0,
+    overdueClaims: 0,
+    patientSatisfactionScore: 0,
+  });
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -1110,11 +987,10 @@ const Billing: React.FC = () => {
                   label="Patient"
                   onChange={(e) => setFormData(prev => ({ ...prev, patientId: e.target.value }))}
                 >
-                  {mockPatients.map((patient) => (
-                    <MenuItem key={patient.id} value={patient.id}>
-                      {patient.name} - {patient.insurance}
-                    </MenuItem>
-                  ))}
+                  {/* TODO: Load patients from API */}
+                  <MenuItem value="">
+                    <em>Select a patient</em>
+                  </MenuItem>
                 </Select>
               </FormControl>
             </Grid>

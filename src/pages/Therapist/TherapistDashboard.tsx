@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Typography, 
   Box, 
@@ -33,24 +33,53 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-
-// Mock data for demonstration
-const todayAppointments = [
-  { id: 1, time: '09:00 AM', patient: 'John Doe', type: 'Initial Consultation', status: 'confirmed' },
-  { id: 2, time: '11:00 AM', patient: 'Jane Smith', type: 'Therapy Session', status: 'confirmed' },
-  { id: 3, time: '02:00 PM', patient: 'Mike Johnson', type: 'Follow-up', status: 'pending' },
-  { id: 4, time: '04:00 PM', patient: 'Sarah Wilson', type: 'Group Therapy', status: 'confirmed' },
-];
-
-const recentMessages = [
-  { id: 1, from: 'John Doe', subject: 'Question about homework', time: '10 min ago', unread: true },
-  { id: 2, from: 'Jane Smith', subject: 'Rescheduling request', time: '1 hour ago', unread: true },
-  { id: 3, from: 'Admin', subject: 'New patient assignment', time: '2 hours ago', unread: false },
-];
+import { apiClient } from '../../services/apiClient';
 
 const TherapistDashboard: React.FC = () => {
   const { state } = useAuth();
   const navigate = useNavigate();
+  
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
+  const [recentMessages, setRecentMessages] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    todayAppointments: 0,
+    activePatients: 0,
+    unreadMessages: 0,
+    pendingSoapNotes: 0
+  });
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      // TODO: Replace with actual API endpoints
+      // const appointmentsRes = await apiClient.get('/appointments/?today=true');
+      // const patientsRes = await apiClient.get('/patients/?status=active');
+      // const messagesRes = await apiClient.get('/messages/?unread=true');
+      // const soapNotesRes = await apiClient.get('/soap-notes/?status=pending');
+      
+      // setTodayAppointments(appointmentsRes.data);
+      // setStats({
+      //   todayAppointments: appointmentsRes.data.length,
+      //   activePatients: patientsRes.data.length,
+      //   unreadMessages: messagesRes.data.length,
+      //   pendingSoapNotes: soapNotesRes.data.length
+      // });
+      
+      setTodayAppointments([]);
+      setRecentMessages([]);
+      setStats({
+        todayAppointments: 0,
+        activePatients: 0,
+        unreadMessages: 0,
+        pendingSoapNotes: 0
+      });
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,7 +114,7 @@ const TherapistDashboard: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Today color="primary" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="primary">
-                4
+                {stats.todayAppointments}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Today's Appointments
@@ -98,7 +127,7 @@ const TherapistDashboard: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <People color="info" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="info.main">
-                24
+                {stats.activePatients}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Active Patients
@@ -109,11 +138,11 @@ const TherapistDashboard: React.FC = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <Badge badgeContent={2} color="error">
+              <Badge badgeContent={stats.unreadMessages} color="error">
                 <Message color="warning" sx={{ fontSize: 40, mb: 1 }} />
               </Badge>
               <Typography variant="h4" color="warning.main">
-                7
+                {stats.unreadMessages}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Unread Messages
@@ -126,7 +155,7 @@ const TherapistDashboard: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Assignment color="success" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="success.main">
-                3
+                {stats.pendingSoapNotes}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Pending SOAP Notes
@@ -157,29 +186,39 @@ const TherapistDashboard: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {todayAppointments.map((appointment) => (
-                      <TableRow key={appointment.id}>
-                        <TableCell>{appointment.time}</TableCell>
-                        <TableCell>{appointment.patient}</TableCell>
-                        <TableCell>{appointment.type}</TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={appointment.status} 
-                            color={getStatusColor(appointment.status) as any}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton size="small" color="primary">
-                            <Edit />
-                          </IconButton>
-                          <IconButton size="small" color="success">
-                            <VideoCall />
-                          </IconButton>
+                    {todayAppointments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                            No appointments scheduled for today
+                          </Typography>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      todayAppointments.map((appointment) => (
+                        <TableRow key={appointment.id}>
+                          <TableCell>{appointment.time}</TableCell>
+                          <TableCell>{appointment.patient}</TableCell>
+                          <TableCell>{appointment.type}</TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={appointment.status} 
+                              color={getStatusColor(appointment.status) as any}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell align="center">
+                            <IconButton size="small" color="primary">
+                              <Edit />
+                            </IconButton>
+                            <IconButton size="small" color="success">
+                              <VideoCall />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>

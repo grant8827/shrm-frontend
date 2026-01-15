@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -44,44 +44,49 @@ import {
 } from '@mui/icons-material';
 import { apiClient } from '../../services/apiClient';
 
-// Mock patient data
-const mockPatients = [
-  {
-    id: 1,
-    name: 'John Doe',
-    age: 34,
-    phone: '(555) 123-4567',
-    email: 'john.doe@email.com',
-    lastVisit: '2025-11-01',
-    status: 'active',
-    diagnosis: 'Anxiety Disorder',
-    nextAppointment: '2025-11-05'
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    age: 28,
-    phone: '(555) 234-5678',
-    email: 'jane.smith@email.com',
-    lastVisit: '2025-10-30',
-    status: 'active',
-    diagnosis: 'Depression',
-    nextAppointment: '2025-11-04'
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    age: 45,
-    phone: '(555) 345-6789',
-    email: 'mike.johnson@email.com',
-    lastVisit: '2025-10-28',
-    status: 'inactive',
-    diagnosis: 'PTSD',
-    nextAppointment: null
-  }
-];
-
 const PatientManagement: React.FC = () => {
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalPatients: 0,
+    activePatients: 0,
+    thisWeek: 0,
+    nextWeek: 0
+  });
+
+  useEffect(() => {
+    loadPatients();
+  }, []);
+
+  const loadPatients = async () => {
+    try {
+      // TODO: Replace with actual API endpoints
+      // const patientsRes = await apiClient.get('/patients/');
+      // const activeRes = await apiClient.get('/patients/?status=active');
+      // const thisWeekRes = await apiClient.get('/appointments/?week=current');
+      // const nextWeekRes = await apiClient.get('/appointments/?week=next');
+      
+      // setPatients(patientsRes.data);
+      // setStats({
+      //   totalPatients: patientsRes.data.length,
+      //   activePatients: activeRes.data.length,
+      //   thisWeek: thisWeekRes.data.length,
+      //   nextWeek: nextWeekRes.data.length
+      // });
+      
+      setPatients([]);
+      setStats({
+        totalPatients: 0,
+        activePatients: 0,
+        thisWeek: 0,
+        nextWeek: 0
+      });
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading patients:', error);
+      setLoading(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -102,7 +107,7 @@ const PatientManagement: React.FC = () => {
   
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const filteredPatients = mockPatients.filter(patient =>
+  const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.diagnosis.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -153,7 +158,7 @@ const PatientManagement: React.FC = () => {
         <Grid item xs={12} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="primary">24</Typography>
+              <Typography variant="h4" color="primary">{stats.totalPatients}</Typography>
               <Typography variant="body2">Total Patients</Typography>
             </CardContent>
           </Card>
@@ -161,7 +166,7 @@ const PatientManagement: React.FC = () => {
         <Grid item xs={12} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="success.main">22</Typography>
+              <Typography variant="h4" color="success.main">{stats.activePatients}</Typography>
               <Typography variant="body2">Active</Typography>
             </CardContent>
           </Card>
@@ -169,7 +174,7 @@ const PatientManagement: React.FC = () => {
         <Grid item xs={12} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="warning.main">8</Typography>
+              <Typography variant="h4" color="warning.main">{stats.thisWeek}</Typography>
               <Typography variant="body2">This Week</Typography>
             </CardContent>
           </Card>
@@ -177,7 +182,7 @@ const PatientManagement: React.FC = () => {
         <Grid item xs={12} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" color="info.main">15</Typography>
+              <Typography variant="h4" color="info.main">{stats.nextWeek}</Typography>
               <Typography variant="body2">Next Week</Typography>
             </CardContent>
           </Card>

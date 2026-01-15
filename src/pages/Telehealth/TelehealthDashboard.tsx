@@ -120,46 +120,10 @@ const TelehealthDashboard: React.FC = () => {
   const loadSessions = async () => {
     setLoading(true);
     try {
-      // Mock data - replace with actual API call
-      const mockSessions: TelehealthSession[] = [
-        {
-          id: '1',
-          title: 'Weekly Therapy Session',
-          patient: { id: '1', name: 'John Doe', avatar: '' },
-          therapist: { id: user?.id || '', name: user?.username || '' },
-          scheduledAt: new Date().toISOString(),
-          duration: 50,
-          status: 'scheduled',
-          sessionUrl: '/telehealth/session/1',
-          hasRecording: false,
-          hasTranscript: false,
-        },
-        {
-          id: '2',
-          title: 'Follow-up Consultation',
-          patient: { id: '2', name: 'Jane Smith', avatar: '' },
-          therapist: { id: user?.id || '', name: user?.username || '' },
-          scheduledAt: new Date(Date.now() + 3600000).toISOString(),
-          duration: 30,
-          status: 'scheduled',
-          sessionUrl: '/telehealth/session/2',
-          hasRecording: false,
-          hasTranscript: false,
-        },
-        {
-          id: '3',
-          title: 'Initial Assessment',
-          patient: { id: '3', name: 'Alice Johnson', avatar: '' },
-          therapist: { id: user?.id || '', name: user?.username || '' },
-          scheduledAt: new Date(Date.now() - 7200000).toISOString(),
-          duration: 60,
-          status: 'completed',
-          hasRecording: true,
-          hasTranscript: true,
-          notes: 'Session went well. Patient showed progress.',
-        },
-      ];
-      setSessions(mockSessions);
+      // TODO: Replace with actual API call to /api/telehealth/sessions/
+      // const response = await apiClient.get('/telehealth/sessions/');
+      // setSessions(response.data);
+      setSessions([]);
     } catch (error) {
       showError('Failed to load sessions');
     } finally {

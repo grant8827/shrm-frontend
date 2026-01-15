@@ -24,34 +24,6 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-// Mock appointments - matches the structure in AppointmentScheduling
-const mockAppointments = [
-  {
-    id: '1',
-    patientId: '1',
-    patientName: 'John Doe',
-    therapistName: 'Dr. Sarah Johnson',
-    date: '2024-01-15',
-    time: '14:00',
-    type: 'Initial Consultation',
-    status: 'scheduled',
-    notes: '',
-    isVirtual: false,
-  },
-  {
-    id: '2',
-    patientId: '2',
-    patientName: 'Jane Smith',
-    therapistName: 'Dr. Michael Chen',
-    date: '2024-01-16',
-    time: '10:00',
-    type: 'Follow-up Session',
-    status: 'scheduled',
-    notes: '',
-    isVirtual: true,
-  },
-];
-
 const ClientDashboard: React.FC = () => {
   const { state } = useAuth();
   const navigate = useNavigate();
@@ -61,20 +33,16 @@ const ClientDashboard: React.FC = () => {
 
   // Load appointments on mount and set up auto-refresh
   useEffect(() => {
-    const loadAppointments = () => {
-      // Filter appointments for current user (match by ID or name)
-      const userAppointments = mockAppointments.filter(apt => {
-        // Match by patient ID
-        if (apt.patientId === state.user?.id) return true;
+    const loadAppointments = async () => {
+      try {
+        // TODO: Replace with actual API call
+        // const response = await apiClient.get('/appointments/');
+        // const allAppointments = response.data;
         
-        // Fallback: Match by patient name (for mock data compatibility)
-        const fullName = `${state.user?.firstName} ${state.user?.lastName}`.trim();
-        if (apt.patientName === fullName) return true;
-        
-        return false;
-      });
-
-      // Filter to upcoming appointments only
+        // For now, show empty state
+        const userAppointments: any[] = [];
+      
+        // Filter to upcoming appointments only
       const now = new Date();
       const upcoming = userAppointments.filter(apt => {
         const appointmentDate = new Date(`${apt.date}T${apt.time}`);
@@ -88,6 +56,12 @@ const ClientDashboard: React.FC = () => {
       setAppointments(upcoming);
       setNextAppointment(upcoming[0] || null);
       setLoadingAppointments(false);
+      } catch (error) {
+        console.error('Failed to load appointments:', error);
+        setAppointments([]);
+        setNextAppointment(null);
+        setLoadingAppointments(false);
+      }
     };
 
     loadAppointments();

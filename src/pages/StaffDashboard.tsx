@@ -88,67 +88,36 @@ const StaffDashboard: React.FC = () => {
   const [, _setLoading] = useState(false);
   const [, setSelectedPatient] = useState<Patient | null>(null);
   const [, setDialogOpen] = useState<'patient' | 'appointment' | 'notes' | null>(null);
+  const [stats, setStats] = useState({
+    todayAppointments: 0,
+    activePatients: 0,
+    pendingNotes: 0,
+    newMessages: 0
+  });
 
-  // Mock data - replace with actual API calls
+  // Load data from API
   useEffect(() => {
-    const mockPatients: Patient[] = [
-      {
-        id: '1',
-        first_name: 'Sarah',
-        last_name: 'Johnson',
-        email: 'sarah.j@email.com',
-        phone: '(555) 123-4567',
-        date_of_birth: '1985-03-15',
-        insurance_number: 'INS123456789',
-        emergency_contact: 'Mike Johnson - (555) 987-6543',
-        last_session: '2025-01-14T10:00:00Z',
-        next_appointment: '2025-01-21T10:00:00Z',
-        diagnosis: 'Anxiety Disorder',
-        treatment_plan: 'CBT Sessions - 12 weeks',
-        status: 'active',
-      },
-      {
-        id: '2',
-        first_name: 'David',
-        last_name: 'Chen',
-        email: 'david.chen@email.com',
-        phone: '(555) 234-5678',
-        date_of_birth: '1978-09-22',
-        insurance_number: 'INS987654321',
-        emergency_contact: 'Lisa Chen - (555) 876-5432',
-        last_session: '2025-01-13T14:30:00Z',
-        next_appointment: '2025-01-20T14:30:00Z',
-        diagnosis: 'Depression',
-        treatment_plan: 'Individual Therapy - Ongoing',
-        status: 'active',
-      },
-    ];
-
-    const mockAppointments: Appointment[] = [
-      {
-        id: '1',
-        patient: mockPatients[0],
-        date: '2025-01-17',
-        time: '10:00',
-        duration: 60,
-        type: 'in-person',
-        status: 'scheduled',
-        session_type: 'individual',
-      },
-      {
-        id: '2',
-        patient: mockPatients[1],
-        date: '2025-01-17',
-        time: '14:30',
-        duration: 50,
-        type: 'telehealth',
-        status: 'scheduled',
-        session_type: 'individual',
-      },
-    ];
-
-    setPatients(mockPatients);
-    setAppointments(mockAppointments);
+    const loadData = async () => {
+      try {
+        // TODO: Load from actual API
+        // const patientsResponse = await apiClient.get('/patients/');
+        // const appointmentsResponse = await apiClient.get('/appointments/');
+        // const soapNotesResponse = await apiClient.get('/soap-notes/?status=pending');
+        // const messagesResponse = await apiClient.get('/messages/?unread=true');
+        
+        setPatients([]);
+        setAppointments([]);
+        setStats({
+          todayAppointments: 0,
+          activePatients: 0,
+          pendingNotes: 0,
+          newMessages: 0
+        });
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      }
+    };
+    loadData();
   }, []);
 
   const DashboardOverview = () => {
@@ -169,7 +138,7 @@ const StaffDashboard: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Today color="primary" />
                   <Box sx={{ ml: 2 }}>
-                    <Typography variant="h6">{todaysAppointments.length}</Typography>
+                    <Typography variant="h6">{stats.todayAppointments}</Typography>
                     <Typography variant="body2" color="textSecondary">
                       Today's Appointments
                     </Typography>
@@ -185,7 +154,7 @@ const StaffDashboard: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <PatientIcon color="success" />
                   <Box sx={{ ml: 2 }}>
-                    <Typography variant="h6">{patients.filter(p => p.status === 'active').length}</Typography>
+                    <Typography variant="h6">{stats.activePatients}</Typography>
                     <Typography variant="body2" color="textSecondary">
                       Active Patients
                     </Typography>
@@ -201,7 +170,7 @@ const StaffDashboard: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <NotesIcon color="warning" />
                   <Box sx={{ ml: 2 }}>
-                    <Typography variant="h6">3</Typography>
+                    <Typography variant="h6">{stats.pendingNotes}</Typography>
                     <Typography variant="body2" color="textSecondary">
                       Pending Notes
                     </Typography>
@@ -217,7 +186,7 @@ const StaffDashboard: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <MessageIcon color="info" />
                   <Box sx={{ ml: 2 }}>
-                    <Typography variant="h6">2</Typography>
+                    <Typography variant="h6">{stats.newMessages}</Typography>
                     <Typography variant="body2" color="textSecondary">
                       New Messages
                     </Typography>
@@ -233,40 +202,46 @@ const StaffDashboard: React.FC = () => {
           <Typography variant="h6" sx={{ mb: 2 }}>
             Today's Schedule
           </Typography>
-          <List>
-            {todaysAppointments.map(appointment => (
-              <ListItem key={appointment.id} divider>
-                <ListItemIcon>
-                  <Avatar sx={{ bgcolor: appointment.type === 'telehealth' ? 'primary.main' : 'success.main' }}>
-                    {appointment.type === 'telehealth' ? <TelehealthIcon /> : <PatientIcon />}
-                  </Avatar>
-                </ListItemIcon>
-                <ListItemText
-                  primary={`${appointment.patient.first_name} ${appointment.patient.last_name}`}
-                  secondary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography variant="body2">
-                        {appointment.time} - {appointment.duration} min
-                      </Typography>
-                      <Chip 
-                        label={appointment.session_type} 
-                        size="small" 
-                        variant="outlined"
-                      />
-                      <Chip 
-                        label={appointment.type} 
-                        size="small" 
-                        color={appointment.type === 'telehealth' ? 'primary' : 'success'}
-                      />
-                    </Box>
-                  }
-                />
-                <IconButton>
-                  <ViewIcon />
-                </IconButton>
-              </ListItem>
-            ))}
-          </List>
+          {todaysAppointments.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
+              No appointments scheduled for today
+            </Typography>
+          ) : (
+            <List>
+              {todaysAppointments.map(appointment => (
+                <ListItem key={appointment.id} divider>
+                  <ListItemIcon>
+                    <Avatar sx={{ bgcolor: appointment.type === 'telehealth' ? 'primary.main' : 'success.main' }}>
+                      {appointment.type === 'telehealth' ? <TelehealthIcon /> : <PatientIcon />}
+                    </Avatar>
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`${appointment.patient.first_name} ${appointment.patient.last_name}`}
+                    secondary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography variant="body2">
+                          {appointment.time} - {appointment.duration} min
+                        </Typography>
+                        <Chip 
+                          label={appointment.session_type} 
+                          size="small" 
+                          variant="outlined"
+                        />
+                        <Chip 
+                          label={appointment.type} 
+                          size="small" 
+                          color={appointment.type === 'telehealth' ? 'primary' : 'success'}
+                        />
+                      </Box>
+                    }
+                  />
+                  <IconButton>
+                    <ViewIcon />
+                  </IconButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
         </Paper>
       </Box>
     );

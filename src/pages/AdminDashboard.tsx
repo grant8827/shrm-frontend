@@ -58,6 +58,7 @@ import {
 } from '@mui/icons-material';
 import { User, Patient, Appointment } from '../types';
 import ReportsSection from '../components/Reports/ReportsSection';
+import { apiClient } from '../services/apiClient';
 // import { authService } from '../../services/authService_new';
 
 interface DashboardStats {
@@ -71,6 +72,24 @@ interface DashboardStats {
   monthlyRevenue: number;
   systemAlerts: number;
   failedLogins: number;
+  activeStaff?: number;
+}
+
+interface SystemAlert {
+  id: string;
+  type: 'warning' | 'error' | 'success' | 'info';
+  title: string;
+  description: string;
+  timestamp: string;
+}
+
+interface ActivityLog {
+  id: string;
+  type: 'user' | 'patient' | 'appointment' | 'system';
+  action: string;
+  description: string;
+  timestamp: string;
+  user?: string;
 }
 
 interface AdminDashboardProps {
@@ -87,6 +106,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [_selectedUser, _setSelectedUser] = useState<User | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
   // Load dashboard data
   useEffect(() => {
@@ -98,53 +119,125 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       setLoading(true);
       setError(null);
 
-      // Simulate API calls - replace with actual API calls
-      const mockStats: DashboardStats = {
-        totalUsers: 45,
-        activeUsers: 42,
-        totalPatients: 150,
-        activePatients: 138,
-        todayAppointments: 23,
-        pendingAppointments: 8,
-        totalRevenue: 125000,
-        monthlyRevenue: 18500,
-        systemAlerts: 3,
-        failedLogins: 12,
+      // Fetch real data from API
+      const usersRes = await apiClient.get('/api/users/');
+      const patientsRes = await apiClient.get('/api/patients/');
+      
+      // Handle both paginated and non-paginated responses
+      const allUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results || []);
+      const allPatients = Array.isArray(patientsRes.data) ? patientsRes.data : (patientsRes.data?.results || []);
+      
+      console.log('Users from API:', allUsers);
+      console.log('Patients from API:', allPatients);
+      
+      // Calculate stats from real data
+      const activeUsers = allUsers.filter((u: any) => u.is_active === true).length;
+      const activePatients = allPatients.filter((p: any) => p.status === 'active').length;
+      const activeStaff = allUsers.filter((u: any) => 
+        u.is_active === true && (u.role === 'therapist' || u.role === 'staff')
+      ).length;
+      
+      console.log('Active staff count:', activeStaff);
+      console.log('Staff breakdown:', {
+        therapists: allUsers.filter((u: any) => u.is_active && u.role === 'therapist').length,
+        staff: allUsers.filter((u: any) => u.is_active && u.role === 'staff').length,
+      });
+      
+      // Get today's date for filtering appointments
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Note: Appointments endpoint may not be fully implemented yet
+      let todayAppointments = 0;
+      let pendingAppointments = 0;
+      try {
+        const appointmentsRes = await apiClient.get('/api/appointments/');
+        const allAppointments = Array.isArray(appointmentsRes.data) 
+          ? appointmentsRes.data 
+          : (appointmentsRes.data?.results || []);
+        
+        console.log('Appointments from API:', allAppointments);
+        
+        todayAppointments = allAppointments.filter((apt: any) => {
+          const aptDate = new Date(apt.start_datetime);
+          return aptDate >= today && aptDate < tomorrow;
+        }).length;
+        
+        pendingAppointments = allAppointments.filter((apt: any) => 
+          apt.status === 'scheduled' || apt.status === 'confirmed'
+        ).length;
+      } catch (aptErr) {
+        console.warn('Appointments endpoint not available:', aptErr);
+      }
+      
+      const dashboardStats: DashboardStats = {
+        totalUsers: allUsers.length,
+        activeUsers: activeUsers,
+        totalPatients: allPatients.length,
+        activePatients: activePatients,
+        todayAppointments: todayAppointments,
+        pendingAppointments: pendingAppointments,
+        totalRevenue: 0, // No revenue data yet
+        monthlyRevenue: 0, // No revenue data yet
+        systemAlerts: 0, // No alerts yet
+        failedLogins: 0, // No failed logins tracked yet
+        activeStaff: activeStaff,
       };
 
-      setStats(mockStats);
+      console.log('Dashboard stats calculated:', dashboardStats);
 
-      // Load recent users, patients, appointments
-      // These would be actual API calls in production
-      _setUsers([]);
-      _setPatients([]);
+      setStats(dashboardStats);
+      setSystemAlerts([]);
+      setRecentActivity([]);
+
+      // Load recent users, patients, appointments for display
+      _setUsers(allUsers.slice(0, 10));
+      _setPatients(allPatients.slice(0, 10));
       _setAppointments([]);
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard data');
+      console.error('Error loading dashboard data:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUserAction = async (action: string, _userId: string) => {
+  const handleUserAction = async (action: string, userId: string) => {
     try {
       switch (action) {
         case 'edit':
-          // Open edit user dialog
+          // Find and set the selected user, then open dialog
+          const userToEdit = _users.find(u => u.id === userId);
+          if (userToEdit) {
+            _setSelectedUser(userToEdit);
+            setUserDialogOpen(true);
+          }
           break;
         case 'lock':
           // Lock user account
+          if (window.confirm('Are you sure you want to lock this user account?')) {
+            await apiClient.post(`/api/users/${userId}/lock/`);
+            await loadDashboardData();
+          }
           break;
         case 'unlock':
           // Unlock user account
+          await apiClient.post(`/api/users/${userId}/unlock/`);
+          await loadDashboardData();
           break;
         case 'delete':
           // Deactivate user account
+          if (window.confirm('Are you sure you want to deactivate this user account?')) {
+            await apiClient.delete(`/api/users/${userId}/`);
+            await loadDashboardData();
+          }
           break;
       }
-      await loadDashboardData();
     } catch (err: any) {
-      setError(err.message || 'Action failed');
+      console.error('Action error:', err);
+      setError(err.response?.data?.detail || err.message || 'Action failed');
     }
   };
 
@@ -153,7 +246,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     value: number | string;
     trend?: 'up' | 'down';
     trendValue?: string;
-    color?: 'primary' | 'secondary' | 'error' | 'warning' | 'success';
+    color?: 'primary' | 'secondary' | 'error' | 'warning' | 'success' | 'info';
     icon: React.ReactNode;
   }> = ({ title, value, trend, trendValue, color = 'primary', icon }) => (
     <Card sx={{ height: '100%' }}>
@@ -199,8 +292,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           <StatsCard
             title="Total Users"
             value={stats?.totalUsers || 0}
-            trend="up"
-            trendValue="+5 this week"
             color="primary"
             icon={<PeopleIcon />}
           />
@@ -209,8 +300,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           <StatsCard
             title="Active Patients"
             value={stats?.activePatients || 0}
-            trend="up"
-            trendValue="+12 this month"
             color="success"
             icon={<Group />}
           />
@@ -227,10 +316,44 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           <StatsCard
             title="Monthly Revenue"
             value={`$${(stats?.monthlyRevenue || 0).toLocaleString()}`}
-            trend="up"
-            trendValue="+8.5%"
             color="success"
             icon={<BillingIcon />}
+          />
+        </Grid>
+      </Grid>
+
+      {/* Secondary Stats */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatsCard
+            title="Active Staff"
+            value={stats?.activeStaff || 0}
+            color="info"
+            icon={<PeopleIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatsCard
+            title="Total Revenue"
+            value={`$${(stats?.totalRevenue || 0).toLocaleString()}`}
+            color="success"
+            icon={<BillingIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatsCard
+            title="System Alerts"
+            value={stats?.systemAlerts || 0}
+            color="error"
+            icon={<NotificationsIcon />}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatsCard
+            title="Pending Appointments"
+            value={stats?.pendingAppointments || 0}
+            color="warning"
+            icon={<Schedule />}
           />
         </Grid>
       </Grid>
@@ -246,35 +369,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 <Box />
               </Badge>
             </Typography>
-            <List>
-              <ListItem>
-                <ListItemIcon>
-                  <Warning color="warning" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Database backup overdue"
-                  secondary="Last backup: 2 days ago"
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <SecurityIcon color="error" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Multiple failed login attempts"
-                  secondary={`${stats?.failedLogins || 0} attempts in the last hour`}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <CheckCircle color="success" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="HIPAA audit completed"
-                  secondary="No issues found"
-                />
-              </ListItem>
-            </List>
+            {systemAlerts.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                No active alerts
+              </Typography>
+            ) : (
+              <List>
+                {systemAlerts.map((alert) => (
+                  <ListItem key={alert.id}>
+                    <ListItemIcon>
+                      {alert.type === 'error' && <SecurityIcon color="error" />}
+                      {alert.type === 'warning' && <Warning color="warning" />}
+                      {alert.type === 'success' && <CheckCircle color="success" />}
+                      {alert.type === 'info' && <NotificationsIcon color="info" />}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={alert.title}
+                      secondary={alert.description}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
           </Paper>
         </Grid>
 
@@ -284,35 +400,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             <Typography variant="h6" sx={{ mb: 2 }}>
               Recent Activity
             </Typography>
-            <List>
-              <ListItem>
-                <ListItemIcon>
-                  <PersonAddIcon color="primary" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="New user registered"
-                  secondary="Dr. Sarah Johnson - Therapist"
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <EditIcon color="info" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Patient record updated"
-                  secondary="John Doe - Insurance information"
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemIcon>
-                  <Schedule color="warning" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Appointment scheduled"
-                  secondary="8 new appointments today"
-                />
-              </ListItem>
-            </List>
+            {recentActivity.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                No recent activity
+              </Typography>
+            ) : (
+              <List>
+                {recentActivity.map((activity) => (
+                  <ListItem key={activity.id}>
+                    <ListItemIcon>
+                      {activity.type === 'user' && <PersonAddIcon color="primary" />}
+                      {activity.type === 'patient' && <EditIcon color="info" />}
+                      {activity.type === 'appointment' && <Schedule color="warning" />}
+                      {activity.type === 'system' && <SecurityIcon color="error" />}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={activity.action}
+                      secondary={activity.description}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
           </Paper>
         </Grid>
       </Grid>
@@ -344,38 +453,63 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {/* Mock data - replace with actual user data */}
-            <TableRow>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ mr: 2 }}>JD</Avatar>
-                  <Box>
-                    <Typography variant="subtitle2">John Doe</Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      john.doe@theracare.com
-                    </Typography>
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell>
-                <Chip label="Admin" color="primary" size="small" />
-              </TableCell>
-              <TableCell>
-                <Chip label="Active" color="success" size="small" />
-              </TableCell>
-              <TableCell>2 hours ago</TableCell>
-              <TableCell>
-                <IconButton onClick={() => handleUserAction('edit', '1')}>
-                  <EditIcon />
-                </IconButton>
-                <IconButton onClick={() => handleUserAction('lock', '1')}>
-                  <LockIcon />
-                </IconButton>
-                <IconButton>
-                  <MoreIcon />
-                </IconButton>
-              </TableCell>
-            </TableRow>
+            {_users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                    No users found
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              _users.map((user: any) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar sx={{ mr: 2 }}>
+                        {user.full_name 
+                          ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() 
+                          : user.username.substring(0, 2).toUpperCase()}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle2">{user.full_name || user.username}</Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          {user.email}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} 
+                      color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'} 
+                      size="small" 
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={user.is_active ? 'Active' : 'Inactive'} 
+                      color={user.is_active ? 'success' : 'default'} 
+                      size="small" 
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                  </TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
+                      <LockIcon />
+                    </IconButton>
+                    <IconButton size="small">
+                      <MoreIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

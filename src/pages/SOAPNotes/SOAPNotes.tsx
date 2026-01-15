@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -31,36 +31,45 @@ import {
   Save,
   Cancel
 } from '@mui/icons-material';
-
-// Mock data for SOAP notes
-const mockSOAPNotes = [
-  {
-    id: 1,
-    patientName: 'John Doe',
-    date: '2025-11-03',
-    sessionType: 'Individual Therapy',
-    status: 'completed',
-    lastModified: '2025-11-03 10:30 AM'
-  },
-  {
-    id: 2,
-    patientName: 'Jane Smith',
-    date: '2025-11-03',
-    sessionType: 'Initial Assessment',
-    status: 'draft',
-    lastModified: '2025-11-03 11:45 AM'
-  },
-  {
-    id: 3,
-    patientName: 'Mike Johnson',
-    date: '2025-11-02',
-    sessionType: 'Group Therapy',
-    status: 'pending',
-    lastModified: '2025-11-02 4:15 PM'
-  }
-];
+import { apiClient } from '../../services/apiClient';
 
 const SOAPNotes: React.FC = () => {
+  const [soapNotes, setSoapNotes] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    completedThisWeek: 0,
+    draftNotes: 0,
+    overdueNotes: 0
+  });
+
+  useEffect(() => {
+    loadSOAPNotes();
+  }, []);
+
+  const loadSOAPNotes = async () => {
+    try {
+      // TODO: Replace with actual API endpoints
+      // const notesRes = await apiClient.get('/soap-notes/');
+      // const thisWeekRes = await apiClient.get('/soap-notes/?status=completed&week=current');
+      // const draftRes = await apiClient.get('/soap-notes/?status=draft');
+      // const overdueRes = await apiClient.get('/soap-notes/?overdue=true');
+      
+      // setSoapNotes(notesRes.data);
+      // setStats({
+      //   completedThisWeek: thisWeekRes.data.length,
+      //   draftNotes: draftRes.data.length,
+      //   overdueNotes: overdueRes.data.length
+      // });
+      
+      setSoapNotes([]);
+      setStats({
+        completedThisWeek: 0,
+        draftNotes: 0,
+        overdueNotes: 0
+      });
+    } catch (error) {
+      console.error('Error loading SOAP notes:', error);
+    }
+  };
   const [open, setOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<any>(null);
   const [soapData, setSoapData] = useState({
@@ -127,7 +136,7 @@ const SOAPNotes: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Assignment color="success" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="success.main">
-                12
+                {stats.completedThisWeek}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Completed This Week
@@ -140,7 +149,7 @@ const SOAPNotes: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Edit color="warning" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="warning.main">
-                3
+                {stats.draftNotes}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Draft Notes
@@ -153,7 +162,7 @@ const SOAPNotes: React.FC = () => {
             <CardContent sx={{ textAlign: 'center' }}>
               <Schedule color="error" sx={{ fontSize: 40, mb: 1 }} />
               <Typography variant="h4" color="error.main">
-                2
+                {stats.overdueNotes}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Overdue Notes
@@ -178,7 +187,16 @@ const SOAPNotes: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {mockSOAPNotes.map((note) => (
+              {soapNotes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 4 }}>
+                      No SOAP notes found. Create your first note to get started.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                soapNotes.map((note) => (
                 <TableRow key={note.id}>
                   <TableCell>{note.date}</TableCell>
                   <TableCell>{note.patientName}</TableCell>
@@ -205,7 +223,8 @@ const SOAPNotes: React.FC = () => {
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
