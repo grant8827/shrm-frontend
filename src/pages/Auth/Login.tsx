@@ -171,9 +171,6 @@ const Login: React.FC = () => {
 
           {/* Additional Actions */}
           <Box textAlign="center">
-            <Link href="/register" variant="body2" sx={{ display: 'block', mb: 1 }}>
-              Don't have an account? Create one
-            </Link>
             <Link href="#" variant="body2" sx={{ display: 'block', mb: 1 }}>
               Forgot your password?
             </Link>
