@@ -165,7 +165,7 @@ export const Layout: React.FC = () => {
     <div>
       <Toolbar>
         <Typography variant="h6" noWrap component="div" color="primary">
-          TheraCare
+          SafeHaven EHR
         </Typography>
       </Toolbar>
       <Divider />
@@ -206,7 +206,7 @@ export const Layout: React.FC = () => {
           </IconButton>
           
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            TheraCare EHR System
+            SafeHaven EHR System
           </Typography>
 
           {/* Notifications */}

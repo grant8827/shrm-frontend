@@ -88,7 +88,7 @@ const Login: React.FC = () => {
           {/* Header */}
           <Box textAlign="center" mb={4}>
             <Typography variant="h4" component="h1" gutterBottom color="primary">
-              TheraCare
+              SafeHaven EHR
             </Typography>
             <Typography variant="h6" component="h2" color="text.secondary">
               Secure EHR Login

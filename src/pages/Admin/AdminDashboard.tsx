@@ -157,7 +157,7 @@ const AdminDashboard: React.FC = () => {
             Admin Dashboard
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Welcome, {state.user?.firstName || (state.user as any)?.first_name || 'Administrator'}! Manage your TheraCare system efficiently.
+            Welcome, {state.user?.firstName || (state.user as any)?.first_name || 'Administrator'}! Manage your SafeHaven EHR system efficiently.
           </Typography>
         </Box>
       </Box>

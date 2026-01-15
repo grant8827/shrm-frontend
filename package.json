@@ -1,7 +1,7 @@
 {
   "name": "theracare-frontend",
   "version": "1.0.0",
-  "description": "TheraCare Frontend - React TypeScript EHR Application",
+  "description": "SafeHaven EHR Frontend - React TypeScript EHR Application",
   "private": true,
   "dependencies": {
     "@types/node": "^20.10.0",
