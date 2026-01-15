@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 // Contexts
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 
 // Components
@@ -15,7 +15,7 @@ import { Layout } from './components/Layout/Layout';
 // Pages
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
-import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import TherapistDashboard from './pages/Therapist/TherapistDashboard';
 import ClientDashboard from './pages/Client/ClientDashboard';
 import Documents from './pages/Client/Documents';
@@ -39,6 +39,23 @@ import { Unauthorized } from './components/Unauthorized';
 
 // Styles
 import { theme } from './utils/theme';
+
+// Helper component to pass user to AdminDashboard
+function AdminRoutes() {
+  const { state } = useAuth();
+  
+  return (
+    <Routes>
+      <Route index element={<AdminDashboard user={state.user!} />} />
+      <Route path="billing" element={<Billing />} />
+      <Route path="patients" element={<AdminPatientManagement />} />
+      <Route path="appointments" element={<AppointmentScheduling />} />
+      <Route path="staff" element={<div>Staff Management</div>} />
+      <Route path="reports" element={<Reports />} />
+      <Route path="settings" element={<AdminSettings />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
@@ -68,15 +85,7 @@ function App() {
                     path="/admin/*"
                     element={
                       <ProtectedRoute requiredRole="admin">
-                        <Routes>
-                          <Route index element={<AdminDashboard />} />
-                          <Route path="billing" element={<Billing />} />
-                          <Route path="patients" element={<AdminPatientManagement />} />
-                          <Route path="appointments" element={<AppointmentScheduling />} />
-                          <Route path="staff" element={<div>Staff Management</div>} />
-                          <Route path="reports" element={<Reports />} />
-                          <Route path="settings" element={<AdminSettings />} />
-                        </Routes>
+                        <AdminRoutes />
                       </ProtectedRoute>
                     }
                   />

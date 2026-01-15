@@ -96,6 +96,16 @@ interface AdminDashboardProps {
   user: User;
 }
 
+interface UserUpdateData {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  username?: string;
+  role?: string;
+  phone_number?: string;
+  is_active?: boolean;
+}
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -106,6 +116,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [_selectedUser, _setSelectedUser] = useState<User | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editUserData, setEditUserData] = useState<UserUpdateData>({});
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
@@ -120,8 +131,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       setError(null);
 
       // Fetch real data from API
-      const usersRes = await apiClient.get('/api/users/');
-      const patientsRes = await apiClient.get('/api/patients/');
+      const usersRes = await apiClient.get('/auth/');
+      const patientsRes = await apiClient.get('/patients/');
       
       // Handle both paginated and non-paginated responses
       const allUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results || []);
@@ -153,7 +164,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       let todayAppointments = 0;
       let pendingAppointments = 0;
       try {
-        const appointmentsRes = await apiClient.get('/api/appointments/');
+        const appointmentsRes = await apiClient.get('/appointments/');
         const allAppointments = Array.isArray(appointmentsRes.data) 
           ? appointmentsRes.data 
           : (appointmentsRes.data?.results || []);
@@ -190,7 +201,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
       setStats(dashboardStats);
       setSystemAlerts([]);
-      setRecentActivity([]);
+      
+      // Mock recent activity data for testing
+      const mockActivity: ActivityLog[] = [
+        {
+          id: '1',
+          type: 'user',
+          action: 'New user registered',
+          description: 'Toni Grant registered as therapist',
+          timestamp: new Date().toISOString(),
+          user: 'System'
+        },
+        {
+          id: '2',
+          type: 'patient',
+          action: 'Patient record updated',
+          description: 'Medical history updated for patient',
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+          user: 'Dr. Grant'
+        },
+        {
+          id: '3',
+          type: 'appointment',
+          action: 'Appointment scheduled',
+          description: 'New appointment created for tomorrow',
+          timestamp: new Date(Date.now() - 7200000).toISOString(),
+          user: 'Reception'
+        },
+        {
+          id: '4',
+          type: 'system',
+          action: 'Security update',
+          description: 'Password policy updated',
+          timestamp: new Date(Date.now() - 86400000).toISOString(),
+          user: 'Admin'
+        }
+      ];
+      setRecentActivity(mockActivity);
 
       // Load recent users, patients, appointments for display
       _setUsers(allUsers.slice(0, 10));
@@ -204,6 +251,37 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     }
   };
 
+  const handleSaveUser = async () => {
+    try {
+      if (_selectedUser) {
+        // Update existing user - only send fields that can be updated
+        const updateData: any = {};
+        
+        // Only include fields that have actually changed
+        if (editUserData.role !== undefined) updateData.role = editUserData.role;
+        if (editUserData.is_active !== undefined) updateData.is_active = editUserData.is_active;
+        if (editUserData.phone_number !== undefined) updateData.phone_number = editUserData.phone_number;
+        
+        console.log('Updating user with data:', updateData);
+        
+        // Use PATCH for partial update
+        await apiClient.patch(`/auth/${_selectedUser.id}/`, updateData);
+      } else {
+        // Create new user
+        await apiClient.post('/auth/register/', editUserData);
+      }
+      setUserDialogOpen(false);
+      _setSelectedUser(null);
+      setEditUserData({});
+      await loadDashboardData();
+    } catch (err: any) {
+      console.error('Save user error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error data:', err.response?.data);
+      setError(err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data) || err.message || 'Failed to save user');
+    }
+  };
+
   const handleUserAction = async (action: string, userId: string) => {
     try {
       switch (action) {
@@ -212,25 +290,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           const userToEdit = _users.find(u => u.id === userId);
           if (userToEdit) {
             _setSelectedUser(userToEdit);
+            setEditUserData({
+              first_name: (userToEdit as any).first_name || userToEdit.firstName,
+              last_name: (userToEdit as any).last_name || userToEdit.lastName,
+              email: userToEdit.email,
+              username: userToEdit.username,
+              role: userToEdit.role,
+              phone_number: (userToEdit as any).phone_number,
+              is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
+            });
             setUserDialogOpen(true);
           }
           break;
         case 'lock':
           // Lock user account
           if (window.confirm('Are you sure you want to lock this user account?')) {
-            await apiClient.post(`/api/users/${userId}/lock/`);
+            await apiClient.post(`/auth/${userId}/lock/`);
             await loadDashboardData();
           }
           break;
         case 'unlock':
           // Unlock user account
-          await apiClient.post(`/api/users/${userId}/unlock/`);
+          await apiClient.post(`/auth/${userId}/unlock/`);
           await loadDashboardData();
           break;
         case 'delete':
           // Deactivate user account
           if (window.confirm('Are you sure you want to deactivate this user account?')) {
-            await apiClient.delete(`/api/users/${userId}/`);
+            await apiClient.delete(`/auth/${userId}/`);
             await loadDashboardData();
           }
           break;
@@ -407,7 +494,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             ) : (
               <List>
                 {recentActivity.map((activity) => (
-                  <ListItem key={activity.id}>
+                  <ListItem 
+                    key={activity.id}
+                    secondaryAction={
+                      <IconButton 
+                        edge="end" 
+                        aria-label="view"
+                        onClick={() => {
+                          // Handle view action based on activity type
+                          if (activity.type === 'user') {
+                            setActiveTab(1); // Switch to User Management tab
+                          } else if (activity.type === 'patient') {
+                            // Navigate to patient details
+                            console.log('View patient:', activity);
+                          } else if (activity.type === 'appointment') {
+                            // Navigate to appointment details
+                            console.log('View appointment:', activity);
+                          }
+                        }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    }
+                  >
                     <ListItemIcon>
                       {activity.type === 'user' && <PersonAddIcon color="primary" />}
                       {activity.type === 'patient' && <EditIcon color="info" />}
@@ -435,7 +544,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         <Button
           variant="contained"
           startIcon={<PersonAddIcon />}
-          onClick={() => setUserDialogOpen(true)}
+          onClick={() => {
+            _setSelectedUser(null);
+            setEditUserData({});
+            setUserDialogOpen(true);
+          }}
         >
           Add User
         </Button>
@@ -632,9 +745,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
       {tabPanels[activeTab]?.component}
 
-      {/* Add User Dialog */}
-      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Add New User</DialogTitle>
+      {/* Add/Edit User Dialog */}
+      <Dialog open={userDialogOpen} onClose={() => {
+        setUserDialogOpen(false);
+        _setSelectedUser(null);
+        setEditUserData({});
+      }} maxWidth="md" fullWidth>
+        <DialogTitle>{_selectedUser ? 'Edit User' : 'Add New User'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
@@ -642,6 +759,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 fullWidth
                 label="First Name"
                 variant="outlined"
+                value={editUserData.first_name || ''}
+                disabled
+                helperText="Cannot be edited (backend limitation)"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -649,6 +769,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 fullWidth
                 label="Last Name"
                 variant="outlined"
+                value={editUserData.last_name || ''}
+                disabled
+                helperText="Cannot be edited (backend limitation)"
               />
             </Grid>
             <Grid item xs={12}>
@@ -657,6 +780,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 label="Email"
                 type="email"
                 variant="outlined"
+                value={editUserData.email || ''}
+                disabled
+                helperText="Cannot be edited (backend limitation)"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -664,12 +790,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 fullWidth
                 label="Username"
                 variant="outlined"
+                value={editUserData.username || ''}
+                onChange={(e) => setEditUserData({ ...editUserData, username: e.target.value })}
+                disabled={!!_selectedUser}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
-                <Select label="Role">
+                <Select 
+                  label="Role"
+                  value={editUserData.role || ''}
+                  onChange={(e) => setEditUserData({ ...editUserData, role: e.target.value as any })}
+                >
                   <MenuItem value="admin">Admin</MenuItem>
                   <MenuItem value="therapist">Therapist</MenuItem>
                   <MenuItem value="staff">Staff</MenuItem>
@@ -682,13 +815,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 fullWidth
                 label="Phone Number"
                 variant="outlined"
+                value={editUserData.phone_number || ''}
+                onChange={(e) => setEditUserData({ ...editUserData, phone_number: e.target.value })}
               />
             </Grid>
+            {_selectedUser && (
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <Box display="flex" alignItems="center">
+                    <Typography>Active Status:</Typography>
+                    <Switch
+                      checked={editUserData.is_active ?? true}
+                      onChange={(e) => setEditUserData({ ...editUserData, is_active: e.target.checked })}
+                    />
+                    <Typography>{editUserData.is_active ? 'Active' : 'Inactive'}</Typography>
+                  </Box>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUserDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained">Create User</Button>
+          <Button onClick={() => {
+            setUserDialogOpen(false);
+            _setSelectedUser(null);
+            setEditUserData({});
+          }}>Cancel</Button>
+          <Button variant="contained" onClick={handleSaveUser}>
+            {_selectedUser ? 'Save Changes' : 'Create User'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

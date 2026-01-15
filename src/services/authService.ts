@@ -122,10 +122,8 @@ class AuthService {
    */
   async validateToken(token: string): Promise<User | null> {
     try {
-      const response = await apiService.get<User>('/auth/validate', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await apiService.post<User>('/auth/validate', {
+        token,
       });
       
       if (response.success && response.data) {
