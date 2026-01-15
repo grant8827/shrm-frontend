@@ -149,7 +149,7 @@ const cptCodes = [
 const Billing: React.FC = () => {
   const { state } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [billingStats, setBillingStats] = useState({
+  const [billingStats] = useState({
     monthlyRevenue: 0,
     totalOutstanding: 0,
     averageCollectionTime: 0,

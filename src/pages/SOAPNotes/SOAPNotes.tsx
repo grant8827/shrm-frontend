@@ -31,7 +31,7 @@ import {
   Save,
   Cancel
 } from '@mui/icons-material';
-import { apiClient } from '../../services/apiClient';
+// import { apiClient } from '../../services/apiClient';
 
 const SOAPNotes: React.FC = () => {
   const [soapNotes, setSoapNotes] = useState<any[]>([]);

@@ -46,7 +46,7 @@ import { apiClient } from '../../services/apiClient';
 
 const PatientManagement: React.FC = () => {
   const [patients, setPatients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalPatients: 0,
     activePatients: 0,

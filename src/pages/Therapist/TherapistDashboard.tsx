@@ -33,7 +33,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../services/apiClient';
+// import { apiClient } from '../../services/apiClient';
 
 const TherapistDashboard: React.FC = () => {
   const { state } = useAuth();
