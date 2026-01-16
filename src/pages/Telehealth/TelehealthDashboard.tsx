@@ -232,16 +232,6 @@ const TelehealthDashboard: React.FC = () => {
     }
   };
 
-  const resetNewSessionForm = () => {
-    setNewSession({
-      title: '',
-      patientId: '',
-      scheduledAt: '',
-      duration: 30,
-      notes: '',
-    });
-  };
-
   const handleJoinSession = (sessionId: string) => {
     navigate(`/telehealth/session/${sessionId}`);
   };

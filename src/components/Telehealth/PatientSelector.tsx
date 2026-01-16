@@ -37,9 +37,7 @@ import {
 import { 
   PatientSessionInfo, 
   SessionInitiationRequest, 
-  UserRole,
-  InvitationStatus,
-  User
+  InvitationStatus
 } from '../../types';
 import { telehealthService } from '../../services/telehealthService';
 import { apiClient } from '../../services/apiClient';
