@@ -42,7 +42,6 @@ const VideoSession: React.FC = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
-  const [isInitiator, setIsInitiator] = useState(false);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -215,14 +214,12 @@ const VideoSession: React.FC = () => {
           // Only create offer if we're already connected (not the first person)
           // The first person will receive this message about themselves and should ignore it
           if (peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
-            setIsInitiator(true);
             await createOffer();
           }
           break;
           
         case 'offer':
           console.log('[VIDEO] Received offer - I am the responder');
-          setIsInitiator(false);
           await handleOffer(data.offer);
           break;
           
