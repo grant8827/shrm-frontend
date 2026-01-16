@@ -21,16 +21,13 @@ import {
   FiberManualRecord,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import apiClient from '../../services/apiClient';
+import { apiClient } from '../../services/apiClient';
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { state } = useAuth();
   const { showSuccess, showError } = useNotification();
-  const user = state.user;
 
   // Video refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -41,11 +38,11 @@ const VideoSession: React.FC = () => {
   const websocketRef = useRef<WebSocket | null>(null);
 
   // Session state
-  const [isConnected, setIsConnected] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
+  const [isInitiator, setIsInitiator] = useState(false);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -126,7 +123,6 @@ const VideoSession: React.FC = () => {
       // Connect to WebSocket signaling server
       connectWebSocket();
       
-      setIsConnected(true);
       setSessionStartTime(new Date());
       showSuccess('Connected to session');
       
@@ -205,20 +201,28 @@ const VideoSession: React.FC = () => {
     
     ws.onopen = () => {
       console.log('[VIDEO] WebSocket connected');
+      // Check if we're the first or second participant
+      // This will be determined by participant_joined messages
     };
     
     ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log('[VIDEO] WebSocket message:', data.type);
+      console.log('[VIDEO] WebSocket message:', data.type, data);
       
       switch (data.type) {
         case 'participant_joined':
-          console.log('[VIDEO] Participant joined, creating offer');
-          await createOffer();
+          console.log('[VIDEO] Participant joined - I am the initiator, creating offer');
+          // Only create offer if we're already connected (not the first person)
+          // The first person will receive this message about themselves and should ignore it
+          if (peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
+            setIsInitiator(true);
+            await createOffer();
+          }
           break;
           
         case 'offer':
-          console.log('[VIDEO] Received offer');
+          console.log('[VIDEO] Received offer - I am the responder');
+          setIsInitiator(false);
           await handleOffer(data.offer);
           break;
           
