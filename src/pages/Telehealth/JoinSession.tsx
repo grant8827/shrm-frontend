@@ -72,12 +72,17 @@ const JoinSession: React.FC = () => {
 
       const sessionData = sessions[0];
 
-      // Verify user is authorized to join this session
-      if (user?.role === 'client' && sessionData.patient_details.id !== user.id) {
-        setError('You are not authorized to join this session.');
-        setLoading(false);
-        return;
+      // Verify user is authorized to join this session (only for registered patients)
+      if (user?.role === 'client' && sessionData.patient_details) {
+        if (sessionData.patient_details.id !== user.id) {
+          setError('You are not authorized to join this session.');
+          setLoading(false);
+          return;
+        }
       }
+      
+      // For external patients (no patient_details), allow anyone with the link to join
+      // This enables the email link to work for non-registered users
 
       // Check if session is active
       if (sessionData.status === 'completed') {
