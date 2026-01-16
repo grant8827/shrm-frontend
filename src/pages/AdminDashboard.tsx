@@ -101,6 +101,8 @@ interface UserUpdateData {
   last_name?: string;
   email?: string;
   username?: string;
+  password?: string;
+  password_confirm?: string;
   role?: string;
   phone_number?: string;
   is_active?: boolean;
@@ -254,10 +256,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const handleSaveUser = async () => {
     try {
       if (_selectedUser) {
-        // Update existing user - only send fields that can be updated
+        // Update existing user - include all editable fields
         const updateData: any = {};
         
         // Only include fields that have actually changed
+        if (editUserData.first_name !== undefined) updateData.first_name = editUserData.first_name;
+        if (editUserData.last_name !== undefined) updateData.last_name = editUserData.last_name;
+        if (editUserData.email !== undefined) updateData.email = editUserData.email;
         if (editUserData.role !== undefined) updateData.role = editUserData.role;
         if (editUserData.is_active !== undefined) updateData.is_active = editUserData.is_active;
         if (editUserData.phone_number !== undefined) updateData.phone_number = editUserData.phone_number;
@@ -267,8 +272,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         // Use PATCH for partial update
         await apiClient.patch(`/auth/${_selectedUser.id}/`, updateData);
       } else {
-        // Create new user
-        await apiClient.post('/auth/register/', editUserData);
+        // Create new user - validate passwords match
+        if (editUserData.password !== editUserData.password_confirm) {
+          setError('Passwords do not match');
+          return;
+        }
+        
+        // Prepare data for registration - backend expects 'phone' not 'phone_number'
+        const createData = {
+          username: editUserData.username,
+          email: editUserData.email,
+          password: editUserData.password,
+          password_confirm: editUserData.password_confirm,
+          first_name: editUserData.first_name || '',
+          last_name: editUserData.last_name || '',
+          role: editUserData.role || 'client',
+          phone: editUserData.phone_number || '',
+        };
+        
+        console.log('Creating user with data:', createData);
+        await apiClient.post('/auth/register/', createData);
       }
       setUserDialogOpen(false);
       _setSelectedUser(null);
@@ -278,7 +301,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       console.error('Save user error:', err);
       console.error('Error response:', err.response);
       console.error('Error data:', err.response?.data);
-      setError(err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data) || err.message || 'Failed to save user');
+      
+      // Better error message formatting
+      let errorMsg = 'Failed to save user';
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (typeof data === 'object') {
+          // Format validation errors
+          const errors = Object.entries(data)
+            .map(([field, messages]: [string, any]) => {
+              const msgArray = Array.isArray(messages) ? messages : [messages];
+              return `${field}: ${msgArray.join(', ')}`;
+            })
+            .join('\n');
+          errorMsg = errors || JSON.stringify(data);
+        } else {
+          errorMsg = data.detail || data.error || String(data);
+        }
+      }
+      setError(errorMsg);
     }
   };
 
@@ -760,8 +801,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 label="First Name"
                 variant="outlined"
                 value={editUserData.first_name || ''}
-                disabled
-                helperText="Cannot be edited (backend limitation)"
+                onChange={(e) => setEditUserData({ ...editUserData, first_name: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -770,8 +810,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 label="Last Name"
                 variant="outlined"
                 value={editUserData.last_name || ''}
-                disabled
-                helperText="Cannot be edited (backend limitation)"
+                onChange={(e) => setEditUserData({ ...editUserData, last_name: e.target.value })}
               />
             </Grid>
             <Grid item xs={12}>
@@ -781,8 +820,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 type="email"
                 variant="outlined"
                 value={editUserData.email || ''}
-                disabled
-                helperText="Cannot be edited (backend limitation)"
+                onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -795,6 +833,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 disabled={!!_selectedUser}
               />
             </Grid>
+            {!_selectedUser && (
+              <>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Password"
+                    type="password"
+                    variant="outlined"
+                    value={editUserData.password || ''}
+                    onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })}
+                    required
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Confirm Password"
+                    type="password"
+                    variant="outlined"
+                    value={editUserData.password_confirm || ''}
+                    onChange={(e) => setEditUserData({ ...editUserData, password_confirm: e.target.value })}
+                    required
+                    error={editUserData.password !== editUserData.password_confirm && !!editUserData.password_confirm}
+                    helperText={editUserData.password !== editUserData.password_confirm && !!editUserData.password_confirm ? 'Passwords do not match' : ''}
+                  />
+                </Grid>
+              </>
+            )}
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>

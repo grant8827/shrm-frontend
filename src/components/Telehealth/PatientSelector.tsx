@@ -38,9 +38,11 @@ import {
   PatientSessionInfo, 
   SessionInitiationRequest, 
   UserRole,
-  InvitationStatus 
+  InvitationStatus,
+  User
 } from '../../types';
 import { telehealthService } from '../../services/telehealthService';
+import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface PatientSelectorProps {
@@ -107,22 +109,34 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
     setError(null);
 
     try {
-      let result;
-      if (user.role === UserRole.ADMIN) {
-        result = await telehealthService.getAllPatients();
-      } else {
-        result = await telehealthService.getAssignedPatients(user.id);
-      }
+      // Fetch real users from database
+      const response = await apiClient.get('/auth/');
+      const allUsers = Array.isArray(response.data) ? response.data : (response.data?.results || []);
+      
+      // Convert users to PatientSessionInfo format
+      const patientInfoList: PatientSessionInfo[] = allUsers.map((dbUser: any) => ({
+        patient: {
+          id: dbUser.id,
+          firstName: dbUser.first_name || dbUser.firstName || '',
+          lastName: dbUser.last_name || dbUser.lastName || '',
+          email: dbUser.email,
+          phone: dbUser.phone || dbUser.phone_number || '',
+          role: dbUser.role,
+        },
+        sessionHistory: {
+          totalSessions: 0,
+          lastSessionDate: undefined,
+          averageDuration: 0
+        },
+        canStartSession: dbUser.is_active !== false,
+        activeInvitation: undefined
+      }));
 
-      if (result.success && result.data) {
-        setPatients(result.data);
-        setFilteredPatients(result.data);
-      } else {
-        setError(result.message || 'Failed to load patients');
-      }
-    } catch (err) {
-      setError('Error loading patients');
-      console.error('Error loading patients:', err);
+      setPatients(patientInfoList);
+      setFilteredPatients(patientInfoList);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error loading users');
+      console.error('Error loading users:', err);
     } finally {
       setLoading(false);
     }

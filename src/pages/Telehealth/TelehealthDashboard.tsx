@@ -54,6 +54,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { apiClient } from '../../services/apiClient';
 import { format, parseISO } from 'date-fns';
 
 interface TelehealthSession {
@@ -102,6 +103,7 @@ const TelehealthDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<TelehealthSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [openNewSessionDialog, setOpenNewSessionDialog] = useState(false);
+  const [patients, setPatients] = useState<any[]>([]);
 
   // New session form state
   const [newSession, setNewSession] = useState({
@@ -115,16 +117,72 @@ const TelehealthDashboard: React.FC = () => {
   // Mock data - replace with actual API calls
   useEffect(() => {
     loadSessions();
+    loadPatients();
   }, []);
+
+  const loadPatients = async () => {
+    try {
+      const response = await apiClient.get('/auth/');
+      const allUsers = Array.isArray(response.data) ? response.data : (response.data?.results || []);
+      setPatients(allUsers);
+    } catch (error) {
+      console.error('Failed to load patients:', error);
+    }
+  };
 
   const loadSessions = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call to /api/telehealth/sessions/
-      // const response = await apiClient.get('/telehealth/sessions/');
-      // setSessions(response.data);
-      setSessions([]);
-    } catch (error) {
+      // Fetch sessions from real API - use my_sessions (underscore not hyphen)
+      let response;
+      try {
+        response = await apiClient.get('/telehealth/sessions/my_sessions/');
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          // Fallback to base endpoint
+          console.log('my_sessions endpoint not found, using base endpoint');
+          response = await apiClient.get('/telehealth/sessions/');
+        } else {
+          throw error;
+        }
+      }
+      
+      console.log('Sessions response:', response);
+      
+      const sessionData = response.data || [];
+      console.log('Session data:', sessionData);
+      
+      // Transform backend data to frontend format
+      const transformedSessions: TelehealthSession[] = sessionData.map((session: any) => ({
+        id: session.id,
+        title: session.title,
+        patient: {
+          id: session.patient,
+          name: session.patient_details 
+            ? `${session.patient_details.first_name || ''} ${session.patient_details.last_name || ''}`.trim()
+            : 'Unknown Patient',
+          avatar: undefined
+        },
+        therapist: {
+          id: session.therapist,
+          name: session.therapist_details
+            ? `${session.therapist_details.first_name || ''} ${session.therapist_details.last_name || ''}`.trim()
+            : 'Unknown Therapist'
+        },
+        scheduledAt: session.scheduled_at,
+        duration: session.duration,
+        status: session.status,
+        sessionUrl: session.session_url,
+        hasRecording: session.has_recording,
+        hasTranscript: session.has_transcript,
+        notes: session.notes
+      }));
+      
+      console.log('Transformed sessions:', transformedSessions);
+      setSessions(transformedSessions);
+    } catch (error: any) {
+      console.error('Failed to load sessions:', error);
+      console.error('Error response:', error.response);
       showError('Failed to load sessions');
     } finally {
       setLoading(false);
@@ -139,26 +197,38 @@ const TelehealthDashboard: React.FC = () => {
         return;
       }
 
-      // Mock API call - replace with actual implementation
-      const session: TelehealthSession = {
-        id: Math.random().toString(36).substr(2, 9),
+      // Create session via API
+      const sessionData = {
         title: newSession.title,
-        patient: { id: newSession.patientId, name: 'Selected Patient' },
-        therapist: { id: user?.id || '', name: user?.username || '' },
-        scheduledAt: newSession.scheduledAt,
+        patient: newSession.patientId,
+        therapist: user?.id,
+        scheduled_at: new Date(newSession.scheduledAt).toISOString(),
         duration: newSession.duration,
-        status: 'scheduled',
-        hasRecording: false,
-        hasTranscript: false,
         notes: newSession.notes,
       };
 
-      setSessions([...sessions, session]);
-      showSuccess('Session created successfully');
+      await apiClient.post('/telehealth/sessions/', sessionData);
+      
+      showSuccess('Telehealth session scheduled successfully');
       setOpenNewSessionDialog(false);
-      resetNewSessionForm();
-    } catch (error) {
-      showError('Failed to create session');
+      
+      // Reset form
+      setNewSession({
+        title: '',
+        patientId: '',
+        scheduledAt: '',
+        duration: 30,
+        notes: '',
+      });
+      
+      // Reload sessions
+      await loadSessions();
+    } catch (error: any) {
+      console.error('Failed to create session:', error);
+      const errorMsg = error.response?.data?.scheduled_at?.[0] || 
+                       error.response?.data?.detail ||
+                       'Failed to create session';
+      showError(errorMsg);
     }
   };
 
@@ -183,12 +253,17 @@ const TelehealthDashboard: React.FC = () => {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
+    if (!window.confirm('Are you sure you want to cancel this session?')) {
+      return;
+    }
+    
     try {
-      // Mock API call
-      setSessions(sessions.filter(s => s.id !== sessionId));
-      showSuccess('Session deleted successfully');
+      await apiClient.post(`/telehealth/sessions/${sessionId}/cancel/`);
+      showSuccess('Session cancelled successfully');
+      await loadSessions();
     } catch (error) {
-      showError('Failed to delete session');
+      console.error('Failed to cancel session:', error);
+      showError('Failed to cancel session');
     }
   };
 
@@ -232,14 +307,17 @@ const TelehealthDashboard: React.FC = () => {
             Manage video sessions, recordings, and transcripts
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setOpenNewSessionDialog(true)}
-          size="large"
-        >
-          New Session
-        </Button>
+        {/* Only show New Session button for admin, therapist, and staff */}
+        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setOpenNewSessionDialog(true)}
+            size="large"
+          >
+            New Session
+          </Button>
+        )}
       </Box>
 
       {/* Stats Cards */}
@@ -340,7 +418,12 @@ const TelehealthDashboard: React.FC = () => {
                     <Box sx={{ mb: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <Person fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body2">{session.patient.name}</Typography>
+                        <Typography variant="body2">
+                          {user?.id === session.patient.id 
+                            ? `Therapist: ${session.therapist.name}`
+                            : `Patient: ${session.patient.name}`
+                          }
+                        </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <CalendarMonth fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
@@ -426,7 +509,12 @@ const TelehealthDashboard: React.FC = () => {
                     <Box sx={{ mb: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <Person fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                        <Typography variant="body2">{session.patient.name}</Typography>
+                        <Typography variant="body2">
+                          {user?.id === session.patient.id 
+                            ? `Therapist: ${session.therapist.name}`
+                            : `Patient: ${session.patient.name}`
+                          }
+                        </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <CalendarMonth fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
@@ -545,9 +633,11 @@ const TelehealthDashboard: React.FC = () => {
                 onChange={(e) => setNewSession({ ...newSession, patientId: e.target.value })}
                 label="Patient"
               >
-                <MenuItem value="1">John Doe</MenuItem>
-                <MenuItem value="2">Jane Smith</MenuItem>
-                <MenuItem value="3">Alice Johnson</MenuItem>
+                {patients.map((patient) => (
+                  <MenuItem key={patient.id} value={patient.id}>
+                    {patient.first_name || patient.firstName || ''} {patient.last_name || patient.lastName || ''} ({patient.email})
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
