@@ -147,16 +147,28 @@ const VideoSession: React.FC = () => {
     
     // Handle incoming tracks from remote peer
     peerConnection.ontrack = (event) => {
-      console.log('[VIDEO] Received remote track:', event.track.kind);
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream();
-      }
-      remoteStreamRef.current.addTrack(event.track);
+      console.log('[VIDEO] Received remote track:', event.track.kind, event.streams);
       
-      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
-        remoteVideoRef.current.srcObject = remoteStreamRef.current;
-        setIsRemoteVideoReady(true);
-        console.log('[VIDEO] Remote video stream set');
+      // Use the stream from the event if available
+      if (event.streams && event.streams[0]) {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+          remoteStreamRef.current = event.streams[0];
+          setIsRemoteVideoReady(true);
+          console.log('[VIDEO] Remote video stream set from event.streams');
+        }
+      } else {
+        // Fallback: manually create stream and add tracks
+        if (!remoteStreamRef.current) {
+          remoteStreamRef.current = new MediaStream();
+        }
+        remoteStreamRef.current.addTrack(event.track);
+        
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStreamRef.current;
+          setIsRemoteVideoReady(true);
+          console.log('[VIDEO] Remote video stream set manually');
+        }
       }
     };
     
@@ -178,7 +190,23 @@ const VideoSession: React.FC = () => {
         showSuccess('Connected to other participant');
       } else if (peerConnection.connectionState === 'disconnected') {
         showError('Participant disconnected');
+      } else if (peerConnection.connectionState === 'failed') {
+        showError('Connection failed');
+        console.error('[VIDEO] Connection failed');
       }
+    };
+    
+    // Handle ICE connection state changes
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log('[VIDEO] ICE connection state:', peerConnection.iceConnectionState);
+      if (peerConnection.iceConnectionState === 'failed') {
+        console.error('[VIDEO] ICE connection failed');
+      }
+    };
+    
+    // Handle ICE gathering state changes
+    peerConnection.onicegatheringstatechange = () => {
+      console.log('[VIDEO] ICE gathering state:', peerConnection.iceGatheringState);
     };
   };
 
@@ -268,10 +296,16 @@ const VideoSession: React.FC = () => {
   };
 
   const handleOffer = async (offer: RTCSessionDescriptionInit) => {
-    if (!peerConnectionRef.current || !websocketRef.current) return;
+    if (!peerConnectionRef.current || !websocketRef.current) {
+      console.error('[VIDEO] Cannot handle offer - missing peer connection or websocket');
+      return;
+    }
     
     try {
+      console.log('[VIDEO] Setting remote description from offer');
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      
+      console.log('[VIDEO] Creating answer');
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
       
@@ -282,26 +316,39 @@ const VideoSession: React.FC = () => {
       }));
     } catch (error) {
       console.error('[VIDEO] Error handling offer:', error);
+      showError('Failed to establish connection');
     }
   };
 
   const handleAnswer = async (answer: RTCSessionDescriptionInit) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.error('[VIDEO] Cannot handle answer - missing peer connection');
+      return;
+    }
     
     try {
+      console.log('[VIDEO] Setting remote description from answer');
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
-      console.log('[VIDEO] Answer applied');
+      console.log('[VIDEO] Answer applied successfully');
     } catch (error) {
       console.error('[VIDEO] Error handling answer:', error);
+      showError('Failed to complete connection');
     }
   };
 
   const handleIceCandidate = async (candidate: RTCIceCandidateInit) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.error('[VIDEO] Cannot handle ICE candidate - missing peer connection');
+      return;
+    }
     
     try {
-      await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-      console.log('[VIDEO] ICE candidate added');
+      if (peerConnectionRef.current.remoteDescription) {
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('[VIDEO] ICE candidate added successfully');
+      } else {
+        console.warn('[VIDEO] Received ICE candidate before remote description, ignoring');
+      }
     } catch (error) {
       console.error('[VIDEO] Error adding ICE candidate:', error);
     }
