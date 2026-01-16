@@ -15,7 +15,7 @@ import {
   Box,
 } from '@mui/material';
 import { Warning } from '@mui/icons-material';
-import apiClient from '../../services/apiClient';
+import { apiClient } from '../../services/apiClient';
 
 interface User {
   id: number;
