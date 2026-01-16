@@ -50,12 +50,14 @@ import {
   Cancel,
   Transcribe,
   RecordVoiceOver,
+  Warning,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { apiClient } from '../../services/apiClient';
 import { format, parseISO } from 'date-fns';
+import EmergencySessionDialog from '../../components/Telehealth/EmergencySessionDialog';
 
 interface TelehealthSession {
   id: string;
@@ -103,6 +105,7 @@ const TelehealthDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<TelehealthSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [openNewSessionDialog, setOpenNewSessionDialog] = useState(false);
+  const [openEmergencyDialog, setOpenEmergencyDialog] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
 
   // New session form state
@@ -294,19 +297,33 @@ const TelehealthDashboard: React.FC = () => {
             Telehealth Dashboard
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Manage video sessions, recordings, and transcripts
+            {user?.role === 'client' 
+              ? 'View your scheduled telehealth sessions'
+              : 'Manage video sessions, recordings, and transcripts'
+            }
           </Typography>
         </Box>
-        {/* Only show New Session button for admin, therapist, and staff */}
+        {/* Only show New Session and Emergency Session buttons for admin, therapist, and staff */}
         {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setOpenNewSessionDialog(true)}
-            size="large"
-          >
-            New Session
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Warning />}
+              onClick={() => setOpenEmergencyDialog(true)}
+              size="large"
+            >
+              Emergency Session
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setOpenNewSessionDialog(true)}
+              size="large"
+            >
+              New Session
+            </Button>
+          </Box>
         )}
       </Box>
 
@@ -338,36 +355,40 @@ const TelehealthDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Transcribe color="info" sx={{ mr: 1 }} />
-                <Typography variant="h6">
-                  {sessions.filter(s => s.hasTranscript).length}
+        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Transcribe color="info" sx={{ mr: 1 }} />
+                  <Typography variant="h6">
+                    {sessions.filter(s => s.hasTranscript).length}
+                  </Typography>
+                </Box>
+                <Typography color="text.secondary" variant="body2">
+                  Transcripts Available
                 </Typography>
-              </Box>
-              <Typography color="text.secondary" variant="body2">
-                Transcripts Available
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <RecordVoiceOver color="warning" sx={{ mr: 1 }} />
-                <Typography variant="h6">
-                  {sessions.filter(s => s.hasRecording).length}
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+          <Grid item xs={12} md={3}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <RecordVoiceOver color="warning" sx={{ mr: 1 }} />
+                  <Typography variant="h6">
+                    {sessions.filter(s => s.hasRecording).length}
+                  </Typography>
+                </Box>
+                <Typography color="text.secondary" variant="body2">
+                  Recordings Saved
                 </Typography>
-              </Box>
-              <Typography color="text.secondary" variant="body2">
-                Recordings Saved
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
 
       {/* Tabs */}
@@ -427,14 +448,16 @@ const TelehealthDashboard: React.FC = () => {
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {session.hasRecording && (
-                        <Chip label="Recording" size="small" color="success" variant="outlined" />
-                      )}
-                      {session.hasTranscript && (
-                        <Chip label="Transcript" size="small" color="info" variant="outlined" />
-                      )}
-                    </Box>
+                    {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {session.hasRecording && (
+                          <Chip label="Recording" size="small" color="success" variant="outlined" />
+                        )}
+                        {session.hasTranscript && (
+                          <Chip label="Transcript" size="small" color="info" variant="outlined" />
+                        )}
+                      </Box>
+                    )}
                   </CardContent>
 
                   <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
@@ -524,14 +547,16 @@ const TelehealthDashboard: React.FC = () => {
                       </Typography>
                     )}
 
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {session.hasRecording && (
-                        <Chip label="Recording Available" size="small" color="success" />
-                      )}
-                      {session.hasTranscript && (
-                        <Chip label="Transcript Available" size="small" color="info" />
-                      )}
-                    </Box>
+                    {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {session.hasRecording && (
+                          <Chip label="Recording Available" size="small" color="success" />
+                        )}
+                        {session.hasTranscript && (
+                          <Chip label="Transcript Available" size="small" color="info" />
+                        )}
+                      </Box>
+                    )}
                   </CardContent>
 
                   <CardActions sx={{ px: 2, pb: 2 }}>
@@ -673,6 +698,16 @@ const TelehealthDashboard: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Emergency Session Dialog */}
+      <EmergencySessionDialog
+        open={openEmergencyDialog}
+        onClose={() => setOpenEmergencyDialog(false)}
+        onSessionCreated={() => {
+          loadSessions();
+          showSuccess('Emergency session created and email sent to patient!');
+        }}
+      />
     </Box>
   );
 };

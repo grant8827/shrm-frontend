@@ -31,6 +31,7 @@ import SOAPNotes from './pages/SOAPNotes/SOAPNotes';
 import Telehealth from './pages/Telehealth/Telehealth';
 import TelehealthDashboard from './pages/Telehealth/TelehealthDashboard';
 import VideoSession from './pages/Telehealth/VideoSession';
+import JoinSession from './pages/Telehealth/JoinSession';
 import Reports from './pages/Reports/Reports';
 
 // Components
@@ -154,6 +155,7 @@ function App() {
                   <Route path="/telehealth" element={<Telehealth />} />
                   <Route path="/telehealth/dashboard" element={<TelehealthDashboard />} />
                   <Route path="/telehealth/session/:sessionId" element={<VideoSession />} />
+                  <Route path="/telehealth/join/:roomId" element={<JoinSession />} />
                   
                   {/* Smart Dashboard Redirect */}
                   <Route index element={<DashboardRedirect />} />
