@@ -64,12 +64,20 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
   const fetchPatients = async () => {
     try {
       const response = await apiClient.get('/auth/');
-      const allUsers = response.data as User[];
-      const clientUsers = allUsers.filter(user => user.role === 'client');
+      // Handle both array and paginated responses
+      const allUsers = Array.isArray(response.data) 
+        ? response.data 
+        : (response.data?.results || []);
+      const clientUsers = allUsers.filter((user: User) => user.role === 'client');
       setPatients(clientUsers);
-    } catch (error) {
+      
+      if (clientUsers.length === 0) {
+        console.warn('No patients found in the system');
+      }
+    } catch (error: any) {
       console.error('Error fetching patients:', error);
-      setError('Failed to load patients');
+      console.error('Error details:', error.response?.data);
+      setError(`Failed to load patients: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
     }
   };
 
