@@ -30,7 +30,7 @@ import Messages from './pages/Messages/Messages';
 import SOAPNotes from './pages/SOAPNotes/SOAPNotes';
 import Telehealth from './pages/Telehealth/Telehealth';
 import TelehealthDashboard from './pages/Telehealth/TelehealthDashboard';
-import VideoSession from './pages/Telehealth/VideoSession';
+import VideoSession from './pages/Telehealth/VideoSessionSimple';
 import JoinSession from './pages/Telehealth/JoinSession';
 import Reports from './pages/Reports/Reports';
 
