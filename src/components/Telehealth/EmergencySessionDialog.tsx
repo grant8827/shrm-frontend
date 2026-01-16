@@ -54,6 +54,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdSessionUrl, setCreatedSessionUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -120,15 +121,13 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
             patient_last_name: newPatientLastName,
           };
 
-      await apiClient.post('/telehealth/sessions/create_emergency/', requestData);
-
+      const response = await apiClient.post('/telehealth/sessions/create_emergency/', requestData);
+      
+      // Store the session URL
+      setCreatedSessionUrl(response.data.session_url);
       setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        resetForm();
-        onSessionCreated();
-        onClose();
-      }, 2000);
+      
+      // Don't auto-close, let user copy the link
     } catch (error: any) {
       console.error('Error creating emergency session:', error);
       setError(
@@ -149,12 +148,23 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
     setNewPatientLastName('');
     setError(null);
     setSuccess(false);
+    setCreatedSessionUrl(null);
   };
 
   const handleClose = () => {
     if (!loading) {
       resetForm();
       onClose();
+      if (success) {
+        onSessionCreated();
+      }
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (createdSessionUrl) {
+      navigator.clipboard.writeText(createdSessionUrl);
+      alert('Join link copied to clipboard!');
     }
   };
 
@@ -291,21 +301,46 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
             )}
           </Box>
         )}
+        
+        {/* Show join link after successful creation */}
+        {success && createdSessionUrl && (
+          <Box sx={{ mt: 3, p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
+            <Typography variant="h6" gutterBottom sx={{ color: 'success.dark' }}>
+              ✅ Emergency Session Created!
+            </Typography>
+            <Typography variant="body2" gutterBottom>
+              Email sent to patient. You can also copy and share this link:
+            </Typography>
+            <Box sx={{ mt: 1, p: 1, bgcolor: 'white', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ flex: 1, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                {createdSessionUrl}
+              </Typography>
+              <Button size="small" variant="outlined" onClick={copyToClipboard}>
+                Copy
+              </Button>
+            </Box>
+            <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'text.secondary' }}>
+              💡 Both you and the patient should use this same link to join the session
+            </Typography>
+          </Box>
+        )}
       </DialogContent>
 
       <DialogActions>
         <Button onClick={handleClose} disabled={loading}>
-          Cancel
+          {success ? 'Close' : 'Cancel'}
         </Button>
-        <Button
-          onClick={handleCreateEmergencySession}
-          variant="contained"
-          color="error"
-          disabled={loading || success}
-          startIcon={loading && <CircularProgress size={20} />}
-        >
-          {loading ? 'Creating...' : 'Start Emergency Session'}
-        </Button>
+        {!success && (
+          <Button
+            onClick={handleCreateEmergencySession}
+            variant="contained"
+            color="error"
+            disabled={loading}
+            startIcon={loading && <CircularProgress size={20} />}
+          >
+            {loading ? 'Creating...' : 'Start Emergency Session'}
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
