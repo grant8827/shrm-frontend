@@ -64,6 +64,8 @@ const VideoSession: React.FC = () => {
   const [transcriptText, setTranscriptText] = useState<string[]>([]);
   const [showTranscript, setShowTranscript] = useState(false);
   const [isInitiator, setIsInitiator] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [isSpeechDetected, setIsSpeechDetected] = useState(false);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
@@ -481,50 +483,110 @@ const VideoSession: React.FC = () => {
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
+        
+        recognition.onstart = () => {
+          console.log('[TRANSCRIBE] Speech recognition started');
+          showSuccess('Transcription started - speak into your microphone');
+        };
         
         recognition.onresult = (event: any) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
+          console.log('[TRANSCRIBE] Got result:', event.results);
+          let interimText = '';
+          let finalText = '';
           
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
+            console.log(`[TRANSCRIBE] Result ${i}:`, transcript, 'isFinal:', event.results[i].isFinal);
+            
             if (event.results[i].isFinal) {
-              finalTranscript += transcript + ' ';
+              finalText += transcript + ' ';
             } else {
-              interimTranscript += transcript;
+              interimText += transcript;
             }
           }
           
-          if (finalTranscript) {
+          // Update interim transcript for live display
+          setInterimTranscript(interimText);
+          
+          if (finalText) {
             const timestamp = new Date().toLocaleTimeString();
-            const entry = `[${timestamp}] ${finalTranscript.trim()}`;
+            const entry = `[${timestamp}] ${finalText.trim()}`;
+            console.log('[TRANSCRIBE] Adding to transcript:', entry);
             setTranscriptText(prev => [...prev, entry]);
+            setInterimTranscript(''); // Clear interim when final text is added
           }
         };
         
+        recognition.onaudiostart = () => {
+          console.log('[TRANSCRIBE] Audio capture started');
+        };
+        
+        recognition.onaudioend = () => {
+          console.log('[TRANSCRIBE] Audio capture ended');
+        };
+        
+        recognition.onsoundstart = () => {
+          console.log('[TRANSCRIBE] Sound detected');
+        };
+        
+        recognition.onsoundend = () => {
+          console.log('[TRANSCRIBE] Sound ended');
+        };
+        
+        recognition.onspeechstart = () => {
+          console.log('[TRANSCRIBE] Speech detected');
+          setIsSpeechDetected(true);
+        };
+        
+        recognition.onspeechend = () => {
+          console.log('[TRANSCRIBE] Speech ended');
+          setIsSpeechDetected(false);
+        };
+        
         recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          if (event.error !== 'no-speech') {
+          console.error('[TRANSCRIBE] Speech recognition error:', event.error);
+          if (event.error === 'no-speech') {
+            console.log('[TRANSCRIBE] No speech detected - waiting...');
+          } else if (event.error === 'audio-capture') {
+            showError('Microphone access error - check permissions');
+          } else if (event.error === 'not-allowed') {
+            showError('Microphone permission denied');
+            setIsTranscribing(false);
+            recognitionRef.current = null;
+          } else {
             showError(`Transcription error: ${event.error}`);
           }
         };
         
         recognition.onend = () => {
+          console.log('[TRANSCRIBE] Recognition ended, isTranscribing:', isTranscribing);
           // Auto-restart if still transcribing
           if (isTranscribing && recognitionRef.current) {
+            console.log('[TRANSCRIBE] Auto-restarting...');
             try {
-              recognitionRef.current.start();
+              setTimeout(() => {
+                if (recognitionRef.current) {
+                  recognitionRef.current.start();
+                }
+              }, 100);
             } catch (error) {
-              console.error('Failed to restart recognition:', error);
+              console.error('[TRANSCRIBE] Failed to restart recognition:', error);
             }
           }
         };
         
-        recognition.start();
+        try {
+          recognition.start();
+          console.log('[TRANSCRIBE] Started recognition');
+        } catch (error) {
+          console.error('[TRANSCRIBE] Failed to start:', error);
+          throw error;
+        }
+        
         recognitionRef.current = recognition;
         setIsTranscribing(true);
         setShowTranscript(true);
-        showSuccess('Transcription started');
       } else {
         // Stop transcription
         if (recognitionRef.current) {
@@ -794,40 +856,84 @@ const VideoSession: React.FC = () => {
           '& .MuiDrawer-paper': {
             width: 400,
             p: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
           },
         }}
       >
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Session Transcript
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="h6">
+            Session Transcript
+          </Typography>
+          {isTranscribing && (
+            <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: isSpeechDetected ? 'success.main' : 'grey.400',
+                  animation: isSpeechDetected ? 'pulse 1.5s infinite' : 'none',
+                  '@keyframes pulse': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.5 },
+                  },
+                }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {isSpeechDetected ? 'Detecting speech...' : 'Listening...'}
+              </Typography>
+            </Box>
+          )}
+        </Box>
         <Divider sx={{ mb: 2 }} />
         
-        {transcriptText.length === 0 ? (
-          <Typography color="text.secondary">
-            {isTranscribing ? 'Listening...' : 'No transcript available'}
-          </Typography>
-        ) : (
-          <List>
-            {transcriptText.map((entry, index) => (
-              <React.Fragment key={index}>
+        <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
+          {transcriptText.length === 0 && !interimTranscript ? (
+            <Typography color="text.secondary">
+              {isTranscribing ? 'Speak into your microphone to start transcribing...' : 'No transcript available'}
+            </Typography>
+          ) : (
+            <List>
+              {transcriptText.map((entry, index) => (
+                <React.Fragment key={index}>
+                  <ListItem>
+                    <ListItemText
+                      primary={entry}
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          fontSize: '0.875rem',
+                          whiteSpace: 'pre-wrap',
+                        },
+                      }}
+                    />
+                  </ListItem>
+                  {index < transcriptText.length - 1 && <Divider />}
+                </React.Fragment>
+              ))}
+              
+              {/* Show interim transcript in real-time */}
+              {interimTranscript && (
                 <ListItem>
                   <ListItemText
-                    primary={entry}
+                    primary={`[Live] ${interimTranscript}`}
                     sx={{
                       '& .MuiListItemText-primary': {
                         fontSize: '0.875rem',
+                        fontStyle: 'italic',
+                        color: 'text.secondary',
                         whiteSpace: 'pre-wrap',
                       },
                     }}
                   />
                 </ListItem>
-                {index < transcriptText.length - 1 && <Divider />}
-              </React.Fragment>
-            ))}
-          </List>
-        )}
+              )}
+            </List>
+          )}
+        </Box>
         
-        <Box sx={{ mt: 'auto', pt: 2 }}>
+        <Box>
           <Button
             fullWidth
             variant="outlined"
