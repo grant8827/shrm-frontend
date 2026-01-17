@@ -74,6 +74,7 @@ interface TelehealthSession {
   scheduledAt: string;
   duration: number;
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+  isEmergency: boolean;
   sessionUrl?: string;
   hasRecording: boolean;
   hasTranscript: boolean;
@@ -175,6 +176,7 @@ const TelehealthDashboard: React.FC = () => {
         scheduledAt: session.scheduled_at,
         duration: session.duration,
         status: session.status,
+        isEmergency: session.is_emergency || false,
         sessionUrl: session.session_url,
         hasRecording: session.has_recording,
         hasTranscript: session.has_transcript,
@@ -287,6 +289,7 @@ const TelehealthDashboard: React.FC = () => {
 
   const upcomingSessions = filterSessions('scheduled');
   const completedSessions = filterSessions('completed');
+  const emergencySessions = sessions.filter(s => s.isEmergency);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -396,6 +399,7 @@ const TelehealthDashboard: React.FC = () => {
         <Tabs value={tabValue} onChange={(_e, v) => setTabValue(v)}>
           <Tab icon={<Schedule />} label="Upcoming" iconPosition="start" />
           <Tab icon={<History />} label="Past Sessions" iconPosition="start" />
+          <Tab icon={<Warning />} label="Emergency Session" iconPosition="start" />
           <Tab icon={<People />} label="All Sessions" iconPosition="start" />
         </Tabs>
       </Paper>
@@ -412,18 +416,28 @@ const TelehealthDashboard: React.FC = () => {
           <Grid container spacing={3}>
             {upcomingSessions.map((session) => (
               <Grid item xs={12} md={6} lg={4} key={session.id}>
-                <Card elevation={2}>
+                <Card elevation={2} sx={session.isEmergency ? { borderLeft: 4, borderColor: 'error.main' } : {}}>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                       <Typography variant="h6" noWrap>
                         {session.title}
                       </Typography>
-                      <Chip
-                        icon={getStatusIcon(session.status) || undefined}
-                        label={session.status}
-                        color={getStatusColor(session.status) as any}
-                        size="small"
-                      />
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {session.isEmergency && (
+                          <Chip
+                            icon={<Warning />}
+                            label="Emergency"
+                            color="error"
+                            size="small"
+                          />
+                        )}
+                        <Chip
+                          icon={getStatusIcon(session.status) || undefined}
+                          label={session.status}
+                          color={getStatusColor(session.status) as any}
+                          size="small"
+                        />
+                      </Box>
                     </Box>
 
                     <Box sx={{ mb: 2 }}>
@@ -575,6 +589,112 @@ const TelehealthDashboard: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
+        {emergencySessions.length === 0 ? (
+          <Alert severity="info">No emergency sessions</Alert>
+        ) : (
+          <Grid container spacing={3}>
+            {emergencySessions.map((session) => (
+              <Grid item xs={12} md={6} lg={4} key={session.id}>
+                <Card elevation={2} sx={{ borderLeft: 4, borderColor: 'error.main' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="h6" noWrap>
+                        {session.title}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Chip
+                          icon={<Warning />}
+                          label="Emergency"
+                          color="error"
+                          size="small"
+                        />
+                        <Chip
+                          icon={getStatusIcon(session.status) || undefined}
+                          label={session.status}
+                          color={getStatusColor(session.status) as any}
+                          size="small"
+                        />
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Person fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                        <Typography variant="body2">
+                          {user?.id === session.patient.id 
+                            ? `Therapist: ${session.therapist.name}`
+                            : `Patient: ${session.patient.name}`
+                          }
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <CalendarMonth fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                        <Typography variant="body2">
+                          {format(parseISO(session.scheduledAt), 'PPp')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <AccessTime fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                        <Typography variant="body2">{session.duration} minutes</Typography>
+                      </Box>
+                    </Box>
+
+                    {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {session.hasRecording && (
+                          <Chip label="Recording" size="small" color="success" variant="outlined" />
+                        )}
+                        {session.hasTranscript && (
+                          <Chip label="Transcript" size="small" color="info" variant="outlined" />
+                        )}
+                      </Box>
+                    )}
+                  </CardContent>
+
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                    <Box>
+                      <Tooltip title="Copy session link">
+                        <IconButton size="small" onClick={() => handleCopySessionLink(session)}>
+                          <ContentCopy fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+                        <>
+                          <Tooltip title="Edit session">
+                            <IconButton size="small">
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete session">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDeleteSession(session.id)}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                    </Box>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      startIcon={<VideoCall />}
+                      onClick={() => handleJoinSession(session.id)}
+                      size="small"
+                    >
+                      Join
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={3}>
         <List>
           {sessions.map((session, index) => (
             <React.Fragment key={session.id}>
@@ -601,6 +721,14 @@ const TelehealthDashboard: React.FC = () => {
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {session.title}
+                      {session.isEmergency && (
+                        <Chip
+                          icon={<Warning />}
+                          label="Emergency"
+                          size="small"
+                          color="error"
+                        />
+                      )}
                       <Chip
                         label={session.status}
                         size="small"
