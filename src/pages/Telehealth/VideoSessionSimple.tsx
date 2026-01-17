@@ -239,10 +239,9 @@ const VideoSession: React.FC = () => {
       return;
     }
     
-    // Determine WebSocket URL based on environment
-    const wsHost = import.meta.env.VITE_WS_HOST || window.location.host.replace(':5173', ':8000');
-    // Use wss:// for Railway production or HTTPS, ws:// only for local HTTP
-    const protocol = wsHost.includes('railway.app') || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Use the correct WebSocket URL for your setup
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${wsHost}/ws/video/${roomId}/`;
     
     console.log('[VIDEO] Connecting to WebSocket:', wsUrl);
@@ -252,7 +251,14 @@ const VideoSession: React.FC = () => {
     
     ws.onopen = () => {
       console.log('[VIDEO] WebSocket connected');
-      // We'll determine if we're the initiator when we receive participant_joined
+      showSuccess('Connected to session server');
+      
+      // Notify server that we joined
+      ws.send(JSON.stringify({
+        type: 'participant_joined',
+        user_id: user?.id,
+        user_name: user?.first_name + ' ' + user?.last_name
+      }));
     };
     
     ws.onmessage = async (event) => {
@@ -262,8 +268,8 @@ const VideoSession: React.FC = () => {
       switch (data.type) {
         case 'participant_joined':
           console.log('[VIDEO] Participant joined notification received');
+          showSuccess('Another participant joined');
           // If we haven't set ourselves as initiator yet, we're the second person
-          // The second person becomes the initiator and creates the offer
           if (!isInitiator && peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
             console.log('[VIDEO] I am the second participant (initiator) - creating offer');
             setIsInitiator(true);
@@ -289,17 +295,21 @@ const VideoSession: React.FC = () => {
         case 'participant_left':
           console.log('[VIDEO] Participant left');
           setIsRemoteVideoReady(false);
+          showError('Other participant left the session');
           break;
       }
     };
     
     ws.onerror = (error) => {
       console.error('[VIDEO] WebSocket error:', error);
-      showError('Connection error');
+      showError('Failed to connect to session server');
     };
     
-    ws.onclose = () => {
-      console.log('[VIDEO] WebSocket closed');
+    ws.onclose = (event) => {
+      console.log('[VIDEO] WebSocket closed:', event.code, event.reason);
+      if (event.code !== 1000) { // Not a normal closure
+        showError('Connection to session server lost');
+      }
     };
   };
 
