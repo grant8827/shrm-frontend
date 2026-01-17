@@ -11,6 +11,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import {
   Videocam,
@@ -19,6 +24,8 @@ import {
   MicOff,
   CallEnd,
   FiberManualRecord,
+  Transcribe,
+  StopCircle,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -50,6 +57,15 @@ const VideoSession: React.FC = () => {
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
+
+  // Recording and Transcription (therapist/staff/admin only)
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcriptText, setTranscriptText] = useState<string[]>([]);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [isInitiator, setIsInitiator] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -233,8 +249,7 @@ const VideoSession: React.FC = () => {
     
     ws.onopen = () => {
       console.log('[VIDEO] WebSocket connected');
-      // Check if we're the first or second participant
-      // This will be determined by participant_joined messages
+      // We'll determine if we're the initiator when we receive participant_joined
     };
     
     ws.onmessage = async (event) => {
@@ -243,10 +258,12 @@ const VideoSession: React.FC = () => {
       
       switch (data.type) {
         case 'participant_joined':
-          console.log('[VIDEO] Participant joined - I am the initiator, creating offer');
-          // Only create offer if we're already connected (not the first person)
-          // The first person will receive this message about themselves and should ignore it
-          if (peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
+          console.log('[VIDEO] Participant joined notification received');
+          // If we haven't set ourselves as initiator yet, we're the second person
+          // The second person becomes the initiator and creates the offer
+          if (!isInitiator && peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
+            console.log('[VIDEO] I am the second participant (initiator) - creating offer');
+            setIsInitiator(true);
             await createOffer();
           }
           break;
@@ -392,6 +409,148 @@ const VideoSession: React.FC = () => {
         audioTrack.enabled = !audioTrack.enabled;
         setIsMicOn(audioTrack.enabled);
       }
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (!sessionId) return;
+    
+    try {
+      if (!isRecording) {
+        // Start recording using MediaRecorder
+        if (localStreamRef.current) {
+          const mediaRecorder = new MediaRecorder(localStreamRef.current);
+          const chunks: BlobPart[] = [];
+          
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+              chunks.push(e.data);
+            }
+          };
+          
+          mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const formData = new FormData();
+            formData.append('recording', blob, 'session-recording.webm');
+            
+            try {
+              await apiClient.post(`/telehealth/sessions/${sessionId}/upload_recording/`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+              });
+              showSuccess('Recording saved successfully');
+            } catch (error) {
+              console.error('Failed to save recording:', error);
+              showError('Failed to save recording');
+            }
+          };
+          
+          mediaRecorder.start(1000); // Collect data every second
+          mediaRecorderRef.current = mediaRecorder;
+          setIsRecording(true);
+          showSuccess('Recording started');
+        }
+      } else {
+        // Stop recording
+        if (mediaRecorderRef.current) {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+        }
+        setIsRecording(false);
+        showSuccess('Recording stopped');
+      }
+    } catch (error) {
+      console.error('Recording error:', error);
+      showError('Failed to toggle recording');
+    }
+  };
+
+  const toggleTranscription = async () => {
+    if (!sessionId) return;
+    
+    try {
+      if (!isTranscribing) {
+        // Start transcription using Web Speech API
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+          showError('Speech recognition not supported in this browser');
+          return;
+        }
+        
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+        
+        recognition.onresult = (event: any) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          
+          if (finalTranscript) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${finalTranscript.trim()}`;
+            setTranscriptText(prev => [...prev, entry]);
+          }
+        };
+        
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          if (event.error !== 'no-speech') {
+            showError(`Transcription error: ${event.error}`);
+          }
+        };
+        
+        recognition.onend = () => {
+          // Auto-restart if still transcribing
+          if (isTranscribing && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (error) {
+              console.error('Failed to restart recognition:', error);
+            }
+          }
+        };
+        
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsTranscribing(true);
+        setShowTranscript(true);
+        showSuccess('Transcription started');
+      } else {
+        // Stop transcription
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+          recognitionRef.current = null;
+        }
+        
+        // Save transcript to backend
+        if (transcriptText.length > 0) {
+          try {
+            await apiClient.post(`/telehealth/sessions/${sessionId}/save_transcript/`, {
+              transcript: transcriptText.join('\n')
+            });
+            showSuccess('Transcript saved');
+          } catch (error) {
+            console.error('Failed to save transcript:', error);
+            showError('Failed to save transcript');
+          }
+        }
+        
+        setIsTranscribing(false);
+        showSuccess('Transcription stopped');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      showError('Failed to toggle transcription');
     }
   };
 
@@ -563,6 +722,39 @@ const VideoSession: React.FC = () => {
           {isCameraOn ? <Videocam /> : <VideocamOff />}
         </IconButton>
 
+        {/* Recording and Transcription - Only for therapists, staff, and admins */}
+        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+          <>
+            <IconButton
+              onClick={toggleRecording}
+              sx={{
+                bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: isRecording ? 'error.dark' : 'rgba(255,255,255,0.2)',
+                },
+              }}
+              title={isRecording ? 'Stop Recording' : 'Start Recording'}
+            >
+              {isRecording ? <StopCircle /> : <FiberManualRecord />}
+            </IconButton>
+
+            <IconButton
+              onClick={toggleTranscription}
+              sx={{
+                bgcolor: isTranscribing ? 'primary.main' : 'rgba(255,255,255,0.1)',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.2)',
+                },
+              }}
+              title={isTranscribing ? 'Stop Transcription' : 'Start Transcription'}
+            >
+              <Transcribe />
+            </IconButton>
+          </>
+        )}
+
         <IconButton
           onClick={() => setShowEndDialog(true)}
           sx={{
@@ -592,6 +784,59 @@ const VideoSession: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Transcript Drawer */}
+      <Drawer
+        anchor="right"
+        open={showTranscript}
+        onClose={() => setShowTranscript(false)}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: 400,
+            p: 2,
+          },
+        }}
+      >
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Session Transcript
+        </Typography>
+        <Divider sx={{ mb: 2 }} />
+        
+        {transcriptText.length === 0 ? (
+          <Typography color="text.secondary">
+            {isTranscribing ? 'Listening...' : 'No transcript available'}
+          </Typography>
+        ) : (
+          <List>
+            {transcriptText.map((entry, index) => (
+              <React.Fragment key={index}>
+                <ListItem>
+                  <ListItemText
+                    primary={entry}
+                    sx={{
+                      '& .MuiListItemText-primary': {
+                        fontSize: '0.875rem',
+                        whiteSpace: 'pre-wrap',
+                      },
+                    }}
+                  />
+                </ListItem>
+                {index < transcriptText.length - 1 && <Divider />}
+              </React.Fragment>
+            ))}
+          </List>
+        )}
+        
+        <Box sx={{ mt: 'auto', pt: 2 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => setShowTranscript(false)}
+          >
+            Close
+          </Button>
+        </Box>
+      </Drawer>
     </Box>
   );
 };
