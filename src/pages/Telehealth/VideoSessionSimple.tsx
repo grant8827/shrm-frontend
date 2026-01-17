@@ -257,7 +257,7 @@ const VideoSession: React.FC = () => {
       ws.send(JSON.stringify({
         type: 'participant_joined',
         user_id: user?.id,
-        user_name: user?.first_name + ' ' + user?.last_name
+        user_name: user?.firstName + ' ' + user?.lastName
       }));
     };
     
