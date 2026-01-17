@@ -239,10 +239,10 @@ const VideoSession: React.FC = () => {
       return;
     }
     
-    // Use the correct WebSocket URL for your setup
-    const wsHost = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${wsHost}/ws/video/${roomId}/`;
+    // Use the correct WebSocket URL - always connect to backend
+    const wsUrl = process.env.NODE_ENV === 'production' 
+      ? `wss://shrm-backend-production.up.railway.app/ws/video/${roomId}/`
+      : `ws://localhost:8000/ws/video/${roomId}/`;
     
     console.log('[VIDEO] Connecting to WebSocket:', wsUrl);
     
