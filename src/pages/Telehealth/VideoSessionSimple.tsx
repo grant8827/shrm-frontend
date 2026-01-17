@@ -22,12 +22,15 @@ import {
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/apiClient';
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
+  const { state } = useAuth();
+  const user = state.user;
 
   // Video refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -42,6 +45,7 @@ const VideoSession: React.FC = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
+  const [sessionData, setSessionData] = useState<any>(null);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -65,6 +69,7 @@ const VideoSession: React.FC = () => {
         const response = await apiClient.get(`/telehealth/sessions/${sessionId}/`);
         const session = response.data;
         setRoomId(session.room_id);
+        setSessionData(session);
         console.log('[VIDEO] Session loaded:', session);
       } catch (error) {
         console.error('[VIDEO] Error fetching session:', error);
@@ -418,13 +423,25 @@ const VideoSession: React.FC = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h6">Emergency Telehealth Session</Typography>
+          <Box>
+            <Typography variant="h6">
+              {sessionData?.title || 'Telehealth Session'}
+            </Typography>
+            {user && ['admin', 'therapist', 'staff'].includes(user.role) && sessionData?.patient_details && (
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                Patient: {sessionData.patient_details.first_name} {sessionData.patient_details.last_name}
+              </Typography>
+            )}
+          </Box>
           <Chip
             label={formatDuration(sessionDuration)}
             color="error"
             size="small"
             icon={<FiberManualRecord />}
           />
+          {user && ['admin', 'therapist', 'staff'].includes(user.role) && sessionData?.is_emergency && (
+            <Chip label="Emergency" color="error" size="small" />
+          )}
           {isRemoteVideoReady && (
             <Chip label="Connected" color="success" size="small" />
           )}
