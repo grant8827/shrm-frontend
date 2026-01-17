@@ -240,8 +240,9 @@ const VideoSession: React.FC = () => {
     }
     
     // Determine WebSocket URL based on environment
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = import.meta.env.VITE_WS_HOST || window.location.host.replace(':5173', ':8000');
+    // Use wss:// for Railway production or HTTPS, ws:// only for local HTTP
+    const protocol = wsHost.includes('railway.app') || window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${wsHost}/ws/video/${roomId}/`;
     
     console.log('[VIDEO] Connecting to WebSocket:', wsUrl);

@@ -234,7 +234,7 @@ class AuditService {
     }
 
     try {
-      await apiService.post('/audit/logs/batch', { logs: logsToSend });
+      await apiService.post('/audit/logs/batch/', { logs: logsToSend });
     } catch (error) {
       console.error('Failed to send audit logs:', error);
       
