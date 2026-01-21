@@ -50,6 +50,7 @@ import {
   Notifications as NotificationsIcon,
   Edit as EditIcon,
   Lock as LockIcon,
+  LockOpen as LockOpenIcon,
   MoreVert as MoreIcon,
   TrendingUp,
   TrendingDown,
@@ -359,22 +360,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           }
           break;
         case 'lock':
-          // Lock user account
-          if (window.confirm('Are you sure you want to lock this user account?')) {
-            await apiClient.post(`/auth/${userId}/lock/`);
+          // Suspend user account (prevent login)
+          if (window.confirm('Are you sure you want to suspend this user account?')) {
+            await apiClient.patch(`/auth/${userId}/`, { is_active: false });
             await loadDashboardData();
           }
           break;
         case 'unlock':
-          // Unlock user account
-          await apiClient.post(`/auth/${userId}/unlock/`);
+          // Unsuspend user account (allow login)
+          await apiClient.patch(`/auth/${userId}/`, { is_active: true });
           await loadDashboardData();
           break;
         case 'delete':
-          // Deactivate user account
-          if (window.confirm('Are you sure you want to deactivate this user account?')) {
-            await apiClient.delete(`/auth/${userId}/`);
-            await loadDashboardData();
+          // Soft delete - remove from view but keep in database
+          if (window.confirm('Are you sure you want to delete this user? They will be removed from the list but data will be preserved.')) {
+            await apiClient.patch(`/auth/${userId}/`, { is_active: false });
+            // Filter out the deleted user from the current view
+            _setUsers(_users.filter(u => u.id !== userId));
           }
           break;
       }
@@ -709,14 +711,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                         </MenuItem>
                         <MenuItem 
                           onClick={() => {
-                            handleUserAction('lock', user.id);
+                            handleUserAction(user.is_active ? 'lock' : 'unlock', user.id);
                             setAnchorEl(null);
                           }}
                         >
                           <ListItemIcon>
-                            <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
+                            {user.is_active ? (
+                              <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
+                            ) : (
+                              <LockOpenIcon fontSize="small" sx={{ color: 'success.main' }} />
+                            )}
                           </ListItemIcon>
-                          <ListItemText>Suspend</ListItemText>
+                          <ListItemText>{user.is_active ? 'Suspend' : 'Unsuspend'}</ListItemText>
                         </MenuItem>
                       </Menu>
                     </TableCell>
