@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -36,6 +37,7 @@ import {
   Tabs,
   Tab,
   Badge,
+  Menu,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -55,6 +57,8 @@ import {
   CheckCircle,
   Schedule,
   Group,
+  Delete as DeleteIcon,
+  Block as BlockIcon,
 } from '@mui/icons-material';
 import { User, Patient, Appointment } from '../types';
 import ReportsSection from '../components/Reports/ReportsSection';
@@ -109,6 +113,7 @@ interface UserUpdateData {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -119,6 +124,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<UserUpdateData>({});
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
@@ -327,20 +334,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     try {
       switch (action) {
         case 'edit':
-          // Find and set the selected user, then open dialog
+          // Find the user and navigate to their profile
           const userToEdit = _users.find(u => u.id === userId);
           if (userToEdit) {
-            _setSelectedUser(userToEdit);
-            setEditUserData({
-              first_name: (userToEdit as any).first_name || userToEdit.firstName,
-              last_name: (userToEdit as any).last_name || userToEdit.lastName,
-              email: userToEdit.email,
-              username: userToEdit.username,
-              role: userToEdit.role,
-              phone_number: (userToEdit as any).phone_number,
-              is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
-            });
-            setUserDialogOpen(true);
+            // Navigate based on role
+            if (userToEdit.role === 'therapist') {
+              navigate('/therapist/profile');
+            } else if (userToEdit.role === 'staff') {
+              navigate('/staff/profile');
+            } else if (userToEdit.role === 'admin') {
+              navigate('/admin/profile');
+            } else {
+              // For other roles, still open the dialog
+              _setSelectedUser(userToEdit);
+              setEditUserData({
+                first_name: (userToEdit as any).first_name || userToEdit.firstName,
+                last_name: (userToEdit as any).last_name || userToEdit.lastName,
+                email: userToEdit.email,
+                username: userToEdit.username,
+                role: userToEdit.role,
+                phone_number: (userToEdit as any).phone_number,
+                is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
+              });
+              setUserDialogOpen(true);
+            }
           }
           break;
         case 'lock':
@@ -657,7 +674,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                     <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
                       <LockIcon />
                     </IconButton>
-                    <IconButton size="small">
+                    <IconButton 
+                      size="small"
+                      onClick={(e) => {
+                        setMenuAnchor(e.currentTarget);
+                        setSelectedUserId(user.id);
+                      }}
+                    >
                       <MoreIcon />
                     </IconButton>
                   </TableCell>
@@ -667,6 +690,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* User Actions Menu */}
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <MenuItem 
+          onClick={() => {
+            if (selectedUserId) {
+              handleUserAction('delete', selectedUserId);
+            }
+            setMenuAnchor(null);
+          }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            if (selectedUserId) {
+              handleUserAction('lock', selectedUserId);
+            }
+            setMenuAnchor(null);
+          }}
+        >
+          <ListItemIcon>
+            <BlockIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Suspend</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 
