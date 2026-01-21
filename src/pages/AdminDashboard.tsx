@@ -704,6 +704,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           vertical: 'top',
           horizontal: 'left',
         }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1,
+              ml: 1,
+            }
+          }
+        }}
       >
         <MenuItem 
           onClick={() => {
