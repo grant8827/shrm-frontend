@@ -54,6 +54,7 @@ function AdminRoutes() {
       <Route path="staff" element={<div>Staff Management</div>} />
       <Route path="reports" element={<Reports />} />
       <Route path="settings" element={<AdminSettings />} />
+      <Route path="profile" element={<AdminSettings />} />
     </Routes>
   );
 }
