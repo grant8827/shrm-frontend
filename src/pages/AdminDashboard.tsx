@@ -703,7 +703,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                           }}
                         >
                           <ListItemIcon>
-                            <DeleteIcon fontSize="small" />
+                            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
                           </ListItemIcon>
                           <ListItemText>Delete</ListItemText>
                         </MenuItem>
@@ -714,7 +714,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                           }}
                         >
                           <ListItemIcon>
-                            <BlockIcon fontSize="small" />
+                            <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
                           </ListItemIcon>
                           <ListItemText>Suspend</ListItemText>
                         </MenuItem>
