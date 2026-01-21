@@ -87,33 +87,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initAuth = async () => {
       try {
         const token = localStorage.getItem('theracare_token');
-        if (token) {
-          // Decrypt and validate token
+        const userStr = localStorage.getItem('user');
+        
+        if (token && userStr) {
+          // Decrypt token and get stored user
           const decryptedToken = encryptionService.decrypt(token);
-          const user = await authService.validateToken(decryptedToken);
+          const user = JSON.parse(userStr);
           
-          if (user) {
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: { user, token: decryptedToken },
-            });
-            
-            // Log successful authentication
-            auditService.log({
-              action: 'AUTH_VALIDATE_SUCCESS',
-              resource: 'authentication',
-              resourceId: user.id,
-            });
-          } else {
-            localStorage.removeItem('theracare_token');
-            dispatch({ type: 'LOGIN_FAILURE' });
-          }
+          // Set auth token for API requests
+          const { apiClient } = await import('../services/apiClient');
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${decryptedToken}`;
+          
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user, token: decryptedToken },
+          });
+          
+          // Log successful authentication
+          auditService.log({
+            action: 'AUTH_VALIDATE_SUCCESS',
+            resource: 'authentication',
+            resourceId: user.id,
+          });
         } else {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
         localStorage.removeItem('theracare_token');
+        localStorage.removeItem('user');
         dispatch({ type: 'LOGIN_FAILURE' });
         
         // Log failed authentication
@@ -141,6 +143,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Encrypt and store token
         const encryptedToken = encryptionService.encrypt(token);
         localStorage.setItem('theracare_token', encryptedToken);
+        localStorage.setItem('user', JSON.stringify(user));
         
         dispatch({
           type: 'LOGIN_SUCCESS',
@@ -199,6 +202,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Clear local storage
       localStorage.removeItem('theracare_token');
+      localStorage.removeItem('user');
       
       // Update state
       dispatch({ type: 'LOGOUT' });
@@ -206,6 +210,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', error);
       // Force logout even if API call fails
       localStorage.removeItem('theracare_token');
+      localStorage.removeItem('user');
       dispatch({ type: 'LOGOUT' });
     }
   };
