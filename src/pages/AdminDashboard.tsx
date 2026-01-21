@@ -124,8 +124,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<UserUpdateData>({});
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
@@ -633,105 +631,102 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              _users.map((user: any) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ mr: 2 }}>
-                        {user.full_name 
-                          ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() 
-                          : user.username.substring(0, 2).toUpperCase()}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2">{user.full_name || user.username}</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {user.email}
-                        </Typography>
+              _users.map((user: any) => {
+                const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+                const menuOpen = Boolean(anchorEl);
+                
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar sx={{ mr: 2 }}>
+                          {user.full_name 
+                            ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() 
+                            : user.username.substring(0, 2).toUpperCase()}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle2">{user.full_name || user.username}</Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {user.email}
+                          </Typography>
+                        </Box>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} 
-                      color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'} 
-                      size="small" 
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={user.is_active ? 'Active' : 'Inactive'} 
-                      color={user.is_active ? 'success' : 'default'} 
-                      size="small" 
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
-                      <LockIcon />
-                    </IconButton>
-                    <IconButton 
-                      size="small"
-                      onClick={(e) => {
-                        setMenuAnchor(e.currentTarget);
-                        setSelectedUserId(user.id);
-                      }}
-                    >
-                      <MoreIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} 
+                        color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'} 
+                        size="small" 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={user.is_active ? 'Active' : 'Inactive'} 
+                        color={user.is_active ? 'success' : 'default'} 
+                        size="small" 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                    </TableCell>
+                    <TableCell>
+                      <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
+                        <LockIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small"
+                        onClick={(e) => setAnchorEl(e.currentTarget)}
+                      >
+                        <MoreIcon />
+                      </IconButton>
+                      
+                      <Menu
+                        anchorEl={anchorEl}
+                        open={menuOpen}
+                        onClose={() => setAnchorEl(null)}
+                        anchorOrigin={{
+                          vertical: 'bottom',
+                          horizontal: 'right',
+                        }}
+                        transformOrigin={{
+                          vertical: 'top',
+                          horizontal: 'right',
+                        }}
+                      >
+                        <MenuItem 
+                          onClick={() => {
+                            handleUserAction('delete', user.id);
+                            setAnchorEl(null);
+                          }}
+                        >
+                          <ListItemIcon>
+                            <DeleteIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText>Delete</ListItemText>
+                        </MenuItem>
+                        <MenuItem 
+                          onClick={() => {
+                            handleUserAction('lock', user.id);
+                            setAnchorEl(null);
+                          }}
+                        >
+                          <ListItemIcon>
+                            <BlockIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText>Suspend</ListItemText>
+                        </MenuItem>
+                      </Menu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </TableContainer>
-
-      {/* User Actions Menu */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        anchorOrigin={{
-          vertical: 'center',
-          horizontal: 'center',
-        }}
-        transformOrigin={{
-          vertical: 'center',
-          horizontal: 'center',
-        }}
-      >
-        <MenuItem 
-          onClick={() => {
-            if (selectedUserId) {
-              handleUserAction('delete', selectedUserId);
-            }
-            setMenuAnchor(null);
-          }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
-        </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            if (selectedUserId) {
-              handleUserAction('lock', selectedUserId);
-            }
-            setMenuAnchor(null);
-          }}
-        >
-          <ListItemIcon>
-            <BlockIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Suspend</ListItemText>
-        </MenuItem>
-      </Menu>
     </Box>
   );
 
