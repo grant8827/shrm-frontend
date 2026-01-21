@@ -333,30 +333,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     try {
       switch (action) {
         case 'edit':
-          // Find the user and navigate to their profile
+          // Find the user and open edit dialog
           const userToEdit = _users.find(u => u.id === userId);
           if (userToEdit) {
-            // Navigate based on role
-            if (userToEdit.role === 'therapist') {
-              navigate('/therapist/profile');
-            } else if (userToEdit.role === 'staff') {
-              navigate('/staff/profile');
-            } else if (userToEdit.role === 'admin') {
-              navigate('/admin/profile');
-            } else {
-              // For other roles, still open the dialog
-              _setSelectedUser(userToEdit);
-              setEditUserData({
-                first_name: (userToEdit as any).first_name || userToEdit.firstName,
-                last_name: (userToEdit as any).last_name || userToEdit.lastName,
-                email: userToEdit.email,
-                username: userToEdit.username,
-                role: userToEdit.role,
-                phone_number: (userToEdit as any).phone_number,
-                is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
-              });
-              setUserDialogOpen(true);
-            }
+            _setSelectedUser(userToEdit);
+            setEditUserData({
+              first_name: (userToEdit as any).first_name || userToEdit.firstName,
+              last_name: (userToEdit as any).last_name || userToEdit.lastName,
+              email: userToEdit.email,
+              username: userToEdit.username,
+              role: userToEdit.role,
+              phone_number: (userToEdit as any).phone_number,
+              is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
+            });
+            setUserDialogOpen(true);
           }
           break;
         case 'lock':
