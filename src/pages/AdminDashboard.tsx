@@ -697,11 +697,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         open={Boolean(menuAnchor)}
         onClose={() => setMenuAnchor(null)}
         anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
+          vertical: 'top',
+          horizontal: 'right',
         }}
         transformOrigin={{
-          vertical: 'bottom',
+          vertical: 'top',
           horizontal: 'left',
         }}
       >
