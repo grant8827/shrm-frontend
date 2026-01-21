@@ -701,7 +701,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           horizontal: 'left',
         }}
         transformOrigin={{
-          vertical: 'top',
+          vertical: 'bottom',
           horizontal: 'left',
         }}
       >
