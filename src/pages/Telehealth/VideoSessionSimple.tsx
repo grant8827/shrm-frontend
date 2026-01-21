@@ -240,9 +240,10 @@ const VideoSession: React.FC = () => {
     }
     
     // Use the correct WebSocket URL - always connect to backend
-    const wsUrl = process.env.NODE_ENV === 'production' 
-      ? `wss://shrm-backend-production.up.railway.app/ws/video/${roomId}/`
-      : `ws://localhost:8000/ws/video/${roomId}/`;
+    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8000';
+    const wsProtocol = import.meta.env.PROD ? 'wss' : 'ws';
+
+    const wsUrl = `${wsProtocol}://${wsHost}/ws/video/${roomId}/`;
     
     console.log('[VIDEO] Connecting to WebSocket:', wsUrl);
     
