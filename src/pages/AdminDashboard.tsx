@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; // Not currently used
 import {
   Box,
   Grid,
@@ -114,7 +114,7 @@ interface UserUpdateData {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Removed - not currently used
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -261,6 +261,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
   const handleSaveUser = async () => {
     try {
+      console.log('Current logged in user:', _user);
+      console.log('User being edited:', _selectedUser);
+      
       if (_selectedUser) {
         // Update existing user - include all editable fields
         const updateData: any = {};
@@ -307,6 +310,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       console.error('Save user error:', err);
       console.error('Error response:', err.response);
       console.error('Error data:', err.response?.data);
+      
+      // Show specific error message to user
+      if (err.response?.status === 403) {
+        setError('Permission denied: You do not have permission to edit this user.');
+      } else if (err.response?.data) {
+        const errorMsg = typeof err.response.data === 'string' 
+          ? err.response.data 
+          : JSON.stringify(err.response.data);
+        setError(`Failed to save user: ${errorMsg}`);
+      } else {
+        setError('Failed to save user. Please try again.');
+      }
       
       // Better error message formatting
       let errorMsg = 'Failed to save user';
