@@ -56,10 +56,11 @@ interface Bill {
 
 interface Patient {
   id: number;
-  user: number;
+  patient_number: string;
   first_name: string;
   last_name: string;
   email: string;
+  status: string;
 }
 
 interface BillingFormData {
@@ -358,7 +359,8 @@ const BillingManagement: React.FC = () => {
                     <MenuItem value={0}>Select a patient</MenuItem>
                     {patients.map((patient) => (
                       <MenuItem key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} ({patient.email})
+                        {patient.first_name} {patient.last_name} 
+                        {patient.email ? ` (${patient.email})` : ` - #${patient.patient_number}`}
                       </MenuItem>
                     ))}
                   </Select>
