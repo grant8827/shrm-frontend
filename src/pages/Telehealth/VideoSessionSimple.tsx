@@ -553,7 +553,8 @@ const VideoSession: React.FC = () => {
           }
         }
         
-        const mixedStream = destination.stream;
+        // Note: Web Speech API uses default microphone, mixed stream for future enhancement
+        console.log('[TRANSCRIBE] Audio context created for mixed audio');
         
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
