@@ -26,6 +26,8 @@ import PatientManagement from './pages/Patients/PatientManagement';
 import AdminPatientManagement from './pages/Admin/AdminPatientManagement';
 import AppointmentScheduling from './pages/Appointments/AppointmentScheduling';
 import Billing from './pages/Billing/Billing';
+import BillingManagement from './pages/BillingManagement';
+import PatientBilling from './pages/PatientBilling';
 import Messages from './pages/Messages/Messages';
 import SOAPNotes from './pages/SOAPNotes/SOAPNotes';
 import Telehealth from './pages/Telehealth/Telehealth';
@@ -48,7 +50,7 @@ function AdminRoutes() {
   return (
     <Routes>
       <Route index element={<AdminDashboard user={state.user!} />} />
-      <Route path="billing" element={<Billing />} />
+      <Route path="billing" element={<BillingManagement />} />
       <Route path="patients" element={<AdminPatientManagement />} />
       <Route path="appointments" element={<AppointmentScheduling />} />
       <Route path="staff" element={<div>Staff Management</div>} />
@@ -104,6 +106,7 @@ function App() {
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />
                           <Route path="telehealth" element={<Telehealth />} />
+                          <Route path="billing" element={<BillingManagement />} />
                           <Route path="reports" element={<Reports />} />
                           <Route path="settings" element={<TherapistSettings />} />
                           <Route path="profile" element={<TherapistSettings />} />
@@ -124,6 +127,7 @@ function App() {
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />
                           <Route path="telehealth" element={<Telehealth />} />
+                          <Route path="billing" element={<BillingManagement />} />
                           <Route path="reports" element={<Reports />} />
                           <Route path="settings" element={<TherapistSettings />} />
                           <Route path="profile" element={<TherapistSettings />} />
@@ -143,7 +147,7 @@ function App() {
                           <Route path="messages" element={<Messages />} />
                           <Route path="telehealth" element={<Telehealth />} />
                           <Route path="documents" element={<Documents />} />
-                          <Route path="billing" element={<Billing />} />
+                          <Route path="billing" element={<PatientBilling />} />
                           <Route path="settings" element={<Settings />} />
                         </Routes>
                       </ProtectedRoute>
