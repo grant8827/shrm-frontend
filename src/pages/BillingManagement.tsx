@@ -121,9 +121,20 @@ const BillingManagement: React.FC = () => {
   const fetchPatients = async () => {
     try {
       const response = await apiClient.get('/patients/');
-      setPatients(response.data.results || response.data);
+      console.log('Patients API response:', response.data);
+      const patientList = response.data.results || response.data;
+      console.log('Patient list:', patientList);
+      
+      // Filter only active patients
+      const activePatients = Array.isArray(patientList) 
+        ? patientList.filter((p: Patient) => p.status === 'active')
+        : [];
+      
+      console.log('Active patients:', activePatients);
+      setPatients(activePatients);
     } catch (error) {
       console.error('Error fetching patients:', error);
+      showError('Failed to load patients');
     }
   };
 
@@ -357,12 +368,16 @@ const BillingManagement: React.FC = () => {
                     label="Patient"
                   >
                     <MenuItem value={0}>Select a patient</MenuItem>
-                    {patients.map((patient) => (
-                      <MenuItem key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} 
-                        {patient.email ? ` (${patient.email})` : ` - #${patient.patient_number}`}
-                      </MenuItem>
-                    ))}
+                    {patients.length === 0 ? (
+                      <MenuItem disabled>No active patients found</MenuItem>
+                    ) : (
+                      patients.map((patient) => (
+                        <MenuItem key={patient.id} value={patient.id}>
+                          {patient.first_name} {patient.last_name} 
+                          {patient.email ? ` (${patient.email})` : ` - #${patient.patient_number}`}
+                        </MenuItem>
+                      ))
+                    )}
                   </Select>
                 </FormControl>
               </Grid>
