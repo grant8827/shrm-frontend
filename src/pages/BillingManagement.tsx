@@ -55,16 +55,18 @@ interface Bill {
 }
 
 interface Patient {
-  id: number;
-  patient_number: string;
+  id: string;
+  username: string;
+  email: string;
   first_name: string;
   last_name: string;
-  email: string;
-  status: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
 }
 
 interface BillingFormData {
-  patient: number;
+  patient: string;
   title: string;
   description: string;
   amount: string;
@@ -89,7 +91,7 @@ const BillingManagement: React.FC = () => {
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   
   const [formData, setFormData] = useState<BillingFormData>({
-    patient: 0,
+    patient: '',
     title: '',
     description: '',
     amount: '',
@@ -120,20 +122,20 @@ const BillingManagement: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await apiClient.get('/patients/');
-      console.log('Patients API response:', response.data);
-      const patientList = response.data.results || response.data;
-      console.log('Patient list:', patientList);
+      const response = await apiClient.get('/users/');
+      console.log('Users API response:', response.data);
+      const userList = response.data.results || response.data;
+      console.log('User list:', userList);
       
-      // Filter only active patients
-      const activePatients = Array.isArray(patientList) 
-        ? patientList.filter((p: Patient) => p.status === 'active')
+      // Filter only active client users
+      const activeClients = Array.isArray(userList) 
+        ? userList.filter((u: Patient) => u.role === 'client' && u.is_active === true)
         : [];
       
-      console.log('Active patients:', activePatients);
-      setPatients(activePatients);
+      console.log('Active client users:', activeClients);
+      setPatients(activeClients);
     } catch (error) {
-      console.error('Error fetching patients:', error);
+      console.error('Error fetching client users:', error);
       showError('Failed to load patients');
     }
   };
@@ -143,7 +145,7 @@ const BillingManagement: React.FC = () => {
       setEditMode(true);
       setSelectedBill(bill);
       setFormData({
-        patient: bill.patient,
+        patient: bill.patient.toString(),
         title: bill.title,
         description: bill.description,
         amount: bill.amount,
@@ -154,7 +156,7 @@ const BillingManagement: React.FC = () => {
       setEditMode(false);
       setSelectedBill(null);
       setFormData({
-        patient: 0,
+        patient: '',
         title: '',
         description: '',
         amount: '',
@@ -364,17 +366,16 @@ const BillingManagement: React.FC = () => {
                   <InputLabel>Patient</InputLabel>
                   <Select
                     value={formData.patient}
-                    onChange={(e) => setFormData({ ...formData, patient: e.target.value as number })}
+                    onChange={(e) => setFormData({ ...formData, patient: e.target.value as string })}
                     label="Patient"
                   >
-                    <MenuItem value={0}>Select a patient</MenuItem>
+                    <MenuItem value="">Select a patient</MenuItem>
                     {patients.length === 0 ? (
                       <MenuItem disabled>No active patients found</MenuItem>
                     ) : (
                       patients.map((patient) => (
                         <MenuItem key={patient.id} value={patient.id}>
-                          {patient.first_name} {patient.last_name} 
-                          {patient.email ? ` (${patient.email})` : ` - #${patient.patient_number}`}
+                          {patient.full_name || `${patient.first_name} ${patient.last_name}`} ({patient.email})
                         </MenuItem>
                       ))
                     )}
