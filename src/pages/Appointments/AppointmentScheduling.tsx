@@ -86,20 +86,20 @@ interface Appointment {
 
 interface Patient {
   id: string;
-  patient_number: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  primary_therapist: string | null;
-  assigned_therapists: string[];
+  username: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
 }
 
 interface Therapist {
   id: string;
-  first_name: string;
-  last_name: string;
+  username: string;
   email: string;
+  full_name: string;
   role: string;
+  is_active: boolean;
 }
 
 interface TimeSlot {
@@ -134,22 +134,27 @@ const AppointmentScheduling: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
-  // Load all patients from API
+  // Load all patients from API (Users with role='client')
   React.useEffect(() => {
     const loadPatients = async () => {
       try {
         setIsLoadingPatients(true);
-        const response = await apiClient.get('/patients/');
-        console.log('Patients API Response:', response.data);
+        const response = await apiClient.get('/auth/');
+        console.log('Users API Response:', response.data);
         
-        const allPatients: Patient[] = Array.isArray(response.data.results) 
+        const allUsers = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
         
-        console.log('Parsed patients:', allPatients);
-        setPatients(allPatients);
+        // Filter to get only active clients
+        const clientUsers = allUsers.filter((user: any) => 
+          user.role === 'client' && user.is_active === true
+        );
+        
+        console.log('Filtered clients:', clientUsers);
+        setPatients(clientUsers);
       } catch (error) {
         console.error('Failed to load patients:', error);
         setPatients([]);
@@ -166,7 +171,7 @@ const AppointmentScheduling: React.FC = () => {
     const loadTherapists = async () => {
       try {
         setIsLoadingTherapists(true);
-        const response = await apiClient.get('/users/');
+        const response = await apiClient.get('/auth/');
         console.log('Users API Response:', response.data);
         
         const allUsers = Array.isArray(response.data.results) 
@@ -175,9 +180,9 @@ const AppointmentScheduling: React.FC = () => {
           ? response.data 
           : [];
         
-        // Filter to get only therapists and admins (who can also provide therapy)
+        // Filter to get only active therapists and admins
         const therapistUsers = allUsers.filter((user: any) => 
-          user.role === 'therapist' || user.role === 'admin'
+          (user.role === 'therapist' || user.role === 'admin') && user.is_active === true
         );
         
         console.log('Filtered therapists:', therapistUsers);
@@ -284,12 +289,12 @@ const AppointmentScheduling: React.FC = () => {
 
     const selectedPatient = patients.find(p => p.id === formData.patientId);
     const patientFullName = selectedPatient 
-      ? `${selectedPatient.first_name} ${selectedPatient.last_name}`.trim()
+      ? selectedPatient.full_name
       : '';
 
     const selectedTherapist = therapists.find(t => t.id === formData.therapistId);
     const therapistFullName = selectedTherapist
-      ? `${selectedTherapist.first_name} ${selectedTherapist.last_name}`.trim()
+      ? selectedTherapist.full_name
       : '';
 
     const appointmentData: Appointment = {
@@ -929,7 +934,7 @@ const AppointmentScheduling: React.FC = () => {
                   ) : (
                     patients.map((patient) => (
                       <MenuItem key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} - {patient.phone || 'No phone'}
+                        {patient.full_name} - {patient.email}
                       </MenuItem>
                     ))
                   )}
@@ -953,7 +958,7 @@ const AppointmentScheduling: React.FC = () => {
                   ) : (
                     therapists.map((therapist) => (
                       <MenuItem key={therapist.id} value={therapist.id}>
-                        {therapist.first_name} {therapist.last_name} - {therapist.email}
+                        {therapist.full_name} - {therapist.email}
                       </MenuItem>
                     ))
                   )}
