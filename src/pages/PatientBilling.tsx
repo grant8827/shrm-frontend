@@ -12,28 +12,21 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  MenuItem,
-  Alert,
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Payment as PaymentIcon,
   Receipt as ReceiptIcon,
   AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
-import { apiClient } from '../../services/apiClient';
-import { useNotification } from '../../contexts/NotificationContext';
-import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../services/apiClient';
+import { useNotification } from '../contexts/NotificationContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Bill {
   id: number;
@@ -68,13 +61,10 @@ interface BillingSummary {
 }
 
 const PatientBilling: React.FC = () => {
-  const { showSuccess, showError } = useNotification();
-  const { state } = useAuth();
-  const user = state.user;
+  const { showError } = useNotification();
   
   const [bills, setBills] = useState<Bill[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -90,8 +80,6 @@ const PatientBilling: React.FC = () => {
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
-    } finally {
-      setLoading(false);
     }
   };
 

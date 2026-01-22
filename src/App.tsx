@@ -25,7 +25,6 @@ import AdminSettings from './pages/Admin/AdminSettings';
 import PatientManagement from './pages/Patients/PatientManagement';
 import AdminPatientManagement from './pages/Admin/AdminPatientManagement';
 import AppointmentScheduling from './pages/Appointments/AppointmentScheduling';
-import Billing from './pages/Billing/Billing';
 import BillingManagement from './pages/BillingManagement';
 import PatientBilling from './pages/PatientBilling';
 import Messages from './pages/Messages/Messages';

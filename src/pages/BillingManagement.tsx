@@ -12,7 +12,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Chip,
   IconButton,
   Dialog,
@@ -21,7 +20,6 @@ import {
   DialogActions,
   TextField,
   MenuItem,
-  Alert,
   FormControl,
   InputLabel,
   Select,
@@ -32,9 +30,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Payment as PaymentIcon,
-  Receipt as ReceiptIcon,
-  AttachMoney as MoneyIcon,
-  Close as CloseIcon,
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
@@ -85,11 +80,9 @@ interface PaymentFormData {
 
 const BillingManagement: React.FC = () => {
   const { showSuccess, showError } = useNotification();
-  const { state } = useAuth();
   
   const [bills, setBills] = useState<Bill[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -122,8 +115,6 @@ const BillingManagement: React.FC = () => {
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -225,17 +216,6 @@ const BillingManagement: React.FC = () => {
     } catch (error: any) {
       showError(error.response?.data?.detail || 'Failed to record payment');
       console.error('Error recording payment:', error);
-    }
-  };
-
-  const handleMarkPaid = async (billId: number) => {
-    try {
-      await apiClient.post(`/billing/bills/${billId}/mark_paid/`);
-      showSuccess('Bill marked as paid');
-      fetchBills();
-    } catch (error: any) {
-      showError(error.response?.data?.detail || 'Failed to mark bill as paid');
-      console.error('Error marking bill as paid:', error);
     }
   };
 
