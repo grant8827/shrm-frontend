@@ -26,7 +26,6 @@ import {
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
-import { useAuth } from '../contexts/AuthContext';
 
 interface Bill {
   id: number;
