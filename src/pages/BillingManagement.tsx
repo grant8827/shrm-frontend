@@ -122,21 +122,30 @@ const BillingManagement: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await apiClient.get('/users/');
-      console.log('Users API response:', response.data);
+      console.log('Fetching users from /auth/ endpoint...');
+      const response = await apiClient.get('/auth/');
+      console.log('Users API response:', response);
+      console.log('Response data:', response.data);
+      
       const userList = response.data.results || response.data;
-      console.log('User list:', userList);
+      console.log('User list (before filtering):', userList);
+      console.log('Is array?', Array.isArray(userList));
       
       // Filter only active client users
       const activeClients = Array.isArray(userList) 
-        ? userList.filter((u: Patient) => u.role === 'client' && u.is_active === true)
+        ? userList.filter((u: Patient) => {
+            console.log(`Checking user ${u.username}: role=${u.role}, is_active=${u.is_active}`);
+            return u.role === 'client' && u.is_active === true;
+          })
         : [];
       
-      console.log('Active client users:', activeClients);
+      console.log('Active client users (after filtering):', activeClients);
+      console.log('Number of active clients:', activeClients.length);
       setPatients(activeClients);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching client users:', error);
-      showError('Failed to load patients');
+      console.error('Error details:', error.response?.data);
+      showError('Failed to load patients: ' + (error.response?.data?.detail || error.message));
     }
   };
 
