@@ -68,6 +68,7 @@ const VideoSession: React.FC = () => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSpeechDetected, setIsSpeechDetected] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   // Dialogs
@@ -426,6 +427,20 @@ const VideoSession: React.FC = () => {
     if (websocketRef.current) {
       websocketRef.current.close();
     }
+    
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   const toggleCamera = () => {
@@ -512,6 +527,33 @@ const VideoSession: React.FC = () => {
           showError('Speech recognition not supported in this browser');
           return;
         }
+        
+        // Create a mixed audio stream from both local and remote
+        const audioContext = new AudioContext();
+        audioContextRef.current = audioContext;
+        const destination = audioContext.createMediaStreamDestination();
+        
+        // Add local audio
+        if (localStreamRef.current) {
+          const localAudioTracks = localStreamRef.current.getAudioTracks();
+          if (localAudioTracks.length > 0) {
+            const localSource = audioContext.createMediaStreamSource(new MediaStream([localAudioTracks[0]]));
+            localSource.connect(destination);
+            console.log('[TRANSCRIBE] Added local audio to mixer');
+          }
+        }
+        
+        // Add remote audio
+        if (remoteStreamRef.current) {
+          const remoteAudioTracks = remoteStreamRef.current.getAudioTracks();
+          if (remoteAudioTracks.length > 0) {
+            const remoteSource = audioContext.createMediaStreamSource(new MediaStream([remoteAudioTracks[0]]));
+            remoteSource.connect(destination);
+            console.log('[TRANSCRIBE] Added remote audio to mixer');
+          }
+        }
+        
+        const mixedStream = destination.stream;
         
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -626,6 +668,12 @@ const VideoSession: React.FC = () => {
         if (recognitionRef.current) {
           recognitionRef.current.stop();
           recognitionRef.current = null;
+        }
+        
+        // Close audio context
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
         }
         
         // Save transcript to backend
@@ -883,7 +931,7 @@ const VideoSession: React.FC = () => {
 
       {/* Transcript Drawer */}
       <Drawer
-        anchor="right"
+        anchor="left"
         open={showTranscript}
         onClose={() => setShowTranscript(false)}
         sx={{
