@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom'; // Not currently used
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -114,7 +114,7 @@ interface UserUpdateData {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
-  // const navigate = useNavigate(); // Removed - not currently used
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -348,20 +348,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     try {
       switch (action) {
         case 'edit':
-          // Find the user and open edit dialog
+          // Navigate to the appropriate profile page based on role
           const userToEdit = _users.find(u => u.id === userId);
           if (userToEdit) {
-            _setSelectedUser(userToEdit);
-            setEditUserData({
-              first_name: (userToEdit as any).first_name || userToEdit.firstName,
-              last_name: (userToEdit as any).last_name || userToEdit.lastName,
-              email: userToEdit.email,
-              username: userToEdit.username,
-              role: userToEdit.role,
-              phone_number: (userToEdit as any).phone_number,
-              is_active: (userToEdit as any).is_active ?? userToEdit.isActive,
-            });
-            setUserDialogOpen(true);
+            switch (userToEdit.role) {
+              case 'admin':
+                navigate('/admin/profile');
+                break;
+              case 'therapist':
+                navigate('/therapist/profile');
+                break;
+              case 'staff':
+                navigate('/staff/profile');
+                break;
+              case 'client':
+                navigate('/client/profile');
+                break;
+              default:
+                console.error('Unknown user role:', userToEdit.role);
+            }
           }
           break;
         case 'lock':
