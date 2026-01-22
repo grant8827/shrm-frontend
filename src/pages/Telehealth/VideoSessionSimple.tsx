@@ -53,6 +53,7 @@ const VideoSession: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
+  const [participantCount, setParticipantCount] = useState(0);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -254,7 +255,12 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] WebSocket connected');
       showSuccess('Connected to session server');
       
-      // Notify server that we joined
+      // Request current participant count first
+      ws.send(JSON.stringify({
+        type: 'request_participant_count'
+      }));
+      
+      // Then notify server that we joined
       ws.send(JSON.stringify({
         type: 'participant_joined',
         user_id: user?.id,
@@ -267,14 +273,30 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] WebSocket message:', data.type, data);
       
       switch (data.type) {
-        case 'participant_joined':
-          console.log('[VIDEO] Participant joined notification received');
-          showSuccess('Another participant joined');
-          // If we haven't set ourselves as initiator yet, we're the second person
-          if (!isInitiator && peerConnectionRef.current && peerConnectionRef.current.signalingState === 'stable') {
-            console.log('[VIDEO] I am the second participant (initiator) - creating offer');
+        case 'participant_count':
+          const count = data.count;
+          console.log('[VIDEO] Participant count:', count);
+          setParticipantCount(count);
+          
+          // If there are already 2 participants (including us), we should initiate
+          if (count >= 2 && !isInitiator) {
+            console.log('[VIDEO] I am participant #' + count + ' - initiating offer');
             setIsInitiator(true);
-            await createOffer();
+            // Small delay to ensure both peers are ready
+            setTimeout(() => createOffer(), 500);
+          }
+          break;
+          
+        case 'participant_joined':
+          console.log('[VIDEO] Another participant joined');
+          showSuccess('Another participant joined');
+          setParticipantCount(prev => prev + 1);
+          
+          // If we're the first participant and someone just joined, create offer
+          if (!isInitiator && participantCount === 1) {
+            console.log('[VIDEO] First participant creating offer for newcomer');
+            setIsInitiator(true);
+            setTimeout(() => createOffer(), 500);
           }
           break;
           
