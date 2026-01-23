@@ -344,9 +344,14 @@ const AppointmentScheduling: React.FC = () => {
       // Reload appointments after save
       await loadAppointments();
       handleCloseDialog();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save appointment:', error);
-      alert('Failed to save appointment. Please try again.');
+      console.error('Error details:', error.response?.data);
+      const errorMessage = error.response?.data?.detail 
+        || error.response?.data?.message 
+        || JSON.stringify(error.response?.data) 
+        || 'Failed to save appointment. Please try again.';
+      alert(errorMessage);
     }
   };
 
