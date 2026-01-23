@@ -313,10 +313,27 @@ const AppointmentScheduling: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      // Check if appointment types are loaded
-      if (appointmentTypes.length === 0) {
-        alert('Appointment types are still loading. Please wait and try again.');
-        return;
+      // Use a default appointment type if none are loaded
+      let appointmentTypeId = null;
+      if (appointmentTypes.length > 0) {
+        appointmentTypeId = appointmentTypes[0].id;
+      } else {
+        // Try to load appointment types one more time
+        console.log('Attempting to reload appointment types...');
+        const response = await apiClient.get('/appointments/types/');
+        const types = Array.isArray(response.data.results) 
+          ? response.data.results 
+          : Array.isArray(response.data) 
+          ? response.data 
+          : [];
+        
+        if (types.length > 0) {
+          setAppointmentTypes(types);
+          appointmentTypeId = types[0].id;
+        } else {
+          alert('No appointment types available. Please contact administrator.');
+          return;
+        }
       }
 
       // Combine date and time into ISO datetime strings
@@ -330,7 +347,7 @@ const AppointmentScheduling: React.FC = () => {
       const appointmentPayload = {
         patient: formData.patientId,
         therapist: formData.therapistId,
-        appointment_type: appointmentTypes[0].id, // Use first available appointment type
+        appointment_type: appointmentTypeId,
         start_datetime: startDateTime.toISOString(),
         end_datetime: endDateTime.toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -339,7 +356,6 @@ const AppointmentScheduling: React.FC = () => {
         is_telehealth: formData.format === 'telehealth',
       };
 
-      console.log('Appointment types available:', appointmentTypes.length);
       console.log('Appointment payload:', appointmentPayload);
 
       if (editingAppointment) {
