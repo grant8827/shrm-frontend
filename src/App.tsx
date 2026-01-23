@@ -52,6 +52,8 @@ function AdminRoutes() {
       <Route path="billing" element={<BillingManagement />} />
       <Route path="patients" element={<AdminPatientManagement />} />
       <Route path="appointments" element={<AppointmentScheduling />} />
+      <Route path="soap-notes" element={<SOAPNotes />} />
+      <Route path="messages" element={<Messages />} />
       <Route path="staff" element={<div>Staff Management</div>} />
       <Route path="reports" element={<Reports />} />
       <Route path="settings" element={<AdminSettings />} />
