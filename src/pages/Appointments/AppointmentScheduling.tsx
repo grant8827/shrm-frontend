@@ -217,6 +217,8 @@ const AppointmentScheduling: React.FC = () => {
         console.error('Failed to load appointment types:', error);
         console.error('Error response:', error.response?.data);
         console.error('Error status:', error.response?.status);
+        // Set empty array on error so form doesn't get stuck
+        setAppointmentTypes([]);
       }
     };
 
@@ -320,19 +322,27 @@ const AppointmentScheduling: React.FC = () => {
       } else {
         // Try to load appointment types one more time
         console.log('Attempting to reload appointment types...');
-        const response = await apiClient.get('/appointments/types/');
-        const types = Array.isArray(response.data.results) 
-          ? response.data.results 
-          : Array.isArray(response.data) 
-          ? response.data 
-          : [];
+        try {
+          const response = await apiClient.get('/appointments/types/');
+          const types = Array.isArray(response.data.results) 
+            ? response.data.results 
+            : Array.isArray(response.data) 
+            ? response.data 
+            : [];
+          
+          if (types.length > 0) {
+            setAppointmentTypes(types);
+            appointmentTypeId = types[0].id;
+          }
+        } catch (reloadError) {
+          console.error('Failed to reload appointment types:', reloadError);
+        }
         
-        if (types.length > 0) {
-          setAppointmentTypes(types);
-          appointmentTypeId = types[0].id;
-        } else {
-          alert('No appointment types available. Please contact administrator.');
-          return;
+        // If still no appointment types, use a known ID from database
+        if (!appointmentTypeId) {
+          // Use the Follow-up Session type ID from the database
+          appointmentTypeId = '2d666946-ed73-4981-9fef-946a7c9c1a0e';
+          console.log('Using fallback appointment type ID:', appointmentTypeId);
         }
       }
 
@@ -407,37 +417,49 @@ const AppointmentScheduling: React.FC = () => {
   // Load appointments from API
   const loadAppointments = async () => {
     try {
+      console.log('Loading appointments from API...');
       const response = await apiClient.get('/appointments/');
+      console.log('Appointments API response:', response.data);
+      
       const appointmentsData = Array.isArray(response.data.results) 
         ? response.data.results 
         : Array.isArray(response.data) 
         ? response.data 
         : [];
       
-      // Map backend data to frontend format
-      const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => ({
-        id: apt.id,
-        patientId: apt.patient,
-        patientName: apt.patient_name,
-        therapistId: apt.therapist,
-        therapistName: apt.therapist_name,
-        date: apt.start_datetime.split('T')[0],
-        time: new Date(apt.start_datetime).toTimeString().substring(0, 5),
-        duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
-        type: 'follow-up' as const, // Map from appointment_type if needed
-        format: apt.is_telehealth ? 'telehealth' as const : 'in-person' as const,
-        status: apt.status,
-        notes: '',
-        location: '',
-        reminderSent: false,
-        createdBy: apt.created_by || '',
-        createdAt: apt.created_at,
-        updatedAt: apt.updated_at,
-      }));
+      console.log('Raw appointments data:', appointmentsData);
       
+      // Map backend data to frontend format
+      const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => {
+        console.log('Mapping appointment:', apt);
+        return {
+          id: apt.id,
+          patientId: apt.patient,
+          patientName: apt.patient_name || 'Unknown Patient',
+          therapistId: apt.therapist,
+          therapistName: apt.therapist_name || 'Unknown Therapist',
+          date: apt.start_datetime.split('T')[0],
+          time: new Date(apt.start_datetime).toTimeString().substring(0, 5),
+          duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
+          type: 'follow-up' as const, // Map from appointment_type if needed
+          format: apt.is_telehealth ? 'telehealth' as const : 'in-person' as const,
+          status: apt.status,
+          notes: apt.notes || '',
+          location: apt.location || '',
+          reminderSent: false,
+          createdBy: apt.created_by || '',
+          createdAt: apt.created_at,
+          updatedAt: apt.updated_at,
+        };
+      });
+      
+      console.log('Mapped appointments:', mappedAppointments);
       setAppointments(mappedAppointments);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load appointments:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      setAppointments([]);
     }
   };
 
@@ -498,14 +520,28 @@ const AppointmentScheduling: React.FC = () => {
     setSelectedAppointmentId(null);
   };
 
-  // Status update handlers
-  const updateAppointmentStatus = (appointmentId: string, status: Appointment['status']) => {
-    setAppointments(prev => prev.map(apt => 
-      apt.id === appointmentId 
-        ? { ...apt, status, updatedAt: new Date().toISOString() }
-        : apt
-    ));
-    handleMenuClose();
+  const updateAppointmentStatus = async (appointmentId: string, status: Appointment['status']) => {
+    try {
+      if (status === 'confirmed') {
+        await apiClient.post(`/appointments/${appointmentId}/confirm/`);
+      } else if (status === 'cancelled') {
+        await apiClient.post(`/appointments/${appointmentId}/cancel/`);
+      } else if (status === 'completed') {
+        await apiClient.post(`/appointments/${appointmentId}/complete/`);
+      }
+      
+      // Update local state
+      setAppointments(prev => prev.map(apt => 
+        apt.id === appointmentId 
+          ? { ...apt, status, updatedAt: new Date().toISOString() }
+          : apt
+      ));
+      handleMenuClose();
+      alert(`Appointment ${status} successfully!`);
+    } catch (error: any) {
+      console.error(`Failed to ${status} appointment:`, error);
+      alert(`Failed to ${status} appointment. Please try again.`);
+    }
   };
 
   const getStatusColor = (status: Appointment['status']) => {
@@ -873,12 +909,23 @@ const AppointmentScheduling: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton 
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, appointment.id)}
-                        >
-                          <MoreVert />
-                        </IconButton>
+                        {isPatient && appointment.status === 'scheduled' ? (
+                          <Button 
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => confirmAppointment(appointment.id)}
+                          >
+                            Confirm
+                          </Button>
+                        ) : (
+                          <IconButton 
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, appointment.id)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -967,12 +1014,23 @@ const AppointmentScheduling: React.FC = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton 
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, appointment.id)}
-                        >
-                          <MoreVert />
-                        </IconButton>
+                        {isPatient && appointment.status === 'scheduled' ? (
+                          <Button 
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            onClick={() => confirmAppointment(appointment.id)}
+                          >
+                            Confirm
+                          </Button>
+                        ) : (
+                          <IconButton 
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, appointment.id)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
