@@ -326,7 +326,6 @@ const AppointmentScheduling: React.FC = () => {
         status: 'scheduled',
         priority: 'normal',
         is_telehealth: formData.format === 'telehealth',
-        is_recurring: false,
       };
 
       if (!appointmentPayload.appointment_type) {
