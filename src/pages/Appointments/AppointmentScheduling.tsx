@@ -1029,15 +1029,21 @@ const AppointmentScheduling: React.FC = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell align="center">
-                        {isPatient && appointment.status === 'scheduled' ? (
-                          <Button 
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            onClick={() => confirmAppointment(appointment.id)}
-                          >
-                            Confirm
-                          </Button>
+                        {isPatient ? (
+                          appointment.status === 'scheduled' ? (
+                            <Button 
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
+                            >
+                              Confirm
+                            </Button>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              {appointment.status}
+                            </Typography>
+                          )
                         ) : (
                           <IconButton 
                             size="small"
