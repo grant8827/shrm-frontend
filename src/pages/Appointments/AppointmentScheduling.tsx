@@ -132,7 +132,6 @@ const AppointmentScheduling: React.FC = () => {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [isLoadingTherapists, setIsLoadingTherapists] = useState(true);
   const [appointmentTypes, setAppointmentTypes] = useState<any[]>([]);
-  const [isLoadingAppointmentTypes, setIsLoadingAppointmentTypes] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
@@ -204,7 +203,6 @@ const AppointmentScheduling: React.FC = () => {
   React.useEffect(() => {
     const loadAppointmentTypes = async () => {
       try {
-        setIsLoadingAppointmentTypes(true);
         console.log('Fetching appointment types from /appointments/types/...');
         const response = await apiClient.get('/appointments/types/');
         console.log('Appointment types response:', response.data);
@@ -219,8 +217,6 @@ const AppointmentScheduling: React.FC = () => {
         console.error('Failed to load appointment types:', error);
         console.error('Error response:', error.response?.data);
         console.error('Error status:', error.response?.status);
-      } finally {
-        setIsLoadingAppointmentTypes(false);
       }
     };
 
