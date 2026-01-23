@@ -120,9 +120,10 @@ export const Layout: React.FC = () => {
         { text: 'Admin Dashboard', icon: <Dashboard />, path: '/admin' },
         { text: 'Patient Management', icon: <People />, path: '/admin/patients' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
+        { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },
         { text: 'Messages', icon: <Message />, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },
-        { text: 'Billing', icon: <Receipt />, path: '/admin/billing' },
+        { text: 'Billing', icon: <AttachMoney />, path: '/admin/billing' },
         { text: 'Reports', icon: <Settings />, path: '/admin/reports' },
       );
     }
