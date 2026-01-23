@@ -85,7 +85,9 @@ const SOAPNotes: React.FC = () => {
       const notesRes = await apiClient.get('/soap-notes/soap-notes/');
       const statsRes = await apiClient.get('/soap-notes/soap-notes/stats/');
       
-      setSoapNotes(notesRes.data);
+      // Handle both paginated (results array) and non-paginated (direct array) responses
+      const notesData = Array.isArray(notesRes.data) ? notesRes.data : (notesRes.data.results || []);
+      setSoapNotes(notesData);
       setStats({
         completedThisWeek: statsRes.data.completed_this_week || 0,
         draftNotes: statsRes.data.draft || 0,
@@ -119,9 +121,12 @@ const SOAPNotes: React.FC = () => {
   const loadPatients = async () => {
     try {
       const response = await apiClient.get('/auth/?role=client');
-      setPatients(response.data);
+      // Handle both paginated (results array) and non-paginated (direct array) responses
+      const patientsData = Array.isArray(response.data) ? response.data : (response.data.results || []);
+      setPatients(patientsData);
     } catch (error) {
       console.error('Error loading patients:', error);
+      setPatients([]);
     }
   };
 
