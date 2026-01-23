@@ -317,6 +317,12 @@ const AppointmentScheduling: React.FC = () => {
     if (!validateForm()) return;
 
     try {
+      // Check if appointment types are loaded
+      if (appointmentTypes.length === 0) {
+        alert('Appointment types are still loading. Please wait and try again.');
+        return;
+      }
+
       // Combine date and time into ISO datetime strings
       const startDateTime = new Date(formData.date!);
       const timeDate = new Date(formData.time!);
@@ -328,7 +334,7 @@ const AppointmentScheduling: React.FC = () => {
       const appointmentPayload = {
         patient: formData.patientId,
         therapist: formData.therapistId,
-        appointment_type: appointmentTypes.length > 0 ? appointmentTypes[0].id : null,
+        appointment_type: appointmentTypes[0].id, // Use first available appointment type
         start_datetime: startDateTime.toISOString(),
         end_datetime: endDateTime.toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -337,20 +343,17 @@ const AppointmentScheduling: React.FC = () => {
         is_telehealth: formData.format === 'telehealth',
       };
 
-      console.log('Appointment types available:', appointmentTypes);
+      console.log('Appointment types available:', appointmentTypes.length);
       console.log('Appointment payload:', appointmentPayload);
-
-      if (!appointmentPayload.appointment_type) {
-        alert(`No appointment types available. Please contact administrator.\n\nLoaded types: ${appointmentTypes.length}\nIs loading: ${isLoadingAppointmentTypes}`);
-        return;
-      }
 
       if (editingAppointment) {
         // Update existing appointment
         await apiClient.put(`/appointments/${editingAppointment.id}/`, appointmentPayload);
+        alert('Appointment updated successfully!');
       } else {
         // Create new appointment
         await apiClient.post('/appointments/', appointmentPayload);
+        alert('Appointment scheduled successfully!');
       }
 
       // Reload appointments after save
@@ -359,10 +362,32 @@ const AppointmentScheduling: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to save appointment:', error);
       console.error('Error details:', error.response?.data);
-      const errorMessage = error.response?.data?.detail 
-        || error.response?.data?.message 
-        || JSON.stringify(error.response?.data) 
-        || 'Failed to save appointment. Please try again.';
+      
+      let errorMessage = 'Failed to save appointment. Please try again.';
+      
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else {
+          // Handle field-specific errors
+          const fieldErrors = [];
+          for (const [field, errors] of Object.entries(error.response.data)) {
+            if (Array.isArray(errors)) {
+              fieldErrors.push(`${field}: ${errors.join(', ')}`);
+            } else {
+              fieldErrors.push(`${field}: ${errors}`);
+            }
+          }
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join('\n');
+          }
+        }
+      }
+      
       alert(errorMessage);
     }
   };
