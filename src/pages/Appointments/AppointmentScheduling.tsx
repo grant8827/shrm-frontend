@@ -132,6 +132,7 @@ const AppointmentScheduling: React.FC = () => {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [isLoadingTherapists, setIsLoadingTherapists] = useState(true);
   const [appointmentTypes, setAppointmentTypes] = useState<any[]>([]);
+  const [isLoadingAppointmentTypes, setIsLoadingAppointmentTypes] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
@@ -203,15 +204,23 @@ const AppointmentScheduling: React.FC = () => {
   React.useEffect(() => {
     const loadAppointmentTypes = async () => {
       try {
-        const response = await apiClient.get('/appointments/appointment-types/');
+        setIsLoadingAppointmentTypes(true);
+        console.log('Fetching appointment types from /appointments/types/...');
+        const response = await apiClient.get('/appointments/types/');
+        console.log('Appointment types response:', response.data);
         const types = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
+        console.log('Loaded appointment types:', types);
         setAppointmentTypes(types);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load appointment types:', error);
+        console.error('Error response:', error.response?.data);
+        console.error('Error status:', error.response?.status);
+      } finally {
+        setIsLoadingAppointmentTypes(false);
       }
     };
 
@@ -328,8 +337,11 @@ const AppointmentScheduling: React.FC = () => {
         is_telehealth: formData.format === 'telehealth',
       };
 
+      console.log('Appointment types available:', appointmentTypes);
+      console.log('Appointment payload:', appointmentPayload);
+
       if (!appointmentPayload.appointment_type) {
-        alert('No appointment types available. Please contact administrator.');
+        alert(`No appointment types available. Please contact administrator.\n\nLoaded types: ${appointmentTypes.length}\nIs loading: ${isLoadingAppointmentTypes}`);
         return;
       }
 
