@@ -131,6 +131,7 @@ const AppointmentScheduling: React.FC = () => {
   const [isLoadingPatients, setIsLoadingPatients] = useState(true);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [isLoadingTherapists, setIsLoadingTherapists] = useState(true);
+  const [appointmentTypes, setAppointmentTypes] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
@@ -196,6 +197,25 @@ const AppointmentScheduling: React.FC = () => {
     };
 
     loadTherapists();
+  }, []);
+
+  // Load appointment types from API
+  React.useEffect(() => {
+    const loadAppointmentTypes = async () => {
+      try {
+        const response = await apiClient.get('/appointments/appointment-types/');
+        const types = Array.isArray(response.data.results) 
+          ? response.data.results 
+          : Array.isArray(response.data) 
+          ? response.data 
+          : [];
+        setAppointmentTypes(types);
+      } catch (error) {
+        console.error('Failed to load appointment types:', error);
+      }
+    };
+
+    loadAppointmentTypes();
   }, []);
   
   // Filter appointments based on user role for display
@@ -284,48 +304,94 @@ const AppointmentScheduling: React.FC = () => {
   };
 
   // Handle form submission
-  const handleSubmitAppointment = () => {
+  const handleSubmitAppointment = async () => {
     if (!validateForm()) return;
 
-    const selectedPatient = patients.find(p => p.id === formData.patientId);
-    const patientFullName = selectedPatient 
-      ? selectedPatient.full_name
-      : '';
+    try {
+      // Combine date and time into ISO datetime strings
+      const startDateTime = new Date(formData.date!);
+      const timeDate = new Date(formData.time!);
+      startDateTime.setHours(timeDate.getHours(), timeDate.getMinutes(), 0, 0);
+      
+      const endDateTime = new Date(startDateTime);
+      endDateTime.setMinutes(endDateTime.getMinutes() + formData.duration);
 
-    const selectedTherapist = therapists.find(t => t.id === formData.therapistId);
-    const therapistFullName = selectedTherapist
-      ? selectedTherapist.full_name
-      : '';
+      const appointmentPayload = {
+        patient: formData.patientId,
+        therapist: formData.therapistId,
+        appointment_type: appointmentTypes.length > 0 ? appointmentTypes[0].id : null,
+        start_datetime: startDateTime.toISOString(),
+        end_datetime: endDateTime.toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        status: 'scheduled',
+        priority: 'normal',
+        is_telehealth: formData.format === 'telehealth',
+        is_recurring: false,
+      };
 
-    const appointmentData: Appointment = {
-      id: editingAppointment ? editingAppointment.id : Date.now().toString(),
-      patientId: formData.patientId,
-      patientName: patientFullName,
-      therapistId: formData.therapistId,
-      therapistName: therapistFullName,
-      date: formData.date!.toISOString().split('T')[0],
-      time: formData.time!.toTimeString().substring(0, 5),
-      duration: formData.duration,
-      type: formData.type,
-      format: formData.format,
-      status: 'scheduled',
-      notes: formData.notes,
-      location: formData.location,
-      meetingLink: formData.format === 'telehealth' ? `https://meet.example.com/session-${Date.now()}` : undefined,
-      reminderSent: false,
-      createdBy: state.user?.id || 'user',
-      createdAt: editingAppointment ? editingAppointment.createdAt : new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+      if (!appointmentPayload.appointment_type) {
+        alert('No appointment types available. Please contact administrator.');
+        return;
+      }
 
-    if (editingAppointment) {
-      setAppointments(prev => prev.map(apt => apt.id === editingAppointment.id ? appointmentData : apt));
-    } else {
-      setAppointments(prev => [...prev, appointmentData]);
+      if (editingAppointment) {
+        // Update existing appointment
+        await apiClient.put(`/appointments/${editingAppointment.id}/`, appointmentPayload);
+      } else {
+        // Create new appointment
+        await apiClient.post('/appointments/', appointmentPayload);
+      }
+
+      // Reload appointments after save
+      await loadAppointments();
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Failed to save appointment:', error);
+      alert('Failed to save appointment. Please try again.');
     }
-
-    handleCloseDialog();
   };
+
+  // Load appointments from API
+  const loadAppointments = async () => {
+    try {
+      const response = await apiClient.get('/appointments/');
+      const appointmentsData = Array.isArray(response.data.results) 
+        ? response.data.results 
+        : Array.isArray(response.data) 
+        ? response.data 
+        : [];
+      
+      // Map backend data to frontend format
+      const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => ({
+        id: apt.id,
+        patientId: apt.patient,
+        patientName: apt.patient_name,
+        therapistId: apt.therapist,
+        therapistName: apt.therapist_name,
+        date: apt.start_datetime.split('T')[0],
+        time: new Date(apt.start_datetime).toTimeString().substring(0, 5),
+        duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
+        type: 'follow-up' as const, // Map from appointment_type if needed
+        format: apt.is_telehealth ? 'telehealth' as const : 'in-person' as const,
+        status: apt.status,
+        notes: '',
+        location: '',
+        reminderSent: false,
+        createdBy: apt.created_by || '',
+        createdAt: apt.created_at,
+        updatedAt: apt.updated_at,
+      }));
+      
+      setAppointments(mappedAppointments);
+    } catch (error) {
+      console.error('Failed to load appointments:', error);
+    }
+  };
+
+  // Load appointments on component mount
+  React.useEffect(() => {
+    loadAppointments();
+  }, []);
 
   // Dialog handlers
   const handleOpenDialog = (appointment?: Appointment) => {
@@ -532,18 +598,17 @@ const AppointmentScheduling: React.FC = () => {
           )}
           
           <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+            <Tab label="All Appointments" />
+            <Tab label="Upcoming" />
             {/* Hide Daily View from patients - they don't need the scheduling grid */}
             {!isPatient && <Tab label="Daily View" />}
-            <Tab label="Upcoming" />
-            <Tab label="All Appointments" />
-            <Tab label="All Appointments" />
           </Tabs>
         </Box>
       </Paper>
 
       {/* Main Content */}
-      {/* Daily View - Admin/Therapist Only */}
-      {!isPatient && tabValue === 0 && (
+      {/* Daily View - Admin/Therapist Only - tab 2 */}
+      {!isPatient && tabValue === 2 && (
         /* Daily View */
         <Grid container spacing={3}>
           <Grid item xs={12} md={8}>
@@ -691,8 +756,8 @@ const AppointmentScheduling: React.FC = () => {
         </Grid>
       )}
 
-      {/* Upcoming Appointments - For patients this is tab 0, for admin/therapist it's tab 1 */}
-      {((isPatient && tabValue === 0) || (!isPatient && tabValue === 1)) && (
+      {/* Upcoming Appointments - Always tab 1 */}
+      {tabValue === 1 && (
         /* Upcoming Appointments */
         <Paper>
           <Box sx={{ p: 2 }}>
@@ -771,8 +836,8 @@ const AppointmentScheduling: React.FC = () => {
         </Paper>
       )}
 
-      {/* All Appointments - For patients this is tab 1, for admin/therapist it's tab 2 */}
-      {((isPatient && tabValue === 1) || (!isPatient && tabValue === 2)) && (
+      {/* All Appointments - Always tab 0 */}
+      {tabValue === 0 && (
         /* All Appointments */
         <Paper>
           <Box sx={{ p: 2 }}>
