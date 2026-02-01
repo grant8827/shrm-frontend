@@ -101,7 +101,7 @@ const AdminSettings: React.FC = () => {
     };
     
     loadUserData();
-  }, [editUserId, showError]);
+  }, [editUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [systemSettings, setSystemSettings] = useState({
     maintenanceMode: false,
