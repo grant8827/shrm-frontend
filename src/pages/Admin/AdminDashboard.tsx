@@ -466,13 +466,33 @@ const AdminDashboard: React.FC = () => {
                         </TableCell>
                         <TableCell>{user.lastActive}</TableCell>
                         <TableCell align="center">
-                          <IconButton size="small" color="primary">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => navigate(`/admin/patients`)}
+                            title="View Details"
+                          >
                             <Visibility />
                           </IconButton>
-                          <IconButton size="small" color="info">
+                          <IconButton 
+                            size="small" 
+                            color="info"
+                            onClick={() => {
+                              // Edit user - you can implement a dialog or navigate to edit page
+                              console.log('Edit user:', user);
+                              // For now, navigate to user management
+                              navigate('/admin/patients');
+                            }}
+                            title="Edit User"
+                          >
                             <Edit />
                           </IconButton>
-                          <IconButton size="small" color="success">
+                          <IconButton 
+                            size="small" 
+                            color="success"
+                            onClick={() => navigate('/messages')}
+                            title="Send Message"
+                          >
                             <Message />
                           </IconButton>
                         </TableCell>

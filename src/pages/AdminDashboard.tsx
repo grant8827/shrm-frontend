@@ -127,6 +127,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [editUserData, setEditUserData] = useState<UserUpdateData>({});
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
+  const [userMenuAnchorEl, setUserMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedMenuUserId, setSelectedMenuUserId] = useState<string | null>(null);
 
   // Load dashboard data
   useEffect(() => {
@@ -384,9 +386,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         case 'delete':
           // Soft delete - remove from view but keep in database
           if (window.confirm('Are you sure you want to delete this user? They will be removed from the list but data will be preserved.')) {
-            await apiClient.patch(`/auth/${userId}/`, { is_active: false });
-            // Filter out the deleted user from the current view
-            _setUsers(_users.filter(u => u.id !== userId));
+            await apiClient.delete(`/auth/${userId}/`);
+            await loadDashboardData();
           }
           break;
       }
@@ -644,9 +645,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
               </TableRow>
             ) : (
               _users.map((user: any) => {
-                const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-                const menuOpen = Boolean(anchorEl);
-                
                 return (
                   <TableRow key={user.id}>
                     <TableCell>
@@ -690,51 +688,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                       </IconButton>
                       <IconButton 
                         size="small"
-                        onClick={(e) => setAnchorEl(e.currentTarget)}
+                        onClick={(e) => {
+                          setUserMenuAnchorEl(e.currentTarget);
+                          setSelectedMenuUserId(user.id);
+                        }}
                       >
                         <MoreIcon />
                       </IconButton>
-                      
-                      <Menu
-                        anchorEl={anchorEl}
-                        open={menuOpen}
-                        onClose={() => setAnchorEl(null)}
-                        anchorOrigin={{
-                          vertical: 'bottom',
-                          horizontal: 'right',
-                        }}
-                        transformOrigin={{
-                          vertical: 'top',
-                          horizontal: 'right',
-                        }}
-                      >
-                        <MenuItem 
-                          onClick={() => {
-                            handleUserAction('delete', user.id);
-                            setAnchorEl(null);
-                          }}
-                        >
-                          <ListItemIcon>
-                            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-                          </ListItemIcon>
-                          <ListItemText>Delete</ListItemText>
-                        </MenuItem>
-                        <MenuItem 
-                          onClick={() => {
-                            handleUserAction(user.is_active ? 'lock' : 'unlock', user.id);
-                            setAnchorEl(null);
-                          }}
-                        >
-                          <ListItemIcon>
-                            {user.is_active ? (
-                              <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
-                            ) : (
-                              <LockOpenIcon fontSize="small" sx={{ color: 'success.main' }} />
-                            )}
-                          </ListItemIcon>
-                          <ListItemText>{user.is_active ? 'Suspend' : 'Unsuspend'}</ListItemText>
-                        </MenuItem>
-                      </Menu>
                     </TableCell>
                   </TableRow>
                 );
@@ -743,6 +703,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           </TableBody>
         </Table>
       </TableContainer>
+      
+      {/* User action menu - rendered outside the map loop */}
+      {userMenuAnchorEl && (
+        <Menu
+          anchorEl={userMenuAnchorEl}
+          open={Boolean(userMenuAnchorEl)}
+          onClose={() => {
+            setUserMenuAnchorEl(null);
+            setSelectedMenuUserId(null);
+          }}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+        >
+        <MenuItem 
+          onClick={() => {
+            if (selectedMenuUserId) {
+              handleUserAction('delete', selectedMenuUserId);
+            }
+            setUserMenuAnchorEl(null);
+            setSelectedMenuUserId(null);
+          }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+        <MenuItem 
+          onClick={() => {
+            if (selectedMenuUserId) {
+              const user = _users.find(u => u.id === selectedMenuUserId);
+              handleUserAction((user as any)?.is_active ? 'lock' : 'unlock', selectedMenuUserId);
+            }
+            setUserMenuAnchorEl(null);
+            setSelectedMenuUserId(null);
+          }}
+        >
+          <ListItemIcon>
+            {(_users.find(u => u.id === selectedMenuUserId) as any)?.is_active ? (
+              <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
+            ) : (
+              <LockOpenIcon fontSize="small" sx={{ color: 'success.main' }} />
+            )}
+          </ListItemIcon>
+          <ListItemText>
+            {(_users.find(u => u.id === selectedMenuUserId) as any)?.is_active ? 'Suspend' : 'Unsuspend'}
+          </ListItemText>
+        </MenuItem>
+      </Menu>
+      )}
     </Box>
   );
 
