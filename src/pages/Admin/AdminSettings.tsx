@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -19,6 +20,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from '@mui/material';
 import {
   Person,
@@ -30,6 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { apiClient } from '../../services/apiClient';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -55,8 +58,13 @@ function TabPanel(props: TabPanelProps) {
 const AdminSettings: React.FC = () => {
   const { state } = useAuth();
   const { showSuccess, showError } = useNotification();
+  const [searchParams] = useSearchParams();
+  const editUserId = searchParams.get('userId');
   
   const [activeTab, setActiveTab] = useState(0);
+  const [loading, setLoading] = useState(!!editUserId);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  
   const [profileData, setProfileData] = useState({
     firstName: state.user?.firstName || '',
     lastName: state.user?.lastName || '',
@@ -64,6 +72,36 @@ const AdminSettings: React.FC = () => {
     phone: '',
     title: 'System Administrator',
   });
+
+  // Load user data if editing another user
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (editUserId) {
+        try {
+          setLoading(true);
+          const response = await apiClient.get(`/auth/${editUserId}/`);
+          const userData = response.data;
+          setEditingUser(userData);
+          setProfileData({
+            firstName: userData.first_name || '',
+            lastName: userData.last_name || '',
+            email: userData.email || '',
+            phone: userData.phone_number || '',
+            title: userData.role === 'therapist' ? 'Therapist' : 
+                   userData.role === 'staff' ? 'Staff' :
+                   userData.role === 'client' ? 'Client' : 'Administrator',
+          });
+        } catch (error) {
+          console.error('Error loading user data:', error);
+          showError('Failed to load user data');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    loadUserData();
+  }, [editUserId, showError]);
 
   const [systemSettings, setSystemSettings] = useState({
     maintenanceMode: false,
@@ -93,11 +131,25 @@ const AdminSettings: React.FC = () => {
     confirmPassword: ''
   });
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     try {
-      // TODO: Implement API call to save profile
-      showSuccess('Profile updated successfully');
+      const userId = editUserId || state.user?.id;
+      if (!userId) {
+        showError('User ID not found');
+        return;
+      }
+
+      const updateData = {
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        email: profileData.email,
+        phone_number: profileData.phone,
+      };
+
+      await apiClient.patch(`/auth/${userId}/`, updateData);
+      showSuccess(editUserId ? 'User updated successfully' : 'Profile updated successfully');
     } catch (error) {
+      console.error('Error updating profile:', error);
       showError('Failed to update profile');
     }
   };
@@ -204,23 +256,34 @@ const AdminSettings: React.FC = () => {
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
-        Administrator Settings
+        {editUserId ? `Edit User: ${profileData.firstName} ${profileData.lastName}` : 'Administrator Settings'}
       </Typography>
+      {editUserId && (
+        <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
+          Editing user account: {editingUser?.email} ({editingUser?.role})
+        </Typography>
+      )}
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, newValue) => setActiveTab(newValue)}
-          aria-label="settings tabs"
-        >
-          <Tab icon={<Person />} label="Profile" />
-          <Tab icon={<AdminPanelSettings />} label="System" />
-          <Tab icon={<Notifications />} label="Notifications" />
-          <Tab icon={<Security />} label="Security" />
-        </Tabs>
-      </Paper>
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
+          <Paper sx={{ mb: 3 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_, newValue) => setActiveTab(newValue)}
+              aria-label="settings tabs"
+            >
+              <Tab icon={<Person />} label="Profile" />
+              {!editUserId && <Tab icon={<AdminPanelSettings />} label="System" />}
+              {!editUserId && <Tab icon={<Notifications />} label="Notifications" />}
+              {!editUserId && <Tab icon={<Security />} label="Security" />}
+            </Tabs>
+          </Paper>
 
-      {/* Profile Tab */}
+          {/* Profile Tab */}
       <TabPanel value={activeTab} index={0}>
         <Card>
           <CardContent>
@@ -598,6 +661,8 @@ const AdminSettings: React.FC = () => {
           </CardContent>
         </Card>
       </TabPanel>
+        </>
+      )}
     </Box>
   );
 };

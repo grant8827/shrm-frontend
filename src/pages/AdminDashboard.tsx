@@ -350,26 +350,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     try {
       switch (action) {
         case 'edit':
-          // Navigate to the appropriate profile page based on role
-          const userToEdit = _users.find(u => u.id === userId);
-          if (userToEdit) {
-            switch (userToEdit.role) {
-              case 'admin':
-                navigate('/admin/profile');
-                break;
-              case 'therapist':
-                navigate('/therapist/profile');
-                break;
-              case 'staff':
-                navigate('/staff/profile');
-                break;
-              case 'client':
-                navigate('/client/profile');
-                break;
-              default:
-                console.error('Unknown user role:', userToEdit.role);
-            }
-          }
+          // Admin can edit any user - navigate to admin settings with userId parameter
+          navigate(`/admin/settings?userId=${userId}`);
           break;
         case 'lock':
           // Suspend user account (prevent login)
