@@ -223,7 +223,7 @@ const AdminPatientManagement: React.FC = () => {
     handleMenuClose();
   };
 
-  const handleAddPatient = (formData: PatientFormData) => {
+  const handleAddPatient = async (formData: PatientFormData) => {
     console.log('handleAddPatient called with:', formData);
     
     // Generate a new patient ID
@@ -308,8 +308,32 @@ const AdminPatientManagement: React.FC = () => {
     setSearchTerm('');
     setStatusFilter('all');
     
-    // Show success message
-    setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been successfully added!`);
+    // Send registration email
+    try {
+      const emailResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/registration/send-email/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone_number: formData.phone
+        })
+      });
+
+      if (emailResponse.ok) {
+        setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added successfully! A registration email has been sent to ${formData.email}`);
+      } else {
+        setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added, but failed to send registration email.`);
+      }
+    } catch (error) {
+      console.error('Error sending registration email:', error);
+      setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added, but failed to send registration email.`);
+    }
+    
     setShowSuccess(true);
     
     console.log('New patient added successfully:', newPatient);

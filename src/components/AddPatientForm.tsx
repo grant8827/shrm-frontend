@@ -194,9 +194,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
         break;
 
       case 2: // Insurance Information
-        if (!formData.insurance.provider) newErrors.insuranceProvider = 'Insurance provider is required';
-        if (!formData.insurance.policyNumber.trim()) newErrors.policyNumber = 'Policy number is required';
-        if (!formData.insurance.memberID.trim()) newErrors.memberID = 'Member ID is required';
+        // Insurance fields are now optional
         break;
 
       case 3: // Medical Information
@@ -551,7 +549,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth error={!!errors.insuranceProvider} required>
+              <FormControl fullWidth error={!!errors.insuranceProvider}>
                 <InputLabel>Insurance Provider</InputLabel>
                 <Select
                   value={formData.insurance.provider}
@@ -573,7 +571,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Member ID"
+                label="Member ID (Optional)"
                 value={formData.insurance.memberID}
                 onChange={(e) => setFormData(prev => ({ 
                   ...prev, 
@@ -581,14 +579,13 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                 }))}
                 error={!!errors.memberID}
                 helperText={errors.memberID}
-                required
               />
             </Grid>
 
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Policy Number"
+                label="Policy Number (Optional)"
                 value={formData.insurance.policyNumber}
                 onChange={(e) => setFormData(prev => ({ 
                   ...prev, 
@@ -596,7 +593,6 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                 }))}
                 error={!!errors.policyNumber}
                 helperText={errors.policyNumber}
-                required
               />
             </Grid>
 

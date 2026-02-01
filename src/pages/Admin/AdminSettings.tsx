@@ -81,12 +81,105 @@ const AdminSettings: React.FC = () => {
     backupAlerts: true,
   });
 
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  const [passwordErrors, setPasswordErrors] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
   const handleSaveProfile = () => {
     try {
       // TODO: Implement API call to save profile
       showSuccess('Profile updated successfully');
     } catch (error) {
       showError('Failed to update profile');
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    // Reset errors
+    setPasswordErrors({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+
+    // Validate fields
+    let hasError = false;
+    const errors = {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    };
+
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required';
+      hasError = true;
+    }
+
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required';
+      hasError = true;
+    } else if (passwordData.newPassword.length < 8) {
+      errors.newPassword = 'Password must be at least 8 characters';
+      hasError = true;
+    }
+
+    if (!passwordData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+      hasError = true;
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+      hasError = true;
+    }
+
+    if (hasError) {
+      setPasswordErrors(errors);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/password/change/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          current_password: passwordData.currentPassword,
+          new_password: passwordData.newPassword,
+          new_password_confirm: passwordData.confirmPassword
+        })
+      });
+
+      if (response.ok) {
+        showSuccess('Password updated successfully');
+        // Clear form
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      } else {
+        const data = await response.json();
+        if (data.current_password) {
+          setPasswordErrors(prev => ({ ...prev, currentPassword: data.current_password[0] || data.current_password }));
+        } else if (data.new_password) {
+          setPasswordErrors(prev => ({ ...prev, newPassword: Array.isArray(data.new_password) ? data.new_password.join(' ') : data.new_password }));
+        } else if (data.new_password_confirm) {
+          setPasswordErrors(prev => ({ ...prev, confirmPassword: data.new_password_confirm[0] || data.new_password_confirm }));
+        } else {
+          showError(data.detail || 'Failed to update password');
+        }
+      }
+    } catch (error) {
+      showError('Failed to update password');
     }
   };
 
@@ -453,6 +546,10 @@ const AdminSettings: React.FC = () => {
                   type="password"
                   label="Current Password"
                   placeholder="Enter current password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                  error={!!passwordErrors.currentPassword}
+                  helperText={passwordErrors.currentPassword}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -461,6 +558,10 @@ const AdminSettings: React.FC = () => {
                   type="password"
                   label="New Password"
                   placeholder="Enter new password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  error={!!passwordErrors.newPassword}
+                  helperText={passwordErrors.newPassword}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -469,12 +570,16 @@ const AdminSettings: React.FC = () => {
                   type="password"
                   label="Confirm New Password"
                   placeholder="Re-enter new password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  error={!!passwordErrors.confirmPassword}
+                  helperText={passwordErrors.confirmPassword}
                 />
               </Grid>
             </Grid>
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="contained" startIcon={<Security />}>
+              <Button variant="contained" startIcon={<Security />} onClick={handleUpdatePassword}>
                 Update Password
               </Button>
             </Box>
