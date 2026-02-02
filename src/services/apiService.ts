@@ -123,8 +123,11 @@ class ApiService {
         throw new Error('No refresh token available');
       }
 
+      // Get base URL without /api suffix for auth endpoints
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      
       const response = await axios.post(
-        `${this.baseURL}/../auth/refresh/`,
+        `${baseUrl}/api/auth/refresh/`,
         { refresh: refreshToken },
         {
           headers: { 'Content-Type': 'application/json' }
