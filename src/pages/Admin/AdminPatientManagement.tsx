@@ -65,7 +65,7 @@ import {
   Psychology,
 } from '@mui/icons-material';
 import AddPatientForm from '../../components/AddPatientForm';
-import apiService from '../../services/apiService';
+import { apiService } from '../../services/apiService';
 
 // Form data interface from AddPatientForm
 interface PatientFormData {
