@@ -5,6 +5,8 @@ import { encryptionService } from './encryptionService';
 class ApiService {
   private client: AxiosInstance;
   private baseURL: string;
+  private isRefreshing: boolean = false;
+  private refreshSubscribers: ((token: string) => void)[] = [];
 
   constructor() {
     this.baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -59,21 +61,92 @@ class ApiService {
         }
         return response;
       },
-      (error) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid
-          this.handleUnauthorized();
-        } else if (error.response?.status === 403) {
+      async (error) => {
+        const originalRequest = error.config;
+
+        // Handle 401 Unauthorized - try to refresh token
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          if (this.isRefreshing) {
+            // If already refreshing, wait for the new token
+            return new Promise((resolve) => {
+              this.refreshSubscribers.push((token: string) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(this.client(originalRequest));
+              });
+            });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const newToken = await this.refreshToken();
+            
+            if (newToken) {
+              // Update token in storage
+              localStorage.setItem('access_token', newToken);
+              
+              // Update the failed request with new token
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              
+              // Retry all queued requests with new token
+              this.refreshSubscribers.forEach(callback => callback(newToken));
+              this.refreshSubscribers = [];
+              
+              // Retry the original request
+              return this.client(originalRequest);
+            }
+          } catch (refreshError) {
+            // Refresh failed - log out user
+            this.handleUnauthorized();
+            return Promise.reject(refreshError);
+          } finally {
+            this.isRefreshing = false;
+          }
+        }
+
+        if (error.response?.status === 403) {
           // Insufficient permissions
           this.handleForbidden();
         }
+        
         return Promise.reject(error);
       }
     );
   }
 
+  private async refreshToken(): Promise<string | null> {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const response = await axios.post(
+        `${this.baseURL}/../auth/refresh/`,
+        { refresh: refreshToken },
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      return response.data.access;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return null;
+    }
+  }
+
   private getStoredToken(): string | null {
     try {
+      // Try access_token first (plain token for API calls)
+      const accessToken = localStorage.getItem('access_token');
+      if (accessToken) {
+        return accessToken;
+      }
+      
+      // Fallback to encrypted token
       const encryptedToken = localStorage.getItem('theracare_token');
       return encryptedToken ? encryptionService.decrypt(encryptedToken) : null;
     } catch (error) {
@@ -130,8 +203,10 @@ class ApiService {
   }
 
   private handleUnauthorized(): void {
-    // Clear stored credentials
+    // Clear all stored credentials
     localStorage.removeItem('theracare_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     
     // Redirect to login
     window.location.href = '/login';
