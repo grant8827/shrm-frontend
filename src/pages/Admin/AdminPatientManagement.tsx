@@ -295,8 +295,9 @@ const AdminPatientManagement: React.FC = () => {
     console.log('handleAddPatient called with:', formData);
     
     try {
-      // Prepare data for API (matching backend serializer field names)
+      // Prepare data for API (matching backend Patient model fields)
       const patientData = {
+        // Personal information
         first_name_write: formData.firstName,
         last_name_write: formData.lastName,
         middle_name_write: '',
@@ -305,23 +306,35 @@ const AdminPatientManagement: React.FC = () => {
         phone_secondary_write: '',
         date_of_birth: formData.dateOfBirth?.toISOString().split('T')[0] || '',
         gender: formData.gender,
+        
+        // Address
         street_address_write: formData.address.street,
         city_write: formData.address.city,
         state: formData.address.state,
         zip_code_write: formData.address.zipCode,
+        
+        // Emergency contact
         emergency_contact_name_write: formData.emergencyContact.name,
         emergency_contact_phone_write: formData.emergencyContact.phone,
         emergency_contact_relationship_write: formData.emergencyContact.relationship,
-        insurance_provider: formData.insurance.provider,
-        insurance_policy_number: formData.insurance.policyNumber,
-        insurance_group_number: formData.insurance.groupNumber,
-        primary_diagnosis: formData.medical.primaryDiagnosis,
+        
+        // Medical information (Patient model fields only)
         allergies: formData.medical.allergies.join(', '),
-        current_medications: formData.medical.medications.join(', '),
+        medications: formData.medical.medications.join(', '), // Changed from current_medications
+        
+        // Care team
         primary_therapist: formData.medical.primaryTherapist || null,
+        
+        // Administrative (required fields)
+        admission_date: new Date().toISOString().split('T')[0], // Required field - default to today
         status: 'active',
+        
+        // Portal access flag
         create_portal_access: true, // Auto-create user account and send welcome email
       };
+      
+      // Note: Insurance is a separate model (InsuranceInformation) and will need to be created separately
+      // Note: primary_diagnosis doesn't exist in Patient model - removed
 
       // Create patient via API using apiService (auto token refresh)
       const response = await apiService.post('/patients/', patientData);
