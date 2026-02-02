@@ -183,8 +183,11 @@ const AdminPatientManagement: React.FC = () => {
       const response = await apiService.get('/patients/');
       const apiPatients = response.data || response;
       
+      // Ensure apiPatients is an array
+      const patientsArray = Array.isArray(apiPatients) ? apiPatients : [];
+      
       // Transform API data to match frontend Patient interface
-      const transformedPatients: Patient[] = apiPatients.map((p: any) => ({
+      const transformedPatients: Patient[] = patientsArray.map((p: any) => ({
         id: p.id.toString(),
         firstName: p.first_name || '[Decryption Error]',
         lastName: p.last_name || '[Decryption Error]',
