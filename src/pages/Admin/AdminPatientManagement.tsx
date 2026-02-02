@@ -65,6 +65,7 @@ import {
   Psychology,
 } from '@mui/icons-material';
 import AddPatientForm from '../../components/AddPatientForm';
+import apiService from '../../services/apiService';
 
 // Form data interface from AddPatientForm
 interface PatientFormData {
@@ -179,17 +180,8 @@ const AdminPatientManagement: React.FC = () => {
   // Load patients from API
   const loadPatients = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/patients/`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load patients');
-      }
-
-      const apiPatients = await response.json();
+      const response = await apiService.get('/patients/');
+      const apiPatients = response.data || response;
       
       // Transform API data to match frontend Patient interface
       const transformedPatients: Patient[] = apiPatients.map((p: any) => ({
@@ -331,23 +323,10 @@ const AdminPatientManagement: React.FC = () => {
         create_portal_access: true, // Auto-create user account and send welcome email
       };
 
-      // Create patient via API
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/patients/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify(patientData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Failed to create patient:', errorData);
-        throw new Error(errorData.detail || 'Failed to create patient');
-      }
-
-      const createdPatient = await response.json();
+      // Create patient via API using apiService (auto token refresh)
+      const response = await apiService.post('/patients/', patientData);
+      const createdPatient = response.data || response;
+      
       console.log('Patient created successfully:', createdPatient);
 
       // Refresh patient list from API
@@ -361,9 +340,10 @@ const AdminPatientManagement: React.FC = () => {
       setSuccessMessage(`Patient ${formData.firstName} ${formData.lastName} has been added successfully! A welcome email with portal credentials has been sent to ${formData.email}`);
       setShowSuccess(true);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating patient:', error);
-      setSuccessMessage(`Failed to add patient: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error.response?.data?.detail || error.message || 'Unknown error';
+      setSuccessMessage(`Failed to add patient: ${errorMessage}`);
       setShowSuccess(true);
     }
   };
