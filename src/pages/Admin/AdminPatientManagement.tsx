@@ -176,6 +176,82 @@ const AdminPatientManagement: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Load patients from API
+  const loadPatients = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/patients/`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load patients');
+      }
+
+      const apiPatients = await response.json();
+      
+      // Transform API data to match frontend Patient interface
+      const transformedPatients: Patient[] = apiPatients.map((p: any) => ({
+        id: p.id.toString(),
+        firstName: p.first_name || '[Decryption Error]',
+        lastName: p.last_name || '[Decryption Error]',
+        dateOfBirth: p.date_of_birth || '',
+        age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 0,
+        phone: p.phone || '',
+        email: p.email || '',
+        address: [p.street_address, p.city, p.state, p.zip_code].filter(Boolean).join(', ') || '',
+        emergencyContact: {
+          name: p.emergency_contact_name || '',
+          phone: p.emergency_contact_phone || '',
+          relationship: p.emergency_contact_relationship || '',
+        },
+        insurance: {
+          provider: p.insurance_provider || '',
+          policyNumber: p.insurance_policy_number || '',
+          groupNumber: p.insurance_group_number || '',
+        },
+        registration: {
+          date: p.admission_date || p.created_at || '',
+          status: p.status || 'active',
+        },
+        medical: {
+          primaryDiagnosis: p.primary_diagnosis || '',
+          secondaryDiagnoses: [],
+          allergies: p.allergies ? p.allergies.split(',').map((a: string) => a.trim()).filter(Boolean) : [],
+          medications: p.current_medications ? p.current_medications.split(',').map((m: string) => m.trim()).filter(Boolean) : [],
+          primaryTherapist: p.primary_therapist_info ? `${p.primary_therapist_info.first_name} ${p.primary_therapist_info.last_name}` : '',
+        },
+        appointments: {
+          total: 0,
+          upcoming: 0,
+          noShows: 0,
+          lastVisit: '',
+          nextAppointment: null,
+        },
+        billing: {
+          outstandingBalance: 0,
+          totalBilled: 0,
+          insuranceClaims: 0,
+        },
+        compliance: {
+          consentForms: true,
+          privacyPolicy: true,
+          treatmentAgreement: true,
+        },
+      }));
+
+      setPatients(transformedPatients);
+    } catch (error) {
+      console.error('Error loading patients:', error);
+    }
+  };
+
+  // Load patients on component mount
+  useEffect(() => {
+    loadPatients();
+  }, []);
+
   // Filter and search logic
   useEffect(() => {
     let filtered = patients;
@@ -226,117 +302,70 @@ const AdminPatientManagement: React.FC = () => {
   const handleAddPatient = async (formData: PatientFormData) => {
     console.log('handleAddPatient called with:', formData);
     
-    // Generate a new patient ID
-    const newPatientId = (Math.max(...patients.map(p => parseInt(p.id))) + 1).toString();
-    console.log('Generated new patient ID:', newPatientId);
-    
-    // Calculate age from date of birth
-    const calculateAge = (birthDate: Date): number => {
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age;
-    };
-    
-    const age = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) : 0;
-    
-    // Convert form data to Patient interface (matching the existing Patient structure)
-    const newPatient: Patient = {
-      id: newPatientId,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      dateOfBirth: formData.dateOfBirth?.toISOString().split('T')[0] || '',
-      age,
-      phone: formData.phone,
-      email: formData.email,
-      address: `${formData.address.street}, ${formData.address.city}, ${formData.address.state} ${formData.address.zipCode}`,
-      emergencyContact: {
-        name: formData.emergencyContact.name,
-        phone: formData.emergencyContact.phone,
-        relationship: formData.emergencyContact.relationship,
-      },
-      insurance: {
-        provider: formData.insurance.provider,
-        policyNumber: formData.insurance.policyNumber,
-        groupNumber: formData.insurance.groupNumber,
-      },
-      registration: {
-        date: new Date().toISOString().split('T')[0],
-        status: 'active'
-      },
-      medical: {
-        primaryDiagnosis: formData.medical.primaryDiagnosis,
-        secondaryDiagnoses: formData.medical.secondaryDiagnoses,
-        allergies: formData.medical.allergies,
-        medications: formData.medical.medications,
-        primaryTherapist: formData.medical.primaryTherapist,
-      },
-      appointments: {
-        total: 0,
-        upcoming: 0,
-        noShows: 0,
-        lastVisit: '',
-        nextAppointment: null,
-      },
-      billing: {
-        outstandingBalance: 0,
-        totalBilled: 0,
-        insuranceClaims: 0,
-      },
-      compliance: {
-        consentForms: formData.compliance.consentForms,
-        privacyPolicy: formData.compliance.privacyPolicy,
-        treatmentAgreement: formData.compliance.treatmentAgreement,
-      }
-    };
-
-    // Add the new patient to the list
-    setPatients(prev => {
-      console.log('Previous patients:', prev.length);
-      const updated = [newPatient, ...prev];
-      console.log('Updated patients:', updated.length);
-      return updated;
-    });
-    
-    // Reset pagination to first page to show the new patient
-    setPage(1);
-    
-    // Clear any search/filter that might hide the new patient
-    setSearchTerm('');
-    setStatusFilter('all');
-    
-    // Send registration email
     try {
-      const emailResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/registration/send-email/`, {
+      // Prepare data for API (matching backend serializer field names)
+      const patientData = {
+        first_name_write: formData.firstName,
+        last_name_write: formData.lastName,
+        middle_name_write: '',
+        email_write: formData.email,
+        phone_write: formData.phone,
+        phone_secondary_write: '',
+        date_of_birth: formData.dateOfBirth?.toISOString().split('T')[0] || '',
+        gender: formData.gender,
+        street_address_write: formData.address.street,
+        city_write: formData.address.city,
+        state: formData.address.state,
+        zip_code_write: formData.address.zipCode,
+        emergency_contact_name_write: formData.emergencyContact.name,
+        emergency_contact_phone_write: formData.emergencyContact.phone,
+        emergency_contact_relationship_write: formData.emergencyContact.relationship,
+        insurance_provider: formData.insurance.provider,
+        insurance_policy_number: formData.insurance.policyNumber,
+        insurance_group_number: formData.insurance.groupNumber,
+        primary_diagnosis: formData.medical.primaryDiagnosis,
+        allergies: formData.medical.allergies.join(', '),
+        current_medications: formData.medical.medications.join(', '),
+        primary_therapist: formData.medical.primaryTherapist || null,
+        status: 'active',
+        create_portal_access: true, // Auto-create user account and send welcome email
+      };
+
+      // Create patient via API
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/patients/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
-        body: JSON.stringify({
-          email: formData.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          phone_number: formData.phone
-        })
+        body: JSON.stringify(patientData)
       });
 
-      if (emailResponse.ok) {
-        setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added successfully! A registration email has been sent to ${formData.email}`);
-      } else {
-        setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added, but failed to send registration email.`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to create patient:', errorData);
+        throw new Error(errorData.detail || 'Failed to create patient');
       }
+
+      const createdPatient = await response.json();
+      console.log('Patient created successfully:', createdPatient);
+
+      // Refresh patient list from API
+      await loadPatients();
+      
+      // Reset pagination and filters
+      setPage(1);
+      setSearchTerm('');
+      setStatusFilter('all');
+      
+      setSuccessMessage(`Patient ${formData.firstName} ${formData.lastName} has been added successfully! A welcome email with portal credentials has been sent to ${formData.email}`);
+      setShowSuccess(true);
+      
     } catch (error) {
-      console.error('Error sending registration email:', error);
-      setSuccessMessage(`Patient ${newPatient.firstName} ${newPatient.lastName} has been added, but failed to send registration email.`);
+      console.error('Error creating patient:', error);
+      setSuccessMessage(`Failed to add patient: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowSuccess(true);
     }
-    
-    setShowSuccess(true);
-    
-    console.log('New patient added successfully:', newPatient);
   };
 
   const getStatusColor = (status: Patient['registration']['status']) => {
