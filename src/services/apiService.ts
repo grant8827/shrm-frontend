@@ -123,11 +123,10 @@ class ApiService {
         throw new Error('No refresh token available');
       }
 
-      // Get base URL without /api suffix for auth endpoints
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      
+      // Use the same base URL as the main API client
+      // this.baseURL is already set from VITE_API_BASE_URL and includes '/api'
       const response = await axios.post(
-        `${baseUrl}/api/auth/refresh/`,
+        `${this.baseURL}/auth/refresh/`,
         { refresh: refreshToken },
         {
           headers: { 'Content-Type': 'application/json' }
