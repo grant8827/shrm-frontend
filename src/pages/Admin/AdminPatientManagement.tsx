@@ -340,10 +340,22 @@ const AdminPatientManagement: React.FC = () => {
       // Note: primary_diagnosis doesn't exist in Patient model - removed
 
       // Create patient via API using apiService (auto token refresh)
+      console.log('Sending patient data to API:', patientData);
       const response = await apiService.post('/patients/', patientData);
+      
+      // Check if the API request was actually successful
+      if (!response || response.success === false) {
+        const errorMessage = response?.message || response?.errors?.[0] || 'Failed to create patient';
+        console.error('Patient creation failed:', response);
+        setSuccessMessage(`Failed to add patient: ${errorMessage}`);
+        setShowSuccess(true);
+        return;
+      }
+      
       const createdPatient = response.data || response;
       
       console.log('Patient created successfully:', createdPatient);
+      console.log('create_portal_access flag:', patientData.create_portal_access);
 
       // Refresh patient list from API
       await loadPatients();
