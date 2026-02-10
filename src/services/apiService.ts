@@ -165,9 +165,9 @@ class ApiService {
 
   private shouldEncryptRequest(url: string): boolean {
     // Define endpoints that require encryption
-    // Temporarily disable encryption for auth endpoints to fix login
+    // Note: Patient endpoint does NOT need request encryption - 
+    // the backend handles field-level encryption internally
     const encryptedEndpoints = [
-      '/patients/',
       '/messages/',
       '/soap-notes/',
       '/billing/',
