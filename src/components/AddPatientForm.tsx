@@ -93,7 +93,6 @@ interface AddPatientFormProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (patientData: PatientFormData) => void;
-  therapists?: Array<{id: string, name: string}>;
 }
 
 const steps = [
@@ -103,8 +102,6 @@ const steps = [
   'Medical Information',
   'Compliance & Documents'
 ];
-
-// Therapists are now loaded from API and passed as props
 
 const insuranceProviders = [
   'Blue Cross Blue Shield',
@@ -117,7 +114,7 @@ const insuranceProviders = [
   'Other'
 ];
 
-const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit, therapists = [] }) => {
+const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<PatientFormData>({
     firstName: '',
@@ -194,7 +191,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
 
       case 3: // Medical Information
         if (!formData.medical.primaryDiagnosis.trim()) newErrors.primaryDiagnosis = 'Primary diagnosis is required';
-        if (!formData.medical.primaryTherapist) newErrors.primaryTherapist = 'Primary therapist is required';
+        // Primary therapist is optional - will be assigned when scheduling appointments
         break;
 
       case 4: // Compliance - For testing, make these warnings instead of errors
@@ -646,33 +643,11 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
               />
             </Grid>
 
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth error={!!errors.primaryTherapist} required>
-                <InputLabel>Primary Therapist</InputLabel>
-                <Select
-                  value={formData.medical.primaryTherapist}
-                  label="Primary Therapist"
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    medical: { ...prev.medical, primaryTherapist: e.target.value }
-                  }))}
-                  onOpen={() => console.log('Therapist dropdown opened. Available therapists:', therapists)}
-                >
-                  {therapists.length === 0 && (
-                    <MenuItem disabled>No therapists available</MenuItem>
-                  )}
-                  {therapists.map((therapist) => (
-                    <MenuItem key={therapist.id} value={therapist.id}>
-                      {therapist.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-                {therapists.length === 0 && (
-                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
-                    No therapists found. Please contact your administrator.
-                  </Typography>
-                )}
-              </FormControl>
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <AlertTitle>Note: Primary Therapist Assignment</AlertTitle>
+                The primary therapist will be assigned when you schedule the patient's first appointment.
+              </Alert>
             </Grid>
 
             <Grid item xs={12}>
