@@ -176,6 +176,24 @@ const AdminPatientManagement: React.FC = () => {
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [therapists, setTherapists] = useState<Array<{id: string, name: string}>>([]);
+
+  // Load therapists from API
+  const loadTherapists = async () => {
+    try {
+      const response = await apiService.get('/auth/');
+      const users = response.data?.results || response.data || [];
+      const therapistUsers = users
+        .filter((user: any) => user.role === 'therapist')
+        .map((user: any) => ({
+          id: user.id,
+          name: user.full_name || `${user.first_name} ${user.last_name}` || user.username
+        }));
+      setTherapists(therapistUsers);
+    } catch (error) {
+      console.error('Error loading therapists:', error);
+    }
+  };
 
   // Load patients from API
   const loadPatients = async () => {
@@ -245,6 +263,7 @@ const AdminPatientManagement: React.FC = () => {
   // Load patients on component mount
   useEffect(() => {
     loadPatients();
+    loadTherapists();
   }, []);
 
   // Filter and search logic
@@ -298,6 +317,15 @@ const AdminPatientManagement: React.FC = () => {
     console.log('handleAddPatient called with:', formData);
     
     try {
+      // Map gender to backend format (M, F, O, P)
+      const genderMap: { [key: string]: string } = {
+        'male': 'M',
+        'female': 'F',
+        'other': 'O',
+        'prefer not to say': 'P',
+      };
+      const mappedGender = genderMap[formData.gender.toLowerCase()] || 'P';
+      
       // Prepare data for API (matching backend Patient model fields)
       const patientData = {
         // Personal information
@@ -308,7 +336,7 @@ const AdminPatientManagement: React.FC = () => {
         phone_write: formData.phone,
         phone_secondary_write: '',
         date_of_birth: formData.dateOfBirth?.toISOString().split('T')[0] || '',
-        gender: formData.gender,
+        gender: mappedGender,
         
         // Address
         street_address_write: formData.address.street,
@@ -325,7 +353,7 @@ const AdminPatientManagement: React.FC = () => {
         allergies: formData.medical.allergies.join(', '),
         medications: formData.medical.medications.join(', '), // Changed from current_medications
         
-        // Care team
+        // Care team - primary_therapist expects UUID
         primary_therapist: formData.medical.primaryTherapist || null,
         
         // Administrative (required fields)
@@ -1015,6 +1043,7 @@ const AdminPatientManagement: React.FC = () => {
         open={addPatientOpen}
         onClose={() => setAddPatientOpen(false)}
         onSubmit={handleAddPatient}
+        therapists={therapists}
       />
 
       {/* Success Notification */}

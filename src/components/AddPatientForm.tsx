@@ -93,6 +93,7 @@ interface AddPatientFormProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (patientData: PatientFormData) => void;
+  therapists?: Array<{id: string, name: string}>;
 }
 
 const steps = [
@@ -103,13 +104,7 @@ const steps = [
   'Compliance & Documents'
 ];
 
-const therapists = [
-  'Dr. Sarah Wilson',
-  'Dr. Michael Johnson',
-  'Dr. Emily Davis',
-  'Dr. Robert Martinez',
-  'Dr. Lisa Anderson'
-];
+// Therapists are now loaded from API and passed as props
 
 const insuranceProviders = [
   'Blue Cross Blue Shield',
@@ -122,7 +117,7 @@ const insuranceProviders = [
   'Other'
 ];
 
-const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit }) => {
+const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit, therapists = [] }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<PatientFormData>({
     firstName: '',
@@ -663,8 +658,8 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                   }))}
                 >
                   {therapists.map((therapist) => (
-                    <MenuItem key={therapist} value={therapist}>
-                      {therapist}
+                    <MenuItem key={therapist.id} value={therapist.id}>
+                      {therapist.name}
                     </MenuItem>
                   ))}
                 </Select>
