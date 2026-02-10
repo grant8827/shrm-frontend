@@ -178,20 +178,38 @@ const AdminPatientManagement: React.FC = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [therapists, setTherapists] = useState<Array<{id: string, name: string}>>([]);
 
+  console.log('AdminPatientManagement component mounted/updated. Current therapists:', therapists);
+
   // Load therapists from API
   const loadTherapists = async () => {
     try {
+      console.log('Loading therapists from API...');
       const response = await apiService.get<any>('/auth/');
+      console.log('Raw API response:', response);
+      console.log('Response data:', response.data);
+      
       const users = response.data?.results || response.data || [];
+      console.log('Users array:', users);
+      console.log('Total users:', users.length);
+      
+      // Filter for both therapist and admin roles
       const therapistUsers = users
-        .filter((user: any) => user.role === 'therapist')
+        .filter((user: any) => {
+          console.log(`User ${user.username}: role=${user.role}`);
+          return user.role === 'therapist' || user.role === 'admin';
+        })
         .map((user: any) => ({
           id: user.id,
           name: user.full_name || `${user.first_name} ${user.last_name}` || user.username
         }));
+      
+      console.log('Filtered therapists and admins:', therapistUsers);
+      console.log('Total therapists/admins found:', therapistUsers.length);
       setTherapists(therapistUsers);
+      console.log('✅ setTherapists called with', therapistUsers.length, 'users');
     } catch (error) {
       console.error('Error loading therapists:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
     }
   };
 
@@ -262,6 +280,7 @@ const AdminPatientManagement: React.FC = () => {
 
   // Load patients on component mount
   useEffect(() => {
+    console.log('🚀 useEffect running - loading patients and therapists...');
     loadPatients();
     loadTherapists();
   }, []);

@@ -656,13 +656,22 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                     ...prev, 
                     medical: { ...prev.medical, primaryTherapist: e.target.value }
                   }))}
+                  onOpen={() => console.log('Therapist dropdown opened. Available therapists:', therapists)}
                 >
+                  {therapists.length === 0 && (
+                    <MenuItem disabled>No therapists available</MenuItem>
+                  )}
                   {therapists.map((therapist) => (
                     <MenuItem key={therapist.id} value={therapist.id}>
                       {therapist.name}
                     </MenuItem>
                   ))}
                 </Select>
+                {therapists.length === 0 && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5 }}>
+                    No therapists found. Please contact your administrator.
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
 
