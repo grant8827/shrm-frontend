@@ -184,7 +184,7 @@ const AdminPatientManagement: React.FC = () => {
   const loadTherapists = async () => {
     try {
       console.log('Loading therapists from API...');
-      const response = await apiService.get<any>('/auth/');
+      const response = await apiService.get<any>('/');
       console.log('Raw API response:', response);
       console.log('Response data:', response.data);
       
