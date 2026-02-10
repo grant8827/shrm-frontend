@@ -181,7 +181,7 @@ const AdminPatientManagement: React.FC = () => {
   // Load therapists from API
   const loadTherapists = async () => {
     try {
-      const response = await apiService.get('/auth/');
+      const response = await apiService.get<any>('/auth/');
       const users = response.data?.results || response.data || [];
       const therapistUsers = users
         .filter((user: any) => user.role === 'therapist')
