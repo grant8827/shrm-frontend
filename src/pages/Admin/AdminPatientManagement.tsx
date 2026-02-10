@@ -345,8 +345,21 @@ const AdminPatientManagement: React.FC = () => {
       
       // Check if the API request was actually successful
       if (!response || response.success === false) {
-        const errorMessage = response?.message || response?.errors?.[0] || 'Failed to create patient';
-        console.error('Patient creation failed:', response);
+        // Log full response for debugging
+        console.error('Full error response:', JSON.stringify(response, null, 2));
+        
+        // Try to extract meaningful error message
+        let errorMessage = 'Failed to create patient';
+        if (response?.errors && Array.isArray(response.errors) && response.errors.length > 0) {
+          errorMessage = response.errors.join(', ');
+        } else if (response?.message) {
+          errorMessage = response.message;
+        } else if (response?.data) {
+          // Sometimes errors are in response.data
+          errorMessage = JSON.stringify(response.data);
+        }
+        
+        console.error('Patient creation failed:', errorMessage);
         setSuccessMessage(`Failed to add patient: ${errorMessage}`);
         setShowSuccess(true);
         return;

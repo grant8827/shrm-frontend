@@ -340,10 +340,44 @@ class ApiService {
   private handleError(error: any): ApiResponse<any> {
     if (error.response) {
       // Server responded with an error status
+      const responseData = error.response.data;
+      
+      // Check if it's a Django REST Framework validation error format
+      // DRF returns: { "field_name": ["error message"], ... }
+      if (responseData && typeof responseData === 'object' && !responseData.message && !responseData.errors) {
+        // Parse Django validation errors
+        const errors: string[] = [];
+        let firstError = '';
+        
+        Object.keys(responseData).forEach(field => {
+          const fieldErrors = responseData[field];
+          if (Array.isArray(fieldErrors)) {
+            fieldErrors.forEach(err => {
+              const errorMsg = `${field}: ${err}`;
+              errors.push(errorMsg);
+              if (!firstError) firstError = errorMsg;
+            });
+          } else if (typeof fieldErrors === 'string') {
+            const errorMsg = `${field}: ${fieldErrors}`;
+            errors.push(errorMsg);
+            if (!firstError) firstError = errorMsg;
+          }
+        });
+        
+        return {
+          success: false,
+          message: firstError || 'Validation error',
+          errors,
+          data: responseData, // Keep original for debugging
+        };
+      }
+      
+      // Standard error format
       return {
         success: false,
-        message: error.response.data?.message || 'An error occurred',
-        errors: error.response.data?.errors || [error.response.statusText],
+        message: responseData?.message || 'An error occurred',
+        errors: responseData?.errors || [error.response.statusText],
+        data: responseData,
       };
     } else if (error.request) {
       // Network error
