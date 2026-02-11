@@ -127,7 +127,7 @@ const AdminPatientManagement: React.FC = () => {
       const response = await apiService.get('/patients/');
       console.log('🔵 Raw API response:', response);
       
-      const data: BackendPatient[] | PaginatedResponse<BackendPatient> = response.data || response;
+      const data = (response.data || response) as BackendPatient[] | PaginatedResponse<BackendPatient>;
       console.log('🔵 Extracted data:', data);
       
       // Handle paginated response - check if it has a 'results' field
