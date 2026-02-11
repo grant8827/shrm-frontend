@@ -7,6 +7,7 @@ export interface User {
   lastName: string;
   role: UserRole;
   isActive: boolean;
+  must_change_password?: boolean;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;

@@ -179,7 +179,7 @@ const AdminPatientManagement: React.FC = () => {
   const handleViewPatient = async (patientId: string) => {
     try {
       const response = await apiService.get(`/patients/${patientId}/`);
-      setSelectedPatient(response.data);
+      setSelectedPatient(response.data as BackendPatient);
       setViewPatientOpen(true);
     } catch (error: any) {
       console.error('❌ Error loading patient details:', error);
@@ -192,7 +192,7 @@ const AdminPatientManagement: React.FC = () => {
   const handleEditPatient = async (patientId: string) => {
     try {
       const response = await apiService.get(`/patients/${patientId}/`);
-      setSelectedPatient(response.data);
+      setSelectedPatient(response.data as BackendPatient);
       setEditPatientOpen(true);
     } catch (error: any) {
       console.error('❌ Error loading patient details:', error);
@@ -224,8 +224,8 @@ const AdminPatientManagement: React.FC = () => {
     try {
       const response = await apiService.post(`/patients/${patientId}/resend_welcome_email/`);
       
-      if (response.data) {
-        setSuccessMessage(`Welcome email sent successfully to ${response.data.email}`);
+      if (response.data && (response.data as any).email) {
+        setSuccessMessage(`Welcome email sent successfully to ${(response.data as any).email}`);
         setShowSuccess(true);
       }
     } catch (error: any) {
