@@ -12,6 +12,10 @@ import {
   FormControlLabel,
   Checkbox,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
@@ -33,6 +37,7 @@ const validationSchema = yup.object({
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false);
   const { login } = useAuth();
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
@@ -49,22 +54,19 @@ const Login: React.FC = () => {
         const success = await login(values.username, values.password);
         
         if (success) {
-          showSuccess('Login successful! Redirecting to dashboard...');
-          
           // Check if user needs to change password
           const userStr = localStorage.getItem('user');
           if (userStr) {
             const user = JSON.parse(userStr);
             if (user.must_change_password) {
-              showError('You must change your temporary password before continuing.');
-              setTimeout(() => {
-                navigate('/change-password');
-              }, 1500);
+              // Show popup dialog instead of redirecting immediately
+              setShowPasswordChangeDialog(true);
               return;
             }
           }
           
           // Redirect to appropriate dashboard after successful login
+          showSuccess('Login successful! Redirecting to dashboard...');
           setTimeout(() => {
             navigate('/dashboard');
           }, 1000);
@@ -201,6 +203,58 @@ const Login: React.FC = () => {
           </Box>
         </Paper>
       </Box>
+
+      {/* Password Change Required Dialog */}
+      <Dialog
+        open={showPasswordChangeDialog}
+        onClose={() => {}} // Prevent closing by clicking outside
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h5" component="span" color="warning.main">
+            ⚠️ Password Change Required
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <strong>Security Notice:</strong> You are using a temporary password.
+          </Alert>
+          <Typography variant="body1" paragraph>
+            For your security, you must change your temporary password before accessing the system.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Your new password must:
+          </Typography>
+          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
+            <Typography component="li" variant="body2" color="text.secondary">
+              Be at least 12 characters long
+            </Typography>
+            <Typography component="li" variant="body2" color="text.secondary">
+              Contain uppercase and lowercase letters
+            </Typography>
+            <Typography component="li" variant="body2" color="text.secondary">
+              Include at least one number
+            </Typography>
+            <Typography component="li" variant="body2" color="text.secondary">
+              Be different from your temporary password
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            onClick={() => {
+              setShowPasswordChangeDialog(false);
+              navigate('/change-password');
+            }}
+          >
+            Change Password Now
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
