@@ -471,8 +471,9 @@ const AdminPatientManagement: React.FC = () => {
         fullWidth
       >
         <AddPatientForm
+          open={addPatientOpen}
+          onClose={() => setAddPatientOpen(false)}
           onSubmit={handleAddPatient}
-          onCancel={() => setAddPatientOpen(false)}
         />
       </Dialog>
 
