@@ -15,6 +15,7 @@ import { Layout } from './components/Layout/Layout';
 // Pages
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ChangePassword from './pages/Auth/ChangePassword';
 import CompleteRegistration from './pages/Auth/CompleteRegistration';
 import AdminDashboard from './pages/AdminDashboard';
 import TherapistDashboard from './pages/Therapist/TherapistDashboard';
@@ -76,6 +77,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/admin/login" element={<Navigate to="/login" replace />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="/complete-registration/:token" element={<CompleteRegistration />} />
                 
                 {/* Protected Routes */}

@@ -50,6 +50,20 @@ const Login: React.FC = () => {
         
         if (success) {
           showSuccess('Login successful! Redirecting to dashboard...');
+          
+          // Check if user needs to change password
+          const userStr = localStorage.getItem('user');
+          if (userStr) {
+            const user = JSON.parse(userStr);
+            if (user.must_change_password) {
+              showError('You must change your temporary password before continuing.');
+              setTimeout(() => {
+                navigate('/change-password');
+              }, 1500);
+              return;
+            }
+          }
+          
           // Redirect to appropriate dashboard after successful login
           setTimeout(() => {
             navigate('/dashboard');

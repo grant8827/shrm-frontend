@@ -15,12 +15,16 @@ import {
   TextField,
   InputAdornment,
   Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Grid,
   Card,
   CardContent,
   Avatar,
   Alert,
   Snackbar,
+  Divider,
 } from '@mui/material';
 import {
   Search,
@@ -28,6 +32,7 @@ import {
   Edit,
   PersonAdd,
   Refresh,
+  EmailOutlined,
 } from '@mui/icons-material';
 import AddPatientForm from '../../components/AddPatientForm';
 import { apiService } from '../../services/apiService';
@@ -111,6 +116,9 @@ const AdminPatientManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [addPatientOpen, setAddPatientOpen] = useState(false);
+  const [viewPatientOpen, setViewPatientOpen] = useState(false);
+  const [editPatientOpen, setEditPatientOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<BackendPatient | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -164,6 +172,69 @@ const AdminPatientManagement: React.FC = () => {
     } finally {
       setLoading(false);
       console.log('🔵 loadPatients completed');
+    }
+  };
+
+  // Open view patient dialog
+  const handleViewPatient = async (patientId: string) => {
+    try {
+      const response = await apiService.get(`/patients/${patientId}/`);
+      setSelectedPatient(response.data);
+      setViewPatientOpen(true);
+    } catch (error: any) {
+      console.error('❌ Error loading patient details:', error);
+      setErrorMessage('Failed to load patient details');
+      setShowError(true);
+    }
+  };
+
+  // Open edit patient dialog
+  const handleEditPatient = async (patientId: string) => {
+    try {
+      const response = await apiService.get(`/patients/${patientId}/`);
+      setSelectedPatient(response.data);
+      setEditPatientOpen(true);
+    } catch (error: any) {
+      console.error('❌ Error loading patient details:', error);
+      setErrorMessage('Failed to load patient details');
+      setShowError(true);
+    }
+  };
+
+  // Handle patient update
+  const handleUpdatePatient = async (formData: any) => {
+    try {
+      if (!selectedPatient) return;
+      
+      await apiService.put(`/patients/${selectedPatient.id}/`, formData);
+      setSuccessMessage('Patient updated successfully');
+      setShowSuccess(true);
+      setEditPatientOpen(false);
+      setSelectedPatient(null);
+      loadPatients(); // Reload the patient list
+    } catch (error: any) {
+      console.error('❌ Error updating patient:', error);
+      setErrorMessage('Failed to update patient');
+      setShowError(true);
+    }
+  };
+
+  // Resend welcome email to patient
+  const handleResendEmail = async (patientId: string) => {
+    try {
+      const response = await apiService.post(`/patients/${patientId}/resend_welcome_email/`);
+      
+      if (response.data) {
+        setSuccessMessage(`Welcome email sent successfully to ${response.data.email}`);
+        setShowSuccess(true);
+      }
+    } catch (error: any) {
+      console.error('❌ Error resending email:', error);
+      setErrorMessage(
+        error.response?.data?.error || 
+        'Failed to send welcome email. Please try again.'
+      );
+      setShowError(true);
     }
   };
 
@@ -506,11 +577,29 @@ const AdminPatientManagement: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <IconButton size="small" color="primary" title="View Details">
+                      <IconButton 
+                        size="small" 
+                        color="primary" 
+                        title="View Details"
+                        onClick={() => handleViewPatient(patient.id)}
+                      >
                         <Visibility />
                       </IconButton>
-                      <IconButton size="small" color="info" title="Edit">
+                      <IconButton 
+                        size="small" 
+                        color="info" 
+                        title="Edit"
+                        onClick={() => handleEditPatient(patient.id)}
+                      >
                         <Edit />
+                      </IconButton>
+                      <IconButton 
+                        size="small" 
+                        color="success" 
+                        title="Resend Welcome Email"
+                        onClick={() => handleResendEmail(patient.id)}
+                      >
+                        <EmailOutlined />
                       </IconButton>
                     </TableCell>
                   </TableRow>
@@ -534,6 +623,241 @@ const AdminPatientManagement: React.FC = () => {
           onClose={() => setAddPatientOpen(false)}
           onSubmit={handleAddPatient}
         />
+      </Dialog>
+
+      {/* View Patient Dialog */}
+      <Dialog
+        open={viewPatientOpen}
+        onClose={() => {
+          setViewPatientOpen(false);
+          setSelectedPatient(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
+              {selectedPatient?.first_name?.charAt(0)}{selectedPatient?.last_name?.charAt(0)}
+            </Avatar>
+            <Box>
+              <Typography variant="h5">
+                {selectedPatient?.first_name} {selectedPatient?.last_name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Patient #{selectedPatient?.patient_number}
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>Personal Information</Typography>
+              <Divider sx={{ mb: 2 }} />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Email</Typography>
+              <Typography variant="body1">{selectedPatient?.email || 'N/A'}</Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Phone</Typography>
+              <Typography variant="body1">{selectedPatient?.phone || 'N/A'}</Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Date of Birth</Typography>
+              <Typography variant="body1">
+                {selectedPatient?.date_of_birth ? new Date(selectedPatient.date_of_birth).toLocaleDateString() : 'N/A'}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Gender</Typography>
+              <Typography variant="body1">
+                {selectedPatient?.gender === 'M' ? 'Male' : 
+                 selectedPatient?.gender === 'F' ? 'Female' : 
+                 selectedPatient?.gender === 'O' ? 'Other' : 'Not specified'}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Status</Typography>
+              <Chip
+                label={selectedPatient?.status ? selectedPatient.status.charAt(0).toUpperCase() + selectedPatient.status.slice(1) : 'N/A'}
+                color={selectedPatient?.status ? getStatusColor(selectedPatient.status) as any : 'default'}
+                size="small"
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary">Admission Date</Typography>
+              <Typography variant="body1">
+                {selectedPatient?.admission_date ? new Date(selectedPatient.admission_date).toLocaleDateString() : 'N/A'}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary">Primary Therapist</Typography>
+              <Typography variant="body1">{selectedPatient?.primary_therapist_name || 'Not assigned'}</Typography>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="body2" color="text.secondary">Created At</Typography>
+              <Typography variant="body1">
+                {selectedPatient?.created_at ? new Date(selectedPatient.created_at).toLocaleString() : 'N/A'}
+              </Typography>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setViewPatientOpen(false);
+            setSelectedPatient(null);
+          }}>
+            Close
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              setViewPatientOpen(false);
+              if (selectedPatient) {
+                handleEditPatient(selectedPatient.id);
+              }
+            }}
+          >
+            Edit Patient
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Patient Dialog */}
+      <Dialog
+        open={editPatientOpen}
+        onClose={() => {
+          setEditPatientOpen(false);
+          setSelectedPatient(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Edit Patient Profile</DialogTitle>
+        <DialogContent dividers>
+          {selectedPatient && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="First Name"
+                  defaultValue={selectedPatient.first_name}
+                  id="edit-first-name"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Last Name"
+                  defaultValue={selectedPatient.last_name}
+                  id="edit-last-name"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Email"
+                  type="email"
+                  defaultValue={selectedPatient.email}
+                  id="edit-email"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  defaultValue={selectedPatient.phone}
+                  id="edit-phone"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Date of Birth"
+                  type="date"
+                  defaultValue={selectedPatient.date_of_birth}
+                  id="edit-dob"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Gender"
+                  select
+                  defaultValue={selectedPatient.gender}
+                  SelectProps={{ native: true }}
+                  id="edit-gender"
+                >
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                  <option value="O">Other</option>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Status"
+                  select
+                  defaultValue={selectedPatient.status}
+                  SelectProps={{ native: true }}
+                  id="edit-status"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="discharged">Discharged</option>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Admission Date"
+                  type="date"
+                  defaultValue={selectedPatient.admission_date}
+                  id="edit-admission"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setEditPatientOpen(false);
+            setSelectedPatient(null);
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={() => {
+              // Gather form data and submit
+              const formData = {
+                first_name: (document.getElementById('edit-first-name') as HTMLInputElement)?.value,
+                last_name: (document.getElementById('edit-last-name') as HTMLInputElement)?.value,
+                email: (document.getElementById('edit-email') as HTMLInputElement)?.value,
+                phone: (document.getElementById('edit-phone') as HTMLInputElement)?.value,
+                date_of_birth: (document.getElementById('edit-dob') as HTMLInputElement)?.value,
+                gender: (document.getElementById('edit-gender') as HTMLSelectElement)?.value,
+                status: (document.getElementById('edit-status') as HTMLSelectElement)?.value,
+                admission_date: (document.getElementById('edit-admission') as HTMLInputElement)?.value,
+              };
+              handleUpdatePatient(formData);
+            }}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Success Snackbar */}
