@@ -50,6 +50,17 @@ interface BackendPatient {
   updated_at: string;
 }
 
+// Paginated API response interface
+interface PaginatedResponse<T> {
+  count: number;
+  current_page: number;
+  total_pages: number;
+  page_size: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 // Form data interface
 interface PatientFormData {
   firstName: string;
@@ -116,7 +127,7 @@ const AdminPatientManagement: React.FC = () => {
       const response = await apiService.get('/patients/');
       console.log('🔵 Raw API response:', response);
       
-      const data = response.data || response;
+      const data: BackendPatient[] | PaginatedResponse<BackendPatient> = response.data || response;
       console.log('🔵 Extracted data:', data);
       
       // Handle paginated response - check if it has a 'results' field
@@ -125,7 +136,7 @@ const AdminPatientManagement: React.FC = () => {
       if (Array.isArray(data)) {
         console.log('✅ Response is a plain array');
         patientsData = data;
-      } else if (data && Array.isArray(data.results)) {
+      } else if (data && 'results' in data && Array.isArray(data.results)) {
         console.log('✅ Response is paginated - extracting results');
         patientsData = data.results;
       } else {
