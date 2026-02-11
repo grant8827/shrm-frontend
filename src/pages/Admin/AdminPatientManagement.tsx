@@ -109,28 +109,50 @@ const AdminPatientManagement: React.FC = () => {
   // Load patients from API
   const loadPatients = async () => {
     try {
+      console.log('🔵 loadPatients called - starting...');
       setLoading(true);
-      const response = await apiService.get('/patients/');
-      const data = response.data || response;
       
-      console.log('📊 Patients loaded from API:', data);
+      console.log('🔵 Making API call to /patients/...');
+      const response = await apiService.get('/patients/');
+      console.log('🔵 Raw API response:', response);
+      
+      const data = response.data || response;
+      console.log('🔵 Extracted data:', data);
+      
+      // Handle paginated response - check if it has a 'results' field
+      let patientsData: BackendPatient[] = [];
       
       if (Array.isArray(data)) {
-        setPatients(data);
-        setFilteredPatients(data);
+        console.log('✅ Response is a plain array');
+        patientsData = data;
+      } else if (data && Array.isArray(data.results)) {
+        console.log('✅ Response is paginated - extracting results');
+        patientsData = data.results;
       } else {
-        console.error('❌ API response is not an array:', data);
+        console.error('❌ Unexpected API response format:', data);
+        setErrorMessage('Unexpected response format from server');
+        setShowError(true);
         setPatients([]);
         setFilteredPatients([]);
+        return;
       }
+      
+      console.log('✅ Setting patients state with', patientsData.length, 'patients');
+      console.log('✅ First patient:', patientsData[0]);
+      setPatients(patientsData);
+      setFilteredPatients(patientsData);
+      console.log('✅ State updated');
+      
     } catch (error: any) {
       console.error('❌ Error loading patients:', error);
+      console.error('❌ Error response:', error.response);
       setErrorMessage(`Failed to load patients: ${error.message || 'Unknown error'}`);
       setShowError(true);
       setPatients([]);
       setFilteredPatients([]);
     } finally {
       setLoading(false);
+      console.log('🔵 loadPatients completed');
     }
   };
 
@@ -141,15 +163,23 @@ const AdminPatientManagement: React.FC = () => {
 
   // Filter patients when search or status changes
   useEffect(() => {
+    console.log('🔍 FILTER EFFECT running');
+    console.log('🔍 patients array:', patients);
+    console.log('🔍 statusFilter:', statusFilter);
+    console.log('🔍 searchTerm:', searchTerm);
+    
     let filtered = [...patients];
 
     // Apply status filter
     if (statusFilter !== 'all') {
+      console.log('🔍 Applying status filter:', statusFilter);
       filtered = filtered.filter(p => p.status === statusFilter);
+      console.log('🔍 After status filter:', filtered.length);
     }
 
     // Apply search filter
     if (searchTerm) {
+      console.log('🔍 Applying search filter:', searchTerm);
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
         p.first_name.toLowerCase().includes(search) ||
@@ -158,8 +188,10 @@ const AdminPatientManagement: React.FC = () => {
         p.phone.includes(search) ||
         p.patient_number.toLowerCase().includes(search)
       );
+      console.log('🔍 After search filter:', filtered.length);
     }
 
+    console.log('✅ FILTER RESULT - Setting filteredPatients to:', filtered.length, 'patients');
     setFilteredPatients(filtered);
   }, [searchTerm, statusFilter, patients]);
 
@@ -215,6 +247,12 @@ const AdminPatientManagement: React.FC = () => {
   const activePatients = patients.filter(p => p.status === 'active').length;
   const inactivePatients = patients.filter(p => p.status === 'inactive').length;
   const dischargedPatients = patients.filter(p => p.status === 'discharged').length;
+
+  console.log('🔍 RENDER - patients.length:', patients.length);
+  console.log('🔍 RENDER - filteredPatients.length:', filteredPatients.length);
+  console.log('🔍 RENDER - loading:', loading);
+  console.log('🔍 RENDER - statusFilter:', statusFilter);
+  console.log('🔍 RENDER - searchTerm:', searchTerm);
 
   // Helper function to calculate age
   const calculateAge = (dateOfBirth: string): number => {
@@ -383,6 +421,13 @@ const AdminPatientManagement: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
+              {(() => {
+                console.log('🎨 TABLE RENDER - loading:', loading);
+                console.log('🎨 TABLE RENDER - filteredPatients.length:', filteredPatients.length);
+                console.log('🎨 TABLE RENDER - patients.length:', patients.length);
+                console.log('🎨 TABLE RENDER - filteredPatients:', filteredPatients);
+                return null;
+              })()}
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={9} align="center">
@@ -398,7 +443,9 @@ const AdminPatientManagement: React.FC = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPatients.map((patient) => (
+                filteredPatients.map((patient) => {
+                  console.log('🎨 Rendering patient row:', patient.first_name, patient.last_name);
+                  return (
                   <TableRow key={patient.id} hover>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -456,7 +503,8 @@ const AdminPatientManagement: React.FC = () => {
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               )}
             </TableBody>
           </Table>
