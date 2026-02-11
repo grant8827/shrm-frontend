@@ -446,6 +446,23 @@ class ApiService {
     }
   }
 
+  // Notification methods
+  async getNotifications(): Promise<ApiResponse<any>> {
+    return this.get('/notifications/notifications/');
+  }
+
+  async getUnreadNotificationCount(): Promise<ApiResponse<any>> {
+    return this.get('/notifications/notifications/unread_count/');
+  }
+
+  async markNotificationAsRead(notificationId: string): Promise<ApiResponse<any>> {
+    return this.post(`/notifications/notifications/${notificationId}/mark_read/`, {});
+  }
+
+  async markAllNotificationsAsRead(): Promise<ApiResponse<any>> {
+    return this.post('/notifications/notifications/mark_all_read/', {});
+  }
+
   // Set authentication token
   setAuthToken(token: string): void {
     if (token) {

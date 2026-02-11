@@ -17,6 +17,9 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  Popover,
+  Paper,
+  ListItemButton,
 } from '@mui/material';
 import {
   Dashboard,
@@ -30,8 +33,10 @@ import {
   Menu as MenuIcon,
   VideoCall,
   AttachMoney,
+  Circle,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../hooks/useNotifications';
 
 const drawerWidth = 240;
 
@@ -40,6 +45,8 @@ export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
+  const { notifications, unreadCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -84,6 +91,27 @@ export const Layout: React.FC = () => {
   const handleLogout = async () => {
     handleMenuClose();
     await logout();
+  };
+
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchor(event.currentTarget);
+    if (!loading && notifications.length === 0) {
+      fetchNotifications();
+    }
+  };
+
+  const handleNotificationClose = () => {
+    setNotificationAnchor(null);
+  };
+
+  const handleNotificationItemClick = async (notificationId: string, relatedObjectId?: string) => {
+    await markAsRead(notificationId);
+    handleNotificationClose();
+    
+    // Navigate to messages if it's a message notification
+    if (relatedObjectId) {
+      navigate('/messages');
+    }
   };
 
   // Navigation items based on user role
@@ -211,11 +239,72 @@ export const Layout: React.FC = () => {
           </Typography>
 
           {/* Notifications */}
-          <IconButton color="inherit" sx={{ mr: 2 }}>
-            <Badge badgeContent={4} color="error">
+          <IconButton color="inherit" sx={{ mr: 2 }} onClick={handleNotificationClick}>
+            <Badge badgeContent={unreadCount} color="error">
               <Notifications />
             </Badge>
           </IconButton>
+
+          {/* Notification Popover */}
+          <Popover
+            open={Boolean(notificationAnchor)}
+            anchorEl={notificationAnchor}
+            onClose={handleNotificationClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+          >
+            <Paper sx={{ width: 360, maxHeight: 400 }}>
+              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6">Notifications</Typography>
+                {unreadCount > 0 && (
+                  <Button size="small" onClick={markAllAsRead}>
+                    Mark all read
+                  </Button>
+                )}
+              </Box>
+              <List sx={{ maxHeight: 300, overflow: 'auto' }}>
+                {loading ? (
+                  <ListItem>
+                    <ListItemText primary="Loading..." />
+                  </ListItem>
+                ) : notifications.length === 0 ? (
+                  <ListItem>
+                    <ListItemText primary="No notifications" secondary="You're all caught up!" />
+                  </ListItem>
+                ) : (
+                  notifications.map((notification) => (
+                    <ListItemButton
+                      key={notification.id}
+                      onClick={() => handleNotificationItemClick(notification.id, notification.related_object_id)}
+                      sx={{
+                        backgroundColor: notification.is_read ? 'transparent' : 'action.hover',
+                        '&:hover': {
+                          backgroundColor: 'action.selected',
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        {!notification.is_read && (
+                          <Circle sx={{ fontSize: 10, color: 'primary.main' }} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={notification.title}
+                        secondary={notification.message}
+                        primaryTypographyProps={{ fontWeight: notification.is_read ? 'normal' : 'bold' }}
+                      />
+                    </ListItemButton>
+                  ))
+                )}
+              </List>
+            </Paper>
+          </Popover>
 
           {/* User Menu */}
           <Button

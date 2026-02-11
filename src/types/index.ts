@@ -1643,3 +1643,19 @@ export interface MotorSettings {
   largeClickTargets: boolean;
   gestureAlternatives: boolean;
 }
+
+// Notification Types
+export interface Notification {
+  id: string;
+  notification_type: 'message' | 'appointment' | 'system';
+  title: string;
+  message: string;
+  is_read: boolean;
+  related_object_id?: string;
+  created_at: string;
+  read_at?: string;
+}
+
+export interface NotificationCount {
+  count: number;
+}
