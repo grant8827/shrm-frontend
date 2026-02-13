@@ -42,10 +42,23 @@ import {
   Phone,
   MedicalServices
 } from '@mui/icons-material';
+import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
 
+interface PatientItem {
+  id: string;
+  name: string;
+  age: number;
+  phone: string;
+  email: string;
+  lastVisit: string;
+  status: string;
+  diagnosis: string;
+  nextAppointment?: string;
+}
+
 const PatientManagement: React.FC = () => {
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<PatientItem[]>([]);
   const [, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalPatients: 0,
@@ -55,10 +68,10 @@ const PatientManagement: React.FC = () => {
   });
 
   useEffect(() => {
-    loadPatients();
+    void loadPatients();
   }, []);
 
-  const loadPatients = async () => {
+  const loadPatients = () => {
     try {
       // TODO: Replace with actual API endpoints
       // const patientsRes = await apiClient.get('/patients/');
@@ -88,7 +101,7 @@ const PatientManagement: React.FC = () => {
     }
   };
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -112,13 +125,89 @@ const PatientManagement: React.FC = () => {
     patient.diagnosis.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleViewDetails = (patient: any) => {
+  const handleViewDetails = (patient: PatientItem) => {
     setSelectedPatient(patient);
     setDetailsOpen(true);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'success' | 'default' => {
     return status === 'active' ? 'success' : 'default';
+  };
+
+  const handleCreatePatient = async () => {
+    try {
+      setIsLoading(true);
+      setFormErrors({});
+
+      const errors: Record<string, string> = {};
+      if (!newPatientData.first_name.trim()) errors.first_name = 'Required';
+      if (!newPatientData.last_name.trim()) errors.last_name = 'Required';
+      if (!newPatientData.email.trim()) errors.email = 'Required';
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        setIsLoading(false);
+        return;
+      }
+
+      const patientData = {
+        first_name_write: newPatientData.first_name,
+        last_name_write: newPatientData.last_name,
+        email_write: newPatientData.email,
+        phone_write: newPatientData.phone || '',
+        date_of_birth: newPatientData.date_of_birth || '1990-01-01',
+        gender: 'P',
+        admission_date: new Date().toISOString().split('T')[0],
+        create_portal_access: true,
+      };
+
+      console.log('Creating patient:', patientData);
+
+      const response = await apiClient.post('/api/patients/', patientData);
+      console.log('Patient created:', response.data);
+
+      setSnackbar({ open: true, message: 'Patient added successfully. Registration email sent.', severity: 'success' });
+      setAddPatientOpen(false);
+      setNewPatientData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        date_of_birth: '',
+        diagnosis: '',
+        assigned_therapist: '',
+      });
+    } catch (error: unknown) {
+      console.error('Failed to add patient:', error);
+
+      if (axios.isAxiosError(error) && error.response?.data && typeof error.response.data === 'object') {
+        const backendErrors = error.response.data as Record<string, unknown>;
+        const formattedErrors: Record<string, string> = {};
+
+        Object.keys(backendErrors).forEach((key) => {
+          const errorValue = backendErrors[key];
+          if (Array.isArray(errorValue) && errorValue.length > 0) {
+            formattedErrors[key] = String(errorValue[0]);
+          } else if (typeof errorValue === 'string') {
+            formattedErrors[key] = errorValue;
+          }
+        });
+
+        setFormErrors(formattedErrors);
+        setSnackbar({
+          open: true,
+          message:
+            (typeof backendErrors.detail === 'string' && backendErrors.detail) ||
+            (typeof backendErrors.message === 'string' && backendErrors.message) ||
+            'Failed to add patient',
+          severity: 'error',
+        });
+      } else {
+        setSnackbar({ open: true, message: 'Failed to add patient', severity: 'error' });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -228,7 +317,7 @@ const PatientManagement: React.FC = () => {
                   <TableCell>
                     <Chip
                       label={patient.status}
-                      color={getStatusColor(patient.status) as any}
+                      color={getStatusColor(patient.status)}
                       size="small"
                       variant="outlined"
                     />
@@ -268,7 +357,7 @@ const PatientManagement: React.FC = () => {
           Patient Details - {selectedPatient?.name}
         </DialogTitle>
         <DialogContent>
-          <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+          <Tabs value={tabValue} onChange={(_event: React.SyntheticEvent, newValue: number) => setTabValue(newValue)}>
             <Tab label="Overview" />
             <Tab label="Medical History" />
             <Tab label="Treatment Plan" />
@@ -460,80 +549,8 @@ const PatientManagement: React.FC = () => {
           </Button>
           <Button 
             variant="contained"
-            onClick={async () => {
-              try {
-                setIsLoading(true);
-                setFormErrors({});
-                
-                // Validate
-                const errors: Record<string, string> = {};
-                if (!newPatientData.first_name.trim()) errors.first_name = 'Required';
-                if (!newPatientData.last_name.trim()) errors.last_name = 'Required';
-                if (!newPatientData.email.trim()) errors.email = 'Required';
-                
-                if (Object.keys(errors).length > 0) {
-                  setFormErrors(errors);
-                  setIsLoading(false);
-                  return;
-                }
-                
-                // Create patient record via backend API and trigger token-based portal registration email
-                const patientData = {
-                  first_name_write: newPatientData.first_name,
-                  last_name_write: newPatientData.last_name,
-                  email_write: newPatientData.email,
-                  phone_write: newPatientData.phone || '',
-                  date_of_birth: newPatientData.date_of_birth || '1990-01-01',
-                  gender: 'P',
-                  admission_date: new Date().toISOString().split('T')[0],
-                  create_portal_access: true,
-                };
-                
-                console.log('Creating patient:', patientData);
-                
-                const response = await apiClient.post('/api/patients/', patientData);
-                console.log('Patient created:', response.data);
-                
-                setSnackbar({ open: true, message: 'Patient added successfully. Registration email sent.', severity: 'success' });
-                setAddPatientOpen(false);
-                setNewPatientData({
-                  first_name: '',
-                  last_name: '',
-                  email: '',
-                  phone: '',
-                  date_of_birth: '',
-                  diagnosis: '',
-                  assigned_therapist: '',
-                });
-              } catch (error: any) {
-                console.error('Failed to add patient:', error);
-                console.error('Error response:', error.response?.data);
-                
-                // Handle validation errors from backend
-                if (error.response?.data) {
-                  const backendErrors = error.response.data;
-                  const formattedErrors: Record<string, string> = {};
-                  
-                  Object.keys(backendErrors).forEach(key => {
-                    const errorValue = backendErrors[key];
-                    if (Array.isArray(errorValue)) {
-                      formattedErrors[key] = errorValue[0];
-                    } else if (typeof errorValue === 'string') {
-                      formattedErrors[key] = errorValue;
-                    }
-                  });
-                  
-                  setFormErrors(formattedErrors);
-                }
-                
-                setSnackbar({ 
-                  open: true, 
-                  message: error.response?.data?.detail || error.response?.data?.message || 'Failed to add patient', 
-                  severity: 'error' 
-                });
-              } finally {
-                setIsLoading(false);
-              }
+            onClick={() => {
+              void handleCreatePatient();
             }}
             disabled={isLoading}
             startIcon={isLoading ? <CircularProgress size={20} /> : <Add />}
