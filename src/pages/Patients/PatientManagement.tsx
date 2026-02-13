@@ -437,7 +437,7 @@ const PatientManagement: React.FC = () => {
 
             <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
               <Typography variant="body2">
-                <strong>Note:</strong> A temporary password will be automatically generated and sent to the patient's email address.
+                <strong>Note:</strong> A registration link will be emailed to the patient so they can create their own username and password.
               </Typography>
             </Box>
           </Box>
@@ -477,30 +477,24 @@ const PatientManagement: React.FC = () => {
                   return;
                 }
                 
-                // Generate username from email
-                const username = newPatientData.email.split('@')[0];
-                
-                // Generate a temporary password
-                const tempPassword = `TempPass${Math.random().toString(36).slice(-8)}!`;
-                
-                // Create patient user via backend API
-                const userData = {
-                  username: username,
-                  email: newPatientData.email,
-                  first_name: newPatientData.first_name,
-                  last_name: newPatientData.last_name,
-                  phone: newPatientData.phone || '',
-                  role: 'client',
-                  password: tempPassword,
-                  password_confirm: tempPassword,
+                // Create patient record via backend API and trigger token-based portal registration email
+                const patientData = {
+                  first_name_write: newPatientData.first_name,
+                  last_name_write: newPatientData.last_name,
+                  email_write: newPatientData.email,
+                  phone_write: newPatientData.phone || '',
+                  date_of_birth: newPatientData.date_of_birth || '1990-01-01',
+                  gender: 'P',
+                  admission_date: new Date().toISOString().split('T')[0],
+                  create_portal_access: true,
                 };
                 
-                console.log('Creating patient:', userData);
+                console.log('Creating patient:', patientData);
                 
-                const response = await apiClient.post('/api/auth/register/', userData);
+                const response = await apiClient.post('/api/patients/', patientData);
                 console.log('Patient created:', response.data);
                 
-                setSnackbar({ open: true, message: `Patient added successfully! Temporary password: ${tempPassword}`, severity: 'success' });
+                setSnackbar({ open: true, message: 'Patient added successfully. Registration email sent.', severity: 'success' });
                 setAddPatientOpen(false);
                 setNewPatientData({
                   first_name: '',

@@ -225,14 +225,14 @@ const AdminPatientManagement: React.FC = () => {
       const response = await apiService.post(`/patients/${patientId}/resend_welcome_email/`);
       
       if (response.data && (response.data as any).email) {
-        setSuccessMessage(`Welcome email sent successfully to ${(response.data as any).email}`);
+        setSuccessMessage(`Registration email sent successfully to ${(response.data as any).email}`);
         setShowSuccess(true);
       }
     } catch (error: any) {
       console.error('❌ Error resending email:', error);
       setErrorMessage(
         error.response?.data?.error || 
-        'Failed to send welcome email. Please try again.'
+        'Failed to send registration email. Please try again.'
       );
       setShowError(true);
     }
@@ -280,21 +280,27 @@ const AdminPatientManagement: React.FC = () => {
   // Handle add patient
   const handleAddPatient = async (formData: PatientFormData) => {
     try {
+      const genderMap: Record<string, string> = {
+        male: 'M',
+        female: 'F',
+        other: 'O',
+        prefer_not_to_say: 'P',
+      };
+
       // Transform form data to backend format
       const patientData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
+        first_name_write: formData.firstName,
+        last_name_write: formData.lastName,
         date_of_birth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
-        gender: formData.gender,
-        phone: formData.phone,
-        email: formData.email,
-        street_address: formData.address.street,
-        city: formData.address.city,
-        state: formData.address.state,
-        zip_code: formData.address.zipCode,
-        emergency_contact_name: formData.emergencyContact.name,
-        emergency_contact_phone: formData.emergencyContact.phone,
-        emergency_contact_relationship: formData.emergencyContact.relationship,
+        gender: genderMap[formData.gender] || 'P',
+        phone_write: formData.phone,
+        email_write: formData.email,
+        street_address_write: formData.address.street,
+        city_write: formData.address.city,
+        zip_code_write: formData.address.zipCode,
+        emergency_contact_name_write: formData.emergencyContact.name,
+        emergency_contact_phone_write: formData.emergencyContact.phone,
+        emergency_contact_relationship_write: formData.emergencyContact.relationship,
         admission_date: new Date().toISOString().split('T')[0],
         status: 'active',
         create_portal_access: true,
@@ -306,7 +312,7 @@ const AdminPatientManagement: React.FC = () => {
       
       console.log('✅ Patient created successfully:', response.data);
 
-      setSuccessMessage('Patient created successfully! Welcome email has been sent.');
+      setSuccessMessage('Patient created successfully! Registration email has been sent.');
       setShowSuccess(true);
       setAddPatientOpen(false);
       
@@ -315,7 +321,8 @@ const AdminPatientManagement: React.FC = () => {
       
     } catch (error: any) {
       console.error('❌ Error creating patient:', error);
-      const errorMsg = error.response?.data?.email?.[0] || 
+      const errorMsg = error.response?.data?.email_write?.[0] ||
+                      error.response?.data?.email?.[0] || 
                       error.response?.data?.detail || 
                       error.message || 
                       'Failed to create patient';
