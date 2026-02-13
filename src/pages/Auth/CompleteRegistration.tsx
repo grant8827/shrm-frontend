@@ -87,8 +87,20 @@ const CompleteRegistration: React.FC = () => {
     if (!formData.password) {
       errors.password = 'Password is required';
       isValid = false;
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
+    } else if (formData.password.length < 12) {
+      errors.password = 'Password must be at least 12 characters';
+      isValid = false;
+    } else if (!/[A-Z]/.test(formData.password)) {
+      errors.password = 'Password must include at least one uppercase letter';
+      isValid = false;
+    } else if (!/[a-z]/.test(formData.password)) {
+      errors.password = 'Password must include at least one lowercase letter';
+      isValid = false;
+    } else if (!/[0-9]/.test(formData.password)) {
+      errors.password = 'Password must include at least one number';
+      isValid = false;
+    } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
+      errors.password = 'Password must include at least one special character';
       isValid = false;
     }
     
@@ -286,7 +298,7 @@ const CompleteRegistration: React.FC = () => {
                 value={formData.password}
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 error={!!formErrors.password}
-                helperText={formErrors.password || 'Must be at least 8 characters'}
+                helperText={formErrors.password || 'Min 12 chars, uppercase, lowercase, number, and special character'}
                 required
                 sx={{ mb: 2 }}
                 InputProps={{
