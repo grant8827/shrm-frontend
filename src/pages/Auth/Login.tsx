@@ -42,6 +42,10 @@ const Login: React.FC = () => {
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
 
+  const hasMustChangePassword = (value: unknown): value is { must_change_password?: boolean } => {
+    return !!value && typeof value === 'object';
+  };
+
   const formik = useFormik({
     initialValues: {
       username: '',
@@ -57,8 +61,8 @@ const Login: React.FC = () => {
           // Check if user needs to change password
           const userStr = localStorage.getItem('user');
           if (userStr) {
-            const user = JSON.parse(userStr);
-            if (user.must_change_password) {
+            const parsedUser: unknown = JSON.parse(userStr);
+            if (hasMustChangePassword(parsedUser) && parsedUser.must_change_password === true) {
               // Show popup dialog instead of redirecting immediately
               setShowPasswordChangeDialog(true);
               return;

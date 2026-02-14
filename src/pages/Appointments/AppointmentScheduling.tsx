@@ -36,6 +36,8 @@ import {
   Menu,
   ListItemIcon,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add,
@@ -124,6 +126,8 @@ interface AppointmentFormData {
 const AppointmentScheduling: React.FC = () => {
   const { state } = useAuth();
   const isPatient = state.user?.role === 'client';
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Store all appointments in state, filter for display
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -590,12 +594,12 @@ const AppointmentScheduling: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
           {isPatient ? 'My Appointments' : 'Appointment Scheduling'}
         </Typography>
         {!isPatient && (
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
             <Button variant="outlined" startIcon={<Refresh />}>
               Sync Calendar
             </Button>
@@ -603,6 +607,7 @@ const AppointmentScheduling: React.FC = () => {
               variant="contained" 
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
+              fullWidth={isMobile}
             >
               New Appointment
             </Button>
@@ -622,7 +627,7 @@ const AppointmentScheduling: React.FC = () => {
 
       {/* Quick Stats */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={isPatient ? 6 : 3}>
+        <Grid item xs={6} sm={6} md={isPatient ? 6 : 3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Badge badgeContent={todaysAppointments.length} color="primary">
@@ -633,7 +638,7 @@ const AppointmentScheduling: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={isPatient ? 6 : 3}>
+        <Grid item xs={6} sm={6} md={isPatient ? 6 : 3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Schedule sx={{ fontSize: 40, color: 'info.main' }} />
@@ -645,7 +650,7 @@ const AppointmentScheduling: React.FC = () => {
         {/* Hide company-wide stats from patients */}
         {!isPatient && (
           <>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <CheckCircle sx={{ fontSize: 40, color: 'success.main' }} />
@@ -656,7 +661,7 @@ const AppointmentScheduling: React.FC = () => {
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={6} sm={6} md={3}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Warning sx={{ fontSize: 40, color: 'warning.main' }} />
@@ -673,14 +678,14 @@ const AppointmentScheduling: React.FC = () => {
 
       {/* Date Navigation & View Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ p: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
           {/* Hide date navigation from patients */}
           {!isPatient && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'space-between', sm: 'flex-start' }, gap: 1 }}>
               <IconButton onClick={() => navigateDate('prev')}>
                 <NavigateBefore />
               </IconButton>
-              <Typography variant="h6">
+              <Typography variant={isMobile ? 'body1' : 'h6'} sx={{ textAlign: 'center', flex: 1 }}>
                 {selectedDate.toLocaleDateString('en-US', { 
                   weekday: 'long', 
                   year: 'numeric', 
@@ -695,13 +700,20 @@ const AppointmentScheduling: React.FC = () => {
                 size="small" 
                 onClick={() => setSelectedDate(new Date())}
                 variant="outlined"
+                fullWidth={isMobile}
               >
                 Today
               </Button>
             </Box>
           )}
           
-          <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+          <Tabs
+            value={tabValue}
+            onChange={(_, newValue) => setTabValue(newValue)}
+            variant={isMobile ? 'scrollable' : 'standard'}
+            scrollButtons={isMobile ? 'auto' : false}
+            allowScrollButtonsMobile
+          >
             <Tab label="All Appointments" />
             <Tab label="Upcoming" />
             {/* Hide Daily View from patients - they don't need the scheduling grid */}
@@ -721,106 +733,152 @@ const AppointmentScheduling: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Daily Schedule - {selectedDate.toLocaleDateString()}
                 </Typography>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Time</TableCell>
-                        <TableCell>Patient</TableCell>
-                        <TableCell>Therapist</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell align="center">Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {timeSlots.map((slot) => {
-                        const appointment = todaysAppointments.find(a => a.time === slot.time);
-                        
-                        return (
-                          <TableRow 
-                            key={slot.time}
-                            sx={{ 
-                              backgroundColor: appointment ? 'action.hover' : 'transparent',
-                              '&:hover': { backgroundColor: 'action.selected' }
-                            }}
-                          >
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <AccessTime fontSize="small" />
-                                {slot.time}
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              {appointment ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Avatar sx={{ width: 32, height: 32 }}>
-                                    {appointment.patientName.charAt(0)}
-                                  </Avatar>
-                                  {appointment.patientName}
+                {isMobile ? (
+                  <Box sx={{ display: 'grid', gap: 1.5 }}>
+                    {timeSlots.map((slot) => {
+                      const appointment = todaysAppointments.find(a => a.time === slot.time);
+                      return (
+                        <Card key={slot.time} variant="outlined">
+                          <CardContent sx={{ pb: '16px !important' }}>
+                            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{slot.time}</Typography>
+                            {appointment ? (
+                              <>
+                                <Typography variant="body2" sx={{ mb: 0.5 }}>{appointment.patientName}</Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                  {appointment.therapistName}
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                  <Chip label={appointment.type} size="small" variant="outlined" />
+                                  <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
                                 </Box>
-                              ) : (
-                                <Typography color="text.secondary">Available</Typography>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {appointment?.therapistName || '-'}
-                            </TableCell>
-                            <TableCell>
-                              {appointment && (
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <IconButton size="small" onClick={(e) => handleMenuOpen(e, appointment.id)}>
+                                    <MoreVert />
+                                  </IconButton>
+                                </Box>
+                              </>
+                            ) : (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  const timeDate = new Date();
+                                  const [hours, minutes] = slot.time.split(':');
+                                  timeDate.setHours(parseInt(hours), parseInt(minutes));
+                                  setFormData(prev => ({ ...prev, date: selectedDate, time: timeDate }));
+                                  handleOpenDialog();
+                                }}
+                              >
+                                Book
+                              </Button>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </Box>
+                ) : (
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Time</TableCell>
+                          <TableCell>Patient</TableCell>
+                          <TableCell>Therapist</TableCell>
+                          <TableCell>Type</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell align="center">Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {timeSlots.map((slot) => {
+                          const appointment = todaysAppointments.find(a => a.time === slot.time);
+
+                          return (
+                            <TableRow
+                              key={slot.time}
+                              sx={{
+                                backgroundColor: appointment ? 'action.hover' : 'transparent',
+                                '&:hover': { backgroundColor: 'action.selected' }
+                              }}
+                            >
+                              <TableCell>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  {getFormatIcon(appointment.format)}
-                                  <Chip 
-                                    label={appointment.type} 
-                                    size="small" 
-                                    variant="outlined"
+                                  <AccessTime fontSize="small" />
+                                  {slot.time}
+                                </Box>
+                              </TableCell>
+                              <TableCell>
+                                {appointment ? (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Avatar sx={{ width: 32, height: 32 }}>
+                                      {appointment.patientName.charAt(0)}
+                                    </Avatar>
+                                    {appointment.patientName}
+                                  </Box>
+                                ) : (
+                                  <Typography color="text.secondary">Available</Typography>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {appointment?.therapistName || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {appointment && (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {getFormatIcon(appointment.format)}
+                                    <Chip
+                                      label={appointment.type}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  </Box>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {appointment && (
+                                  <Chip
+                                    label={appointment.status}
+                                    color={getStatusColor(appointment.status) as any}
+                                    size="small"
                                   />
-                                </Box>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {appointment && (
-                                <Chip 
-                                  label={appointment.status}
-                                  color={getStatusColor(appointment.status) as any}
-                                  size="small"
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell align="center">
-                              {appointment ? (
-                                <IconButton 
-                                  size="small"
-                                  onClick={(e) => handleMenuOpen(e, appointment.id)}
-                                >
-                                  <MoreVert />
-                                </IconButton>
-                              ) : (
-                                <Button 
-                                  size="small" 
-                                  variant="outlined"
-                                  onClick={() => {
-                                    const timeDate = new Date();
-                                    const [hours, minutes] = slot.time.split(':');
-                                    timeDate.setHours(parseInt(hours), parseInt(minutes));
-                                    setFormData(prev => ({ 
-                                      ...prev, 
-                                      date: selectedDate, 
-                                      time: timeDate 
-                                    }));
-                                    handleOpenDialog();
-                                  }}
-                                >
-                                  Book
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                                )}
+                              </TableCell>
+                              <TableCell align="center">
+                                {appointment ? (
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => handleMenuOpen(e, appointment.id)}
+                                  >
+                                    <MoreVert />
+                                  </IconButton>
+                                ) : (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={() => {
+                                      const timeDate = new Date();
+                                      const [hours, minutes] = slot.time.split(':');
+                                      timeDate.setHours(parseInt(hours), parseInt(minutes));
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        date: selectedDate,
+                                        time: timeDate
+                                      }));
+                                      handleOpenDialog();
+                                    }}
+                                  >
+                                    Book
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -868,8 +926,38 @@ const AppointmentScheduling: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Upcoming Appointments
             </Typography>
-            <TableContainer>
-              <Table>
+            {isMobile ? (
+              <Box sx={{ display: 'grid', gap: 1.5 }}>
+                {upcomingAppointments.map((appointment) => (
+                  <Card key={appointment.id} variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2">
+                        {new Date(appointment.date).toLocaleDateString()} • {appointment.time}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>{appointment.patientName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{appointment.therapistName}</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                        <Chip label={appointment.type} size="small" variant="outlined" />
+                        <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                        {isPatient && appointment.status === 'scheduled' ? (
+                          <Button size="small" variant="contained" color="success" onClick={() => confirmAppointment(appointment.id)}>
+                            Confirm
+                          </Button>
+                        ) : (
+                          <IconButton size="small" onClick={(e) => handleMenuOpen(e, appointment.id)}>
+                            <MoreVert />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date & Time</TableCell>
@@ -945,8 +1033,9 @@ const AppointmentScheduling: React.FC = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </TableContainer>
+                </Table>
+              </TableContainer>
+            )}
           </Box>
         </Paper>
       )}
@@ -959,8 +1048,49 @@ const AppointmentScheduling: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               All Appointments
             </Typography>
-            <TableContainer>
-              <Table>
+            {isMobile ? (
+              <Box sx={{ display: 'grid', gap: 1.5 }}>
+                {filteredAppointments
+                  .sort((a, b) => new Date(`${b.date} ${b.time}`).getTime() - new Date(`${a.date} ${a.time}`).getTime())
+                  .map((appointment) => (
+                  <Card key={appointment.id} variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle2">
+                        {new Date(appointment.date).toLocaleDateString()} • {appointment.time}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>{appointment.patientName}</Typography>
+                      <Typography variant="caption" color="text.secondary">{appointment.therapistName}</Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+                        <Chip label={appointment.type} size="small" variant="outlined" />
+                        <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
+                      </Box>
+                      {appointment.notes && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          {appointment.notes}
+                        </Typography>
+                      )}
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                        {isPatient ? (
+                          appointment.status === 'scheduled' ? (
+                            <Button size="small" variant="contained" color="success" onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}>
+                              Confirm
+                            </Button>
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">{appointment.status}</Typography>
+                          )
+                        ) : (
+                          <IconButton size="small" onClick={(e) => handleMenuOpen(e, appointment.id)}>
+                            <MoreVert />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell>Date & Time</TableCell>
@@ -1056,8 +1186,9 @@ const AppointmentScheduling: React.FC = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </TableContainer>
+                </Table>
+              </TableContainer>
+            )}
           </Box>
         </Paper>
       )}

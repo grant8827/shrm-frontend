@@ -280,8 +280,8 @@ export interface AuditLog {
   action: string;
   resource: string;
   resourceId: string;
-  oldValues?: Record<string, any>;
-  newValues?: Record<string, any>;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
   ipAddress: string;
   userAgent: string;
   timestamp: Date;
@@ -815,7 +815,7 @@ export interface SessionAction {
   id: string;
   type: SessionActionType;
   targetId?: string; // participant ID if action targets specific participant
-  parameters?: any;
+  parameters?: unknown;
   timestamp: Date;
   performedBy: string;
   reason?: string;
@@ -1194,7 +1194,7 @@ export interface DocumentField {
   required: boolean;
   options?: string[];
   validation?: FieldValidation;
-  defaultValue?: any;
+  defaultValue?: unknown;
   placeholder?: string;
 }
 

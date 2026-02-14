@@ -21,6 +21,8 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Person,
@@ -57,6 +59,8 @@ function TabPanel(props: TabPanelProps) {
 
 const AdminSettings: React.FC = () => {
   const { state } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { showSuccess, showError } = useNotification();
   const [searchParams] = useSearchParams();
   const editUserId = searchParams.get('userId');
@@ -275,6 +279,9 @@ const AdminSettings: React.FC = () => {
               value={activeTab}
               onChange={(_, newValue) => setActiveTab(newValue)}
               aria-label="settings tabs"
+              variant={isMobile ? 'scrollable' : 'standard'}
+              scrollButtons={isMobile ? 'auto' : false}
+              allowScrollButtonsMobile
             >
               <Tab icon={<Person />} label="Profile" />
               {!editUserId && <Tab icon={<AdminPanelSettings />} label="System" />}
@@ -287,9 +294,9 @@ const AdminSettings: React.FC = () => {
       <TabPanel value={activeTab} index={0}>
         <Card>
           <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', mb: 3, gap: 1.5 }}>
               <Avatar
-                sx={{ width: 100, height: 100, mr: 3 }}
+                sx={{ width: 100, height: 100, mr: { xs: 0, sm: 3 } }}
                 src=""
                 alt={`${profileData.firstName} ${profileData.lastName}`}
               >
@@ -357,6 +364,7 @@ const AdminSettings: React.FC = () => {
                 variant="contained"
                 startIcon={<Save />}
                 onClick={handleSaveProfile}
+                fullWidth={isMobile}
               >
                 Save Profile
               </Button>
@@ -475,6 +483,7 @@ const AdminSettings: React.FC = () => {
                 variant="contained"
                 startIcon={<Save />}
                 onClick={handleSaveSystemSettings}
+                fullWidth={isMobile}
               >
                 Save System Settings
               </Button>
@@ -583,6 +592,7 @@ const AdminSettings: React.FC = () => {
                 variant="contained"
                 startIcon={<Save />}
                 onClick={handleSaveNotifications}
+                fullWidth={isMobile}
               >
                 Save Preferences
               </Button>
@@ -642,7 +652,7 @@ const AdminSettings: React.FC = () => {
             </Grid>
 
             <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="contained" startIcon={<Security />} onClick={handleUpdatePassword}>
+              <Button variant="contained" startIcon={<Security />} onClick={handleUpdatePassword} fullWidth={isMobile}>
                 Update Password
               </Button>
             </Box>
@@ -655,7 +665,7 @@ const AdminSettings: React.FC = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Add an extra layer of security to your account
             </Typography>
-            <Button variant="outlined">
+            <Button variant="outlined" fullWidth={isMobile}>
               Enable Two-Factor Authentication
             </Button>
           </CardContent>

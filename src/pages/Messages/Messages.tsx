@@ -33,6 +33,8 @@ import {
   LinearProgress,
   Snackbar,
   ListItemSecondaryAction,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Send,
@@ -131,6 +133,8 @@ interface MessageFormData {
 
 const Messages: React.FC = () => {
   const { state } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string, name: string, role: string, isOnline?: boolean}>>([]);
@@ -712,8 +716,8 @@ const Messages: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
           <Lock color="primary" />
           <Typography variant="h4" component="h1">
             Secure Messaging
@@ -729,6 +733,7 @@ const Messages: React.FC = () => {
           variant="contained" 
           startIcon={<Add />}
           onClick={handleOpenCompose}
+          fullWidth={isMobile}
         >
           Compose Message
         </Button>
@@ -762,7 +767,7 @@ const Messages: React.FC = () => {
 
       {/* Search and Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' } }}>
           <TextField
             placeholder="Search messages..."
             value={searchQuery}
@@ -774,14 +779,21 @@ const Messages: React.FC = () => {
                 </InputAdornment>
               ),
             }}
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, width: '100%' }}
           />
           <IconButton color="primary">
             <FilterList />
           </IconButton>
         </Box>
         
-        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ mt: 2 }}>
+        <Tabs
+          value={tabValue}
+          onChange={(_, newValue) => setTabValue(newValue)}
+          sx={{ mt: 2 }}
+          variant={isMobile ? 'scrollable' : 'standard'}
+          scrollButtons={isMobile ? 'auto' : false}
+          allowScrollButtonsMobile
+        >
           <Tab 
             label={`All (${conversations.filter(c => 
               !messages.some(m => m.threadId === c.id && m.isArchived) || 
@@ -821,6 +833,7 @@ const Messages: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Conversations List */}
+        {(!isMobile || !selectedConversation) && (
         <Grid item xs={12} md={4}>
           <Paper>
             <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
@@ -846,67 +859,122 @@ const Messages: React.FC = () => {
                   </Button>
                 </Box>
               ) : (
-                filteredConversations.map((conversation) => (
-                <ListItem
-                  key={conversation.id}
-                  button
-                  selected={selectedConversation === conversation.id}
-                  onClick={() => handleConversationSelect(conversation.id)}
-                >
-                  <ListItemAvatar>
-                    <Badge 
-                      badgeContent={conversation.unreadCount} 
-                      color="error"
-                      invisible={conversation.unreadCount === 0}
-                    >
-                      <Avatar>
-                        {conversation.isGroup ? <Group /> : <Person />}
-                      </Avatar>
-                    </Badge>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {conversation.title || conversation.participants
-                          .filter(p => p.id !== state.user?.id)
-                          .map(p => p.name)
-                          .join(', ')
-                        }
-                        {conversation.lastMessage.priority === 'urgent' && (
-                          <Flag color="error" fontSize="small" />
-                        )}
-                      </span>
-                    }
-                    secondary={
-                      <>
-                        <Typography variant="body2" noWrap component="span" display="block">
-                          {conversation.lastMessage.content}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" component="span" display="block">
-                          {new Date(conversation.lastMessage.timestamp).toLocaleString()}
-                        </Typography>
-                      </>
-                    }
-                  />
-                  <ListItemSecondaryAction>
-                    {conversation.lastMessage.isEncrypted && (
-                      <Lock fontSize="small" color="primary" />
-                    )}
-                  </ListItemSecondaryAction>
-                </ListItem>
-              ))
+                isMobile ? (
+                  <Box sx={{ p: 1.5, display: 'grid', gap: 1.25 }}>
+                    {filteredConversations.map((conversation) => (
+                      <Card
+                        key={conversation.id}
+                        variant="outlined"
+                        sx={{
+                          borderColor: selectedConversation === conversation.id ? 'primary.main' : undefined,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleConversationSelect(conversation.id)}
+                      >
+                        <CardContent sx={{ pb: '16px !important' }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Badge
+                                badgeContent={conversation.unreadCount}
+                                color="error"
+                                invisible={conversation.unreadCount === 0}
+                              >
+                                <Avatar sx={{ width: 32, height: 32 }}>
+                                  {conversation.isGroup ? <Group /> : <Person />}
+                                </Avatar>
+                              </Badge>
+                              <Box>
+                                <Typography variant="subtitle2">
+                                  {conversation.title || conversation.participants
+                                    .filter(p => p.id !== state.user?.id)
+                                    .map(p => p.name)
+                                    .join(', ')
+                                  }
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {new Date(conversation.lastMessage.timestamp).toLocaleString()}
+                                </Typography>
+                              </Box>
+                            </Box>
+                            {conversation.lastMessage.isEncrypted && <Lock fontSize="small" color="primary" />}
+                          </Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {conversation.lastMessage.content}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                ) : (
+                  filteredConversations.map((conversation) => (
+                  <ListItem
+                    key={conversation.id}
+                    button
+                    selected={selectedConversation === conversation.id}
+                    onClick={() => handleConversationSelect(conversation.id)}
+                  >
+                    <ListItemAvatar>
+                      <Badge 
+                        badgeContent={conversation.unreadCount} 
+                        color="error"
+                        invisible={conversation.unreadCount === 0}
+                      >
+                        <Avatar>
+                          {conversation.isGroup ? <Group /> : <Person />}
+                        </Avatar>
+                      </Badge>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {conversation.title || conversation.participants
+                            .filter(p => p.id !== state.user?.id)
+                            .map(p => p.name)
+                            .join(', ')
+                          }
+                          {conversation.lastMessage.priority === 'urgent' && (
+                            <Flag color="error" fontSize="small" />
+                          )}
+                        </span>
+                      }
+                      secondary={
+                        <>
+                          <Typography variant="body2" noWrap component="span" display="block">
+                            {conversation.lastMessage.content}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" component="span" display="block">
+                            {new Date(conversation.lastMessage.timestamp).toLocaleString()}
+                          </Typography>
+                        </>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      {conversation.lastMessage.isEncrypted && (
+                        <Lock fontSize="small" color="primary" />
+                      )}
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))
+                )
               )}
             </List>
           </Paper>
         </Grid>
+        )}
 
         {/* Message Thread */}
+        {(!isMobile || selectedConversation) && (
         <Grid item xs={12} md={8}>
           <Paper sx={{ height: 600, display: 'flex', flexDirection: 'column' }}>
             {selectedConversation ? (
               <>
                 {/* Thread Header */}
                 <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                  {isMobile && (
+                    <Button size="small" onClick={() => setSelectedConversation(null)} sx={{ mb: 1 }}>
+                      Back to conversations
+                    </Button>
+                  )}
                   <Typography variant="h6">
                     {conversations.find(c => c.id === selectedConversation)?.title ||
                      conversations.find(c => c.id === selectedConversation)?.participants
@@ -936,8 +1004,8 @@ const Messages: React.FC = () => {
                       <Card 
                         variant="outlined"
                         sx={{ 
-                          ml: message.senderId === state.user?.id ? 4 : 0,
-                          mr: message.senderId === state.user?.id ? 0 : 4,
+                          ml: message.senderId === state.user?.id ? (isMobile ? 0 : 4) : 0,
+                          mr: message.senderId === state.user?.id ? 0 : (isMobile ? 0 : 4),
                         }}
                       >
                         <CardContent>
@@ -1065,6 +1133,7 @@ const Messages: React.FC = () => {
             )}
           </Paper>
         </Grid>
+        )}
       </Grid>
 
       {/* Message Actions Menu */}

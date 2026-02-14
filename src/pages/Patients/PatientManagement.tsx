@@ -28,16 +28,24 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  DialogContentText,
   Snackbar,
   Alert,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add,
   Search,
-  Visibility,
-  Message,
-  Schedule,
+  MoreVert,
+  EmailOutlined,
+  Edit,
+  DeleteOutline,
+  CheckCircleOutline,
   Person,
   Phone,
   MedicalServices
@@ -58,6 +66,8 @@ interface PatientItem {
 }
 
 const PatientManagement: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [patients, setPatients] = useState<PatientItem[]>([]);
   const [, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -107,6 +117,16 @@ const PatientManagement: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [actionAnchorEl, setActionAnchorEl] = useState<null | HTMLElement>(null);
+  const [actionPatient, setActionPatient] = useState<PatientItem | null>(null);
+  const [editPatientOpen, setEditPatientOpen] = useState(false);
+  const [removePatientOpen, setRemovePatientOpen] = useState(false);
+  const [completePatientOpen, setCompletePatientOpen] = useState(false);
+  const [editPatientData, setEditPatientData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
   
   const [newPatientData, setNewPatientData] = useState({
     first_name: '',
@@ -125,9 +145,126 @@ const PatientManagement: React.FC = () => {
     patient.diagnosis.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleViewDetails = (patient: PatientItem) => {
+  const handleOpenActions = (event: React.MouseEvent<HTMLElement>, patient: PatientItem) => {
+    setActionAnchorEl(event.currentTarget);
+    setActionPatient(patient);
     setSelectedPatient(patient);
-    setDetailsOpen(true);
+  };
+
+  const handleCloseActions = () => {
+    setActionAnchorEl(null);
+  };
+
+  const handleResendEmail = async () => {
+    if (!actionPatient) return;
+
+    try {
+      await apiClient.post(`/api/patients/${actionPatient.id}/resend_welcome_email/`);
+      setSnackbar({ open: true, message: `Registration email resent to ${actionPatient.email}`, severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to resend registration email', severity: 'error' });
+    } finally {
+      handleCloseActions();
+    }
+  };
+
+  const handleOpenEditPatient = () => {
+    if (!actionPatient) return;
+
+    setEditPatientData({
+      name: actionPatient.name,
+      email: actionPatient.email,
+      phone: actionPatient.phone,
+    });
+    setEditPatientOpen(true);
+    handleCloseActions();
+  };
+
+  const handleSaveEditPatient = async () => {
+    if (!actionPatient) return;
+
+    const nameParts = editPatientData.name.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ');
+
+    if (!firstName || !lastName || !editPatientData.email.trim()) {
+      setSnackbar({ open: true, message: 'Name (first and last) and email are required', severity: 'error' });
+      return;
+    }
+
+    try {
+      await apiClient.patch(`/api/patients/${actionPatient.id}/`, {
+        first_name_write: firstName,
+        last_name_write: lastName,
+        email_write: editPatientData.email.trim(),
+        phone_write: editPatientData.phone.trim(),
+      });
+
+      setPatients(prev => prev.map(patient => (
+        patient.id === actionPatient.id
+          ? {
+              ...patient,
+              name: editPatientData.name.trim(),
+              email: editPatientData.email.trim(),
+              phone: editPatientData.phone.trim(),
+            }
+          : patient
+      )));
+
+      setSnackbar({ open: true, message: 'Patient updated successfully', severity: 'success' });
+      setEditPatientOpen(false);
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to update patient', severity: 'error' });
+    }
+  };
+
+  const handleOpenRemovePatient = () => {
+    setRemovePatientOpen(true);
+    handleCloseActions();
+  };
+
+  const handleRemovePatient = async () => {
+    if (!actionPatient) return;
+
+    try {
+      await apiClient.delete(`/api/patients/${actionPatient.id}/`);
+      setPatients(prev => prev.filter(patient => patient.id !== actionPatient.id));
+      setSnackbar({ open: true, message: 'Patient removed successfully', severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to remove patient', severity: 'error' });
+    } finally {
+      setRemovePatientOpen(false);
+      setActionPatient(null);
+    }
+  };
+
+  const handleOpenCompletePatient = () => {
+    setCompletePatientOpen(true);
+    handleCloseActions();
+  };
+
+  const handleCompletePatient = async () => {
+    if (!actionPatient) return;
+
+    try {
+      await apiClient.patch(`/api/patients/${actionPatient.id}/`, {
+        status: 'discharged',
+        discharge_date: new Date().toISOString().split('T')[0],
+      });
+
+      setPatients(prev => prev.map(patient => (
+        patient.id === actionPatient.id
+          ? { ...patient, status: 'discharged' }
+          : patient
+      )));
+
+      setSnackbar({ open: true, message: 'Patient marked complete (sessions complete)', severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to mark patient complete', severity: 'error' });
+    } finally {
+      setCompletePatientOpen(false);
+      setActionPatient(null);
+    }
   };
 
   const getStatusColor = (status: string): 'success' | 'default' => {
@@ -212,7 +349,7 @@ const PatientManagement: React.FC = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
           Patient Management
         </Typography>
@@ -220,6 +357,7 @@ const PatientManagement: React.FC = () => {
           variant="contained" 
           startIcon={<Add />}
           onClick={() => setAddPatientOpen(true)}
+          fullWidth={isMobile}
         >
           Add New Patient
         </Button>
@@ -244,7 +382,7 @@ const PatientManagement: React.FC = () => {
 
       {/* Patient Statistics */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="primary">{stats.totalPatients}</Typography>
@@ -252,7 +390,7 @@ const PatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="success.main">{stats.activePatients}</Typography>
@@ -260,7 +398,7 @@ const PatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="warning.main">{stats.thisWeek}</Typography>
@@ -268,7 +406,7 @@ const PatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={6} sm={3}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="info.main">{stats.nextWeek}</Typography>
@@ -278,73 +416,140 @@ const PatientManagement: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Patients Table */}
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Patient</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Last Visit</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Primary Diagnosis</TableCell>
-                <TableCell>Next Appointment</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredPatients.map((patient) => (
-                <TableRow key={patient.id}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {/* Patients List */}
+      {isMobile ? (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+          {filteredPatients.length === 0 ? (
+            <Paper sx={{ p: 2.5, textAlign: 'center' }}>
+              <Typography color="text.secondary">No patients found.</Typography>
+            </Paper>
+          ) : (
+            filteredPatients.map((patient) => (
+              <Card key={patient.id}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <Avatar>{patient.name.charAt(0)}</Avatar>
                       <Box>
-                        <Typography variant="subtitle2">{patient.name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Age: {patient.age}
-                        </Typography>
+                        <Typography variant="subtitle1">{patient.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">Age: {patient.age}</Typography>
                       </Box>
                     </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{patient.phone}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {patient.email}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{patient.lastVisit}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={patient.status}
-                      color={getStatusColor(patient.status)}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>{patient.diagnosis}</TableCell>
-                  <TableCell>{patient.nextAppointment || 'Not scheduled'}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleViewDetails(patient)}
-                    >
-                      <Visibility />
+                    <IconButton size="small" onClick={(event) => handleOpenActions(event, patient)}>
+                      <MoreVert />
                     </IconButton>
-                    <IconButton size="small" color="info">
-                      <Message />
-                    </IconButton>
-                    <IconButton size="small" color="success">
-                      <Schedule />
-                    </IconButton>
-                  </TableCell>
+                  </Box>
+
+                  <Chip
+                    label={patient.status}
+                    color={getStatusColor(patient.status)}
+                    size="small"
+                    variant="outlined"
+                    sx={{ mb: 1.25 }}
+                  />
+
+                  <Typography variant="body2"><strong>Diagnosis:</strong> {patient.diagnosis || 'Not specified'}</Typography>
+                  <Typography variant="body2"><strong>Phone:</strong> {patient.phone || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>Email:</strong> {patient.email || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>Last Visit:</strong> {patient.lastVisit || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>Next Appointment:</strong> {patient.nextAppointment || 'Not scheduled'}</Typography>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Patient</TableCell>
+                  <TableCell>Contact</TableCell>
+                  <TableCell>Last Visit</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Primary Diagnosis</TableCell>
+                  <TableCell>Next Appointment</TableCell>
+                  <TableCell align="center">Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {filteredPatients.map((patient) => (
+                  <TableRow key={patient.id}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar>{patient.name.charAt(0)}</Avatar>
+                        <Box>
+                          <Typography variant="subtitle2">{patient.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Age: {patient.age}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{patient.phone}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {patient.email}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{patient.lastVisit}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={patient.status}
+                        color={getStatusColor(patient.status)}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>{patient.diagnosis}</TableCell>
+                    <TableCell>{patient.nextAppointment || 'Not scheduled'}</TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={(event) => handleOpenActions(event, patient)}
+                      >
+                        <MoreVert />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+
+      <Menu
+        anchorEl={actionAnchorEl}
+        open={Boolean(actionAnchorEl)}
+        onClose={handleCloseActions}
+      >
+        <MenuItem onClick={() => void handleResendEmail()}>
+          <ListItemIcon>
+            <EmailOutlined fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Resend Email</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleOpenEditPatient}>
+          <ListItemIcon>
+            <Edit fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit Patient</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleOpenCompletePatient}>
+          <ListItemIcon>
+            <CheckCircleOutline fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Complete</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleOpenRemovePatient} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteOutline fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Remove Patient</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Patient Details Dialog */}
       <Dialog
@@ -427,6 +632,78 @@ const PatientManagement: React.FC = () => {
             </Box>
           )}
         </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editPatientOpen}
+        onClose={() => setEditPatientOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Patient</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2, display: 'grid', gap: 2 }}>
+            <TextField
+              fullWidth
+              label="Full Name"
+              value={editPatientData.name}
+              onChange={(e) => setEditPatientData(prev => ({ ...prev, name: e.target.value }))}
+            />
+            <TextField
+              fullWidth
+              label="Email"
+              type="email"
+              value={editPatientData.email}
+              onChange={(e) => setEditPatientData(prev => ({ ...prev, email: e.target.value }))}
+            />
+            <TextField
+              fullWidth
+              label="Phone"
+              value={editPatientData.phone}
+              onChange={(e) => setEditPatientData(prev => ({ ...prev, phone: e.target.value }))}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditPatientOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={() => void handleSaveEditPatient()}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={removePatientOpen}
+        onClose={() => setRemovePatientOpen(false)}
+      >
+        <DialogTitle>Remove Patient</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to remove {actionPatient?.name || 'this patient'}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemovePatientOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleRemovePatient()}>
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={completePatientOpen}
+        onClose={() => setCompletePatientOpen(false)}
+      >
+        <DialogTitle>Complete Patient</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Mark {actionPatient?.name || 'this patient'} as complete? This will set status to discharged.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCompletePatientOpen(false)}>Cancel</Button>
+          <Button color="success" variant="contained" onClick={() => void handleCompletePatient()}>
+            Complete
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Add New Patient Dialog */}

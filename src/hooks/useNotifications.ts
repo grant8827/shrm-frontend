@@ -7,12 +7,21 @@ export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const parseRecord = (value: unknown): Record<string, unknown> | null => {
+    if (value && typeof value === 'object') {
+      return value as Record<string, unknown>;
+    }
+    return null;
+  };
+
   // Fetch unread count
   const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await apiService.getUnreadNotificationCount();
       if (response.success && response.data) {
-        setUnreadCount(response.data.count || 0);
+        const data = parseRecord(response.data);
+        const count = data?.count;
+        setUnreadCount(typeof count === 'number' ? count : 0);
       }
     } catch (error) {
       console.error('Error fetching unread count:', error);
@@ -25,10 +34,26 @@ export const useNotifications = () => {
     try {
       const response = await apiService.getNotifications();
       if (response.success && response.data) {
-        // Handle both array and paginated response formats
-        const notificationData = Array.isArray(response.data) 
-          ? response.data 
-          : response.data.results || [];
+        const notificationData: Notification[] = [];
+
+        if (Array.isArray(response.data)) {
+          response.data.forEach((item) => {
+            if (item && typeof item === 'object') {
+              notificationData.push(item as Notification);
+            }
+          });
+        } else {
+          const data = parseRecord(response.data);
+          const results = data?.results;
+          if (Array.isArray(results)) {
+            results.forEach((item) => {
+              if (item && typeof item === 'object') {
+                notificationData.push(item as Notification);
+              }
+            });
+          }
+        }
+
         setNotifications(notificationData);
       }
     } catch (error) {
@@ -69,10 +94,12 @@ export const useNotifications = () => {
 
   // Fetch unread count on mount and set up polling
   useEffect(() => {
-    fetchUnreadCount();
+    void fetchUnreadCount();
     
     // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(() => {
+      void fetchUnreadCount();
+    }, 30000);
     
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);

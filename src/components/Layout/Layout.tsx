@@ -20,6 +20,8 @@ import {
   Popover,
   Paper,
   ListItemButton,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Dashboard,
@@ -43,6 +45,8 @@ const drawerWidth = 240;
 export const Layout: React.FC = () => {
   const { state, logout } = useAuth();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
@@ -88,15 +92,15 @@ export const Layout: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     handleMenuClose();
-    await logout();
+    logout();
   };
 
   const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
     if (!loading && notifications.length === 0) {
-      fetchNotifications();
+      void fetchNotifications();
     }
   };
 
@@ -200,13 +204,18 @@ export const Layout: React.FC = () => {
       <Divider />
       <List>
         {getNavigationItems().map((item) => (
-          <ListItem 
-            button 
-            key={item.text}
-            onClick={() => navigate(item.path)}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton
+              onClick={() => {
+                navigate(item.path);
+                if (isMobile) {
+                  setMobileOpen(false);
+                }
+              }}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
           </ListItem>
         ))}
       </List>
@@ -234,12 +243,12 @@ export const Layout: React.FC = () => {
             <MenuIcon />
           </IconButton>
           
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            SafeHaven EHR System
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+            {isMobile ? 'SafeHaven' : 'SafeHaven EHR System'}
           </Typography>
 
           {/* Notifications */}
-          <IconButton color="inherit" sx={{ mr: 2 }} onClick={handleNotificationClick}>
+          <IconButton color="inherit" sx={{ mr: { xs: 1, sm: 2 } }} onClick={handleNotificationClick}>
             <Badge badgeContent={unreadCount} color="error">
               <Notifications />
             </Badge>
@@ -259,11 +268,11 @@ export const Layout: React.FC = () => {
               horizontal: 'right',
             }}
           >
-            <Paper sx={{ width: 360, maxHeight: 400 }}>
+            <Paper sx={{ width: { xs: 320, sm: 360 }, maxHeight: 400 }}>
               <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="h6">Notifications</Typography>
                 {unreadCount > 0 && (
-                  <Button size="small" onClick={markAllAsRead}>
+                  <Button size="small" onClick={() => void markAllAsRead()}>
                     Mark all read
                   </Button>
                 )}
@@ -281,7 +290,7 @@ export const Layout: React.FC = () => {
                   notifications.map((notification) => (
                     <ListItemButton
                       key={notification.id}
-                      onClick={() => handleNotificationItemClick(notification.id, notification.related_object_id)}
+                      onClick={() => void handleNotificationItemClick(notification.id, notification.related_object_id)}
                       sx={{
                         backgroundColor: notification.is_read ? 'transparent' : 'action.hover',
                         '&:hover': {
@@ -315,8 +324,9 @@ export const Layout: React.FC = () => {
                 {state.user?.firstName?.charAt(0)}
               </Avatar>
             }
+            sx={{ minWidth: isMobile ? 0 : 'auto', px: isMobile ? 1 : 2 }}
           >
-            {state.user?.firstName} {state.user?.lastName}
+            {!isMobile ? `${state.user?.firstName} ${state.user?.lastName}` : ''}
           </Button>
           
           <Menu
@@ -327,7 +337,7 @@ export const Layout: React.FC = () => {
             <MenuItem onClick={handleProfileClick}>Profile</MenuItem>
             <MenuItem onClick={handleSettingsClick}>Settings</MenuItem>
             <Divider />
-            <MenuItem onClick={handleLogout}>
+            <MenuItem onClick={() => handleLogout()}>
               <ExitToApp sx={{ mr: 1 }} />
               Logout
             </MenuItem>
@@ -347,7 +357,7 @@ export const Layout: React.FC = () => {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: Math.min(drawerWidth, 280) },
           }}
         >
           {drawer}
@@ -369,7 +379,7 @@ export const Layout: React.FC = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 1.5, sm: 3 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
         }}
       >

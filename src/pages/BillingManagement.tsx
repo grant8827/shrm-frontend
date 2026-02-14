@@ -24,6 +24,9 @@ import {
   InputLabel,
   Select,
   InputAdornment,
+  useTheme,
+  useMediaQuery,
+  type ChipProps,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -81,6 +84,8 @@ interface PaymentFormData {
 }
 
 const BillingManagement: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { showSuccess, showError } = useNotification();
   
   const [bills, setBills] = useState<Bill[]>([]);
@@ -241,7 +246,7 @@ const BillingManagement: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): ChipProps['color'] => {
     switch (status) {
       case 'paid':
         return 'success';
@@ -265,102 +270,154 @@ const BillingManagement: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
+      <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
         <Typography variant="h4">Billing Management</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
+          fullWidth={isMobile}
         >
           Create Bill
         </Button>
       </Box>
 
-      {/* Bills Table */}
-      <Card>
-        <CardContent>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Paid</TableCell>
-                  <TableCell>Balance</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Due Date</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {bills.length === 0 ? (
+      {isMobile ? (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+          {bills.length === 0 ? (
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" textAlign="center">No bills found</Typography>
+              </CardContent>
+            </Card>
+          ) : (
+            bills.map((bill) => (
+              <Card key={bill.id}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box>
+                      <Typography variant="subtitle1">{bill.patient_name}</Typography>
+                      <Typography variant="body2" color="text.secondary">{bill.title}</Typography>
+                    </Box>
+                    <Chip label={bill.status.toUpperCase()} color={getStatusColor(bill.status)} size="small" />
+                  </Box>
+
+                  <Typography variant="body2"><strong>Amount:</strong> {formatCurrency(bill.amount)}</Typography>
+                  <Typography variant="body2"><strong>Paid:</strong> {formatCurrency(bill.amount_paid)}</Typography>
+                  <Typography variant="body2" color={parseFloat(bill.balance_remaining) > 0 ? 'error.main' : 'success.main'}>
+                    <strong>Balance:</strong> {formatCurrency(bill.balance_remaining)}
+                  </Typography>
+                  <Typography variant="body2" color={bill.is_overdue ? 'error.main' : 'text.primary'}>
+                    <strong>Due:</strong> {formatDate(bill.due_date)}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                    <IconButton size="small" onClick={() => handleOpenDialog(bill)} title="Edit">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleOpenPaymentDialog(bill)}
+                      title="Add Payment"
+                      disabled={bill.status === 'paid' || bill.status === 'cancelled'}
+                    >
+                      <PaymentIcon />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDelete(bill.id)} title="Delete" color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        <Card>
+          <CardContent>
+            <TableContainer>
+              <Table>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      <Typography color="text.secondary">No bills found</Typography>
-                    </TableCell>
+                    <TableCell>Patient</TableCell>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Amount</TableCell>
+                    <TableCell>Paid</TableCell>
+                    <TableCell>Balance</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Due Date</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
-                ) : (
-                  bills.map((bill) => (
-                    <TableRow key={bill.id} hover>
-                      <TableCell>{bill.patient_name}</TableCell>
-                      <TableCell>{bill.title}</TableCell>
-                      <TableCell>{formatCurrency(bill.amount)}</TableCell>
-                      <TableCell>{formatCurrency(bill.amount_paid)}</TableCell>
-                      <TableCell>
-                        <Typography
-                          color={parseFloat(bill.balance_remaining) > 0 ? 'error' : 'success'}
-                          fontWeight="bold"
-                        >
-                          {formatCurrency(bill.balance_remaining)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={bill.status.toUpperCase()}
-                          color={getStatusColor(bill.status) as any}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography color={bill.is_overdue ? 'error' : 'inherit'}>
-                          {formatDate(bill.due_date)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(bill)}
-                          title="Edit"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenPaymentDialog(bill)}
-                          title="Add Payment"
-                          disabled={bill.status === 'paid' || bill.status === 'cancelled'}
-                        >
-                          <PaymentIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(bill.id)}
-                          title="Delete"
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                </TableHead>
+                <TableBody>
+                  {bills.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} align="center">
+                        <Typography color="text.secondary">No bills found</Typography>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+                  ) : (
+                    bills.map((bill) => (
+                      <TableRow key={bill.id} hover>
+                        <TableCell>{bill.patient_name}</TableCell>
+                        <TableCell>{bill.title}</TableCell>
+                        <TableCell>{formatCurrency(bill.amount)}</TableCell>
+                        <TableCell>{formatCurrency(bill.amount_paid)}</TableCell>
+                        <TableCell>
+                          <Typography
+                            color={parseFloat(bill.balance_remaining) > 0 ? 'error' : 'success'}
+                            fontWeight="bold"
+                          >
+                            {formatCurrency(bill.balance_remaining)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={bill.status.toUpperCase()}
+                            color={getStatusColor(bill.status)}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography color={bill.is_overdue ? 'error' : 'inherit'}>
+                            {formatDate(bill.due_date)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(bill)}
+                            title="Edit"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenPaymentDialog(bill)}
+                            title="Add Payment"
+                            disabled={bill.status === 'paid' || bill.status === 'cancelled'}
+                          >
+                            <PaymentIcon />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDelete(bill.id)}
+                            title="Delete"
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Create/Edit Bill Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

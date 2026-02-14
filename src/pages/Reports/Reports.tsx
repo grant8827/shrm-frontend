@@ -44,6 +44,8 @@ import {
   FormControlLabel,
   Checkbox,
   FormGroup,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Assessment,
@@ -547,6 +549,8 @@ const reportAnalytics: ReportAnalytics = {
 
 const Reports: React.FC = () => {
   const { state } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -797,15 +801,15 @@ const Reports: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
           Reports & Analytics Center
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button variant="outlined" startIcon={<Settings />}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
+          <Button variant="outlined" startIcon={<Settings />} fullWidth={isMobile}>
             Report Settings
           </Button>
-          <Button variant="outlined" startIcon={<Help />}>
+          <Button variant="outlined" startIcon={<Help />} fullWidth={isMobile}>
             Help & Guide
           </Button>
         </Box>
@@ -813,7 +817,7 @@ const Reports: React.FC = () => {
 
       {/* Analytics Dashboard */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={6} sm={6} md={2.4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Assessment color="primary" sx={{ fontSize: 40, mb: 1 }} />
@@ -827,7 +831,7 @@ const Reports: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={6} sm={6} md={2.4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <TrendingUp color="success" sx={{ fontSize: 40, mb: 1 }} />
@@ -841,7 +845,7 @@ const Reports: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={6} sm={6} md={2.4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Schedule color="info" sx={{ fontSize: 40, mb: 1 }} />
@@ -855,7 +859,7 @@ const Reports: React.FC = () => {
           </Card>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2.4}>
+        <Grid item xs={6} sm={6} md={2.4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <CheckCircle color="success" sx={{ fontSize: 40, mb: 1 }} />
@@ -886,7 +890,13 @@ const Reports: React.FC = () => {
 
       {/* Main Content Tabs */}
       <Paper>
-        <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, newValue) => setActiveTab(newValue)}
+          variant={isMobile ? 'scrollable' : 'standard'}
+          scrollButtons={isMobile ? 'auto' : false}
+          allowScrollButtonsMobile
+        >
           <Tab label="Report Templates" icon={<Assessment />} iconPosition="start" />
           <Tab 
             label={
@@ -1027,11 +1037,12 @@ const Reports: React.FC = () => {
         {/* Generated Reports Tab */}
         {activeTab === 1 && (
           <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
               <Typography variant="h6">Generated Reports</Typography>
               <Button
                 variant="outlined"
                 startIcon={<Refresh />}
+                fullWidth={isMobile}
                 onClick={() => {
                   // Refresh reports list
                 }}
@@ -1040,6 +1051,41 @@ const Reports: React.FC = () => {
               </Button>
             </Box>
 
+            {isMobile ? (
+              <Box sx={{ display: 'grid', gap: 1.5 }}>
+                {generatedReports
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((report) => {
+                    const statusDisplay = getStatusDisplay(report.status);
+                    return (
+                      <Card key={report.id} variant="outlined">
+                        <CardContent>
+                          <Typography variant="subtitle2">{report.templateName}</Typography>
+                          <Typography variant="caption" color="text.secondary">{report.category}</Typography>
+                          <Typography variant="body2" sx={{ mt: 1 }}>{report.generatedBy}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {new Date(report.createdAt).toLocaleString()}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                            {statusDisplay.icon}
+                            <Chip label={statusDisplay.label} color={statusDisplay.color} size="small" />
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end', mt: 1 }}>
+                            {report.status === 'completed' && (
+                              <IconButton size="small" onClick={() => downloadReport(report)}>
+                                <Download />
+                              </IconButton>
+                            )}
+                            <IconButton size="small">
+                              <Visibility />
+                            </IconButton>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </Box>
+            ) : (
             <TableContainer>
               <Table>
                 <TableHead>
@@ -1122,6 +1168,7 @@ const Reports: React.FC = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+            )}
 
             <TablePagination
               rowsPerPageOptions={[5, 10, 25, 50]}

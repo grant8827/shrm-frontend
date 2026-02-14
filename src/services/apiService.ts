@@ -1,4 +1,12 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosProgressEvent } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosHeaders,
+  AxiosInstance,
+  AxiosProgressEvent,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { ApiResponse, PaginatedResponse } from '../types';
 import { encryptionService } from './encryptionService';
 
@@ -22,6 +30,44 @@ class ApiService {
     this.setupInterceptors();
   }
 
+  private setHeader(config: AxiosRequestConfig, key: string, value: string): void {
+    if (config.headers instanceof AxiosHeaders) {
+      config.headers.set(key, value);
+      return;
+    }
+
+    const currentHeaders = config.headers as Record<string, string> | undefined;
+    config.headers = {
+      ...(currentHeaders ?? {}),
+      [key]: value,
+    };
+  }
+
+  private getErrorStatus(error: unknown): number | undefined {
+    return axios.isAxiosError(error) ? error.response?.status : undefined;
+  }
+
+  private parseUnknownRecord(value: unknown): Record<string, unknown> | null {
+    if (value && typeof value === 'object') {
+      return value as Record<string, unknown>;
+    }
+    return null;
+  }
+
+  private getErrorMessageFromUnknown(error: unknown): string {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
+
+  private getStatusText(error: unknown): string {
+    if (axios.isAxiosError(error) && typeof error.response?.statusText === 'string' && error.response.statusText) {
+      return error.response.statusText;
+    }
+    return 'Request failed';
+  }
+
   private setupInterceptors(): void {
     // Request interceptor
     this.client.interceptors.request.use(
@@ -29,14 +75,14 @@ class ApiService {
         // Add authentication token
         const token = this.getStoredToken();
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          this.setHeader(config, 'Authorization', `Bearer ${token}`);
         }
 
         // Add CSRF token for state-changing requests
         if (['post', 'put', 'patch', 'delete'].includes(config.method || '')) {
           const csrfToken = this.getCSRFToken();
           if (csrfToken) {
-            config.headers['X-CSRFToken'] = csrfToken;
+            this.setHeader(config, 'X-CSRFToken', csrfToken);
           }
         }
 
@@ -61,16 +107,17 @@ class ApiService {
         }
         return response;
       },
-      async (error) => {
-        const originalRequest = error.config;
+      async (error: unknown) => {
+        const axiosError = error as AxiosError;
+        const originalRequest = (axiosError.config ?? {}) as InternalAxiosRequestConfig & { _retry?: boolean };
 
         // Handle 401 Unauthorized - try to refresh token
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (this.getErrorStatus(error) === 401 && !originalRequest._retry) {
           if (this.isRefreshing) {
             // If already refreshing, wait for the new token
             return new Promise((resolve) => {
               this.refreshSubscribers.push((token: string) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
+                this.setHeader(originalRequest, 'Authorization', `Bearer ${token}`);
                 resolve(this.client(originalRequest));
               });
             });
@@ -87,7 +134,7 @@ class ApiService {
               localStorage.setItem('access_token', newToken);
               
               // Update the failed request with new token
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              this.setHeader(originalRequest, 'Authorization', `Bearer ${newToken}`);
               
               // Retry all queued requests with new token
               this.refreshSubscribers.forEach(callback => callback(newToken));
@@ -105,7 +152,7 @@ class ApiService {
           }
         }
 
-        if (error.response?.status === 403) {
+        if (this.getErrorStatus(error) === 403) {
           // Insufficient permissions
           this.handleForbidden();
         }
@@ -133,7 +180,9 @@ class ApiService {
         }
       );
 
-      return response.data.access;
+      const responseData = this.parseUnknownRecord(response.data);
+      const accessToken = responseData?.access;
+      return typeof accessToken === 'string' ? accessToken : null;
     } catch (error) {
       console.error('Token refresh failed:', error);
       return null;
@@ -179,7 +228,7 @@ class ApiService {
     return this.shouldEncryptRequest(url);
   }
 
-  private encryptRequestData(data: any): any {
+  private encryptRequestData(data: unknown): unknown {
     try {
       return {
         encrypted_data: encryptionService.encrypt(JSON.stringify(data)),
@@ -191,10 +240,13 @@ class ApiService {
     }
   }
 
-  private decryptResponseData(data: any): any {
+  private decryptResponseData(data: unknown): unknown {
     try {
-      if (data.encrypted_data) {
-        const decryptedString = encryptionService.decrypt(data.encrypted_data);
+      const responseData = this.parseUnknownRecord(data);
+      const encryptedData = responseData?.encrypted_data;
+
+      if (typeof encryptedData === 'string') {
+        const decryptedString = encryptionService.decrypt(encryptedData);
         return JSON.parse(decryptedString);
       }
       return data;
@@ -224,38 +276,38 @@ class ApiService {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.get(url, config);
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<T>(error);
     }
   }
 
   // Generic POST request
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.post(url, data, config);
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<T>(error);
     }
   }
 
   // Generic PUT request
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.put(url, data, config);
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<T>(error);
     }
   }
 
   // Generic PATCH request
-  async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.patch(url, data, config);
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<T>(error);
     }
   }
 
@@ -264,15 +316,15 @@ class ApiService {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.delete(url, config);
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<T>(error);
     }
   }
 
   // Paginated GET request
   async getPaginated<T>(
     url: string, 
-    params?: { page?: number; limit?: number; [key: string]: any },
+    params?: { page?: number; limit?: number; [key: string]: unknown },
     config?: AxiosRequestConfig
   ): Promise<PaginatedResponse<T>> {
     try {
@@ -285,8 +337,8 @@ class ApiService {
         },
       });
       return response.data;
-    } catch (error: any) {
-      return this.handlePaginatedError(error, params?.page || 1, params?.limit || 20);
+    } catch (error: unknown) {
+      return this.handlePaginatedError<T>(error, params?.page || 1, params?.limit || 20);
     }
   }
 
@@ -295,12 +347,12 @@ class ApiService {
     url: string,
     file: File,
     onProgress?: (progressEvent: AxiosProgressEvent) => void
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<Record<string, unknown>>> {
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response: AxiosResponse<ApiResponse<any>> = await this.client.post(url, formData, {
+      const response: AxiosResponse<ApiResponse<Record<string, unknown>>> = await this.client.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -308,8 +360,8 @@ class ApiService {
       });
 
       return response.data;
-    } catch (error: any) {
-      return this.handleError(error);
+    } catch (error: unknown) {
+      return this.handleError<Record<string, unknown>>(error);
     }
   }
 
@@ -337,14 +389,14 @@ class ApiService {
     }
   }
 
-  private handleError(error: any): ApiResponse<any> {
-    if (error.response) {
+  private handleError<T>(error: unknown): ApiResponse<T> {
+    if (axios.isAxiosError(error) && error.response) {
       // Server responded with an error status
-      const responseData = error.response.data;
+      const responseData = this.parseUnknownRecord(error.response.data);
       
       // Check if it's a Django REST Framework validation error format
       // DRF returns: { "field_name": ["error message"], ... }
-      if (responseData && typeof responseData === 'object' && !responseData.message && !responseData.errors) {
+      if (responseData && !responseData.message && !responseData.errors) {
         // Parse Django validation errors
         const errors: string[] = [];
         let firstError = '';
@@ -352,8 +404,8 @@ class ApiService {
         Object.keys(responseData).forEach(field => {
           const fieldErrors = responseData[field];
           if (Array.isArray(fieldErrors)) {
-            fieldErrors.forEach(err => {
-              const errorMsg = `${field}: ${err}`;
+            fieldErrors.forEach((err) => {
+              const errorMsg = `${field}: ${String(err)}`;
               errors.push(errorMsg);
               if (!firstError) firstError = errorMsg;
             });
@@ -368,18 +420,24 @@ class ApiService {
           success: false,
           message: firstError || 'Validation error',
           errors,
-          data: responseData, // Keep original for debugging
+          data: responseData as T,
         };
       }
       
       // Standard error format
+      const message = responseData && typeof responseData.message === 'string' ? responseData.message : 'An error occurred';
+      const parsedErrors = responseData?.errors;
+      const errors = Array.isArray(parsedErrors)
+        ? parsedErrors.map((entry) => String(entry))
+        : [this.getStatusText(error)];
+      
       return {
         success: false,
-        message: responseData?.message || 'An error occurred',
-        errors: responseData?.errors || [error.response.statusText],
-        data: responseData,
+        message,
+        errors,
+        data: responseData as T,
       };
-    } else if (error.request) {
+    } else if (axios.isAxiosError(error) && error.request) {
       // Network error
       return {
         success: false,
@@ -390,14 +448,14 @@ class ApiService {
       // Other error
       return {
         success: false,
-        message: error.message || 'An unexpected error occurred',
-        errors: [error.message || 'Unknown error'],
+        message: this.getErrorMessageFromUnknown(error) || 'An unexpected error occurred',
+        errors: [this.getErrorMessageFromUnknown(error)],
       };
     }
   }
 
-  private handlePaginatedError(error: any, page: number, limit: number): PaginatedResponse<any> {
-    if (error.response) {
+  private handlePaginatedError<T>(error: unknown, page: number, limit: number): PaginatedResponse<T> {
+    if (axios.isAxiosError(error) && error.response) {
       // Server responded with an error status
       return {
         success: false,
@@ -409,7 +467,7 @@ class ApiService {
           totalPages: 0,
         },
       };
-    } else if (error.request) {
+    } else if (axios.isAxiosError(error) && error.request) {
       // Network error
       return {
         success: false,
@@ -447,20 +505,20 @@ class ApiService {
   }
 
   // Notification methods
-  async getNotifications(): Promise<ApiResponse<any>> {
-    return this.get('/notifications/notifications/');
+  async getNotifications(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.get<Record<string, unknown>>('/notifications/notifications/');
   }
 
-  async getUnreadNotificationCount(): Promise<ApiResponse<any>> {
-    return this.get('/notifications/notifications/unread_count/');
+  async getUnreadNotificationCount(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.get<Record<string, unknown>>('/notifications/notifications/unread_count/');
   }
 
-  async markNotificationAsRead(notificationId: string): Promise<ApiResponse<any>> {
-    return this.post(`/notifications/notifications/${notificationId}/mark_read/`, {});
+  async markNotificationAsRead(notificationId: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.post<Record<string, unknown>>(`/notifications/notifications/${notificationId}/mark_read/`, {});
   }
 
-  async markAllNotificationsAsRead(): Promise<ApiResponse<any>> {
-    return this.post('/notifications/notifications/mark_all_read/', {});
+  async markAllNotificationsAsRead(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.post<Record<string, unknown>>('/notifications/notifications/mark_all_read/', {});
   }
 
   // Set authentication token

@@ -14,6 +14,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Visibility, VisibilityOff, CheckCircle, Person, Lock } from '@mui/icons-material';
+import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
 
 interface TokenData {
@@ -23,6 +24,15 @@ interface TokenData {
   last_name: string;
   phone_number: string;
   is_valid: boolean;
+}
+
+interface RegistrationTokens {
+  access: string;
+  refresh: string;
+}
+
+interface CompleteRegistrationResponse {
+  tokens?: RegistrationTokens;
 }
 
 const CompleteRegistration: React.FC = () => {
@@ -49,8 +59,21 @@ const CompleteRegistration: React.FC = () => {
     password_confirm: ''
   });
 
+  const toRecord = (value: unknown): Record<string, unknown> | null => {
+    if (value && typeof value === 'object') {
+      return value as Record<string, unknown>;
+    }
+    return null;
+  };
+
+  const firstString = (value: unknown): string | null => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+    return null;
+  };
+
   useEffect(() => {
-    validateToken();
+    void validateToken();
   }, [token]);
 
   const validateToken = async () => {
@@ -58,10 +81,16 @@ const CompleteRegistration: React.FC = () => {
     setError(null);
     
     try {
-      const response = await apiClient.post('/auth/registration/validate-token/', { token });
+      const response = await apiClient.post<TokenData>('/auth/registration/validate-token/', { token });
       setTokenData(response.data);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid or expired registration link');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const data = toRecord(err.response?.data);
+        const message = firstString(data?.error);
+        setError(message || 'Invalid or expired registration link');
+      } else {
+        setError('Invalid or expired registration link');
+      }
     } finally {
       setLoading(false);
     }
@@ -127,7 +156,7 @@ const CompleteRegistration: React.FC = () => {
     setError(null);
     
     try {
-      const response = await apiClient.post('/auth/registration/complete/', {
+      const response = await apiClient.post<CompleteRegistrationResponse>('/auth/registration/complete/', {
         token,
         username: formData.username,
         password: formData.password,
@@ -135,7 +164,7 @@ const CompleteRegistration: React.FC = () => {
       });
       
       // Store the tokens
-      if (response.data.tokens) {
+      if (response.data.tokens?.access && response.data.tokens?.refresh) {
         localStorage.setItem('access_token', response.data.tokens.access);
         localStorage.setItem('refresh_token', response.data.tokens.refresh);
       }
@@ -147,24 +176,37 @@ const CompleteRegistration: React.FC = () => {
         navigate('/client');
       }, 2000);
       
-    } catch (err: any) {
-      const errorData = err.response?.data;
+    } catch (err: unknown) {
+      const errorData = axios.isAxiosError(err) ? toRecord(err.response?.data) : null;
       
       if (errorData) {
-        if (typeof errorData === 'object') {
-          // Handle field-specific errors
-          const newErrors = { ...formErrors };
-          if (errorData.username) newErrors.username = Array.isArray(errorData.username) ? errorData.username[0] : errorData.username;
-          if (errorData.password) newErrors.password = Array.isArray(errorData.password) ? errorData.password.join(' ') : errorData.password;
-          if (errorData.password_confirm) newErrors.password_confirm = Array.isArray(errorData.password_confirm) ? errorData.password_confirm[0] : errorData.password_confirm;
-          setFormErrors(newErrors);
-          
-          // Set general error if present
-          if (errorData.error || errorData.detail) {
-            setError(errorData.error || errorData.detail);
-          }
+        const newErrors = { ...formErrors };
+
+        const usernameError = firstString(errorData.username);
+        if (usernameError) {
+          newErrors.username = usernameError;
+        }
+
+        const passwordValue = errorData.password;
+        if (Array.isArray(passwordValue)) {
+          newErrors.password = passwordValue.map((entry) => String(entry)).join(' ');
         } else {
-          setError(errorData);
+          const passwordError = firstString(passwordValue);
+          if (passwordError) {
+            newErrors.password = passwordError;
+          }
+        }
+
+        const passwordConfirmError = firstString(errorData.password_confirm);
+        if (passwordConfirmError) {
+          newErrors.password_confirm = passwordConfirmError;
+        }
+
+        setFormErrors(newErrors);
+
+        const generalError = firstString(errorData.error) || firstString(errorData.detail);
+        if (generalError) {
+          setError(generalError);
         }
       } else {
         setError('Registration failed. Please try again.');
@@ -250,7 +292,9 @@ const CompleteRegistration: React.FC = () => {
               </Alert>
             )}
 
-            <Box component="form" onSubmit={handleSubmit}>
+            <Box component="form" onSubmit={(event) => {
+              void handleSubmit(event);
+            }}>
               {/* Pre-filled information (read-only) */}
               <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>

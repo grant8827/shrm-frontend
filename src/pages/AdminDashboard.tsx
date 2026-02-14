@@ -38,6 +38,8 @@ import {
   Tab,
   Badge,
   Menu,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -115,6 +117,8 @@ interface UserUpdateData {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -426,7 +430,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
     <Box>
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Total Users"
             value={stats?.totalUsers || 0}
@@ -434,7 +438,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<PeopleIcon />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Active Patients"
             value={stats?.activePatients || 0}
@@ -442,7 +446,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<Group />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Today's Appointments"
             value={stats?.todayAppointments || 0}
@@ -450,7 +454,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<Schedule />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Monthly Revenue"
             value={`$${(stats?.monthlyRevenue || 0).toLocaleString()}`}
@@ -462,7 +466,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
       {/* Secondary Stats */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Active Staff"
             value={stats?.activeStaff || 0}
@@ -470,7 +474,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<PeopleIcon />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Total Revenue"
             value={`$${(stats?.totalRevenue || 0).toLocaleString()}`}
@@ -478,7 +482,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<BillingIcon />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="System Alerts"
             value={stats?.systemAlerts || 0}
@@ -486,7 +490,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             icon={<NotificationsIcon />}
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <StatsCard
             title="Pending Appointments"
             value={stats?.pendingAppointments || 0}
@@ -499,7 +503,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       <Grid container spacing={3}>
         {/* System Alerts */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, height: '400px' }}>
+          <Paper sx={{ p: 3, height: { xs: 'auto', md: '400px' } }}>
             <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
               <NotificationsIcon sx={{ mr: 1 }} />
               System Alerts
@@ -512,29 +516,48 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 No active alerts
               </Typography>
             ) : (
-              <List>
-                {systemAlerts.map((alert) => (
-                  <ListItem key={alert.id}>
-                    <ListItemIcon>
-                      {alert.type === 'error' && <SecurityIcon color="error" />}
-                      {alert.type === 'warning' && <Warning color="warning" />}
-                      {alert.type === 'success' && <CheckCircle color="success" />}
-                      {alert.type === 'info' && <NotificationsIcon color="info" />}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={alert.title}
-                      secondary={alert.description}
-                    />
-                  </ListItem>
-                ))}
-              </List>
+              isMobile ? (
+                <Box sx={{ display: 'grid', gap: 1.5 }}>
+                  {systemAlerts.map((alert) => (
+                    <Card key={alert.id} variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          {alert.type === 'error' && <SecurityIcon color="error" />}
+                          {alert.type === 'warning' && <Warning color="warning" />}
+                          {alert.type === 'success' && <CheckCircle color="success" />}
+                          {alert.type === 'info' && <NotificationsIcon color="info" />}
+                          <Typography variant="subtitle2">{alert.title}</Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">{alert.description}</Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              ) : (
+                <List>
+                  {systemAlerts.map((alert) => (
+                    <ListItem key={alert.id}>
+                      <ListItemIcon>
+                        {alert.type === 'error' && <SecurityIcon color="error" />}
+                        {alert.type === 'warning' && <Warning color="warning" />}
+                        {alert.type === 'success' && <CheckCircle color="success" />}
+                        {alert.type === 'info' && <NotificationsIcon color="info" />}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={alert.title}
+                        secondary={alert.description}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )
             )}
           </Paper>
         </Grid>
 
         {/* Recent Activity */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, height: '400px' }}>
+          <Paper sx={{ p: 3, height: { xs: 'auto', md: '400px' } }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Recent Activity
             </Typography>
@@ -543,44 +566,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                 No recent activity
               </Typography>
             ) : (
-              <List>
-                {recentActivity.map((activity) => (
-                  <ListItem 
-                    key={activity.id}
-                    secondaryAction={
-                      <IconButton 
-                        edge="end" 
-                        aria-label="view"
-                        onClick={() => {
-                          // Handle view action based on activity type
-                          if (activity.type === 'user') {
-                            setActiveTab(1); // Switch to User Management tab
-                          } else if (activity.type === 'patient') {
-                            // Navigate to patient details
-                            console.log('View patient:', activity);
-                          } else if (activity.type === 'appointment') {
-                            // Navigate to appointment details
-                            console.log('View appointment:', activity);
-                          }
-                        }}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemIcon>
-                      {activity.type === 'user' && <PersonAddIcon color="primary" />}
-                      {activity.type === 'patient' && <EditIcon color="info" />}
-                      {activity.type === 'appointment' && <Schedule color="warning" />}
-                      {activity.type === 'system' && <SecurityIcon color="error" />}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={activity.action}
-                      secondary={activity.description}
-                    />
-                  </ListItem>
-                ))}
-              </List>
+              isMobile ? (
+                <Box sx={{ display: 'grid', gap: 1.5 }}>
+                  {recentActivity.map((activity) => (
+                    <Card key={activity.id} variant="outlined">
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          {activity.type === 'user' && <PersonAddIcon color="primary" />}
+                          {activity.type === 'patient' && <EditIcon color="info" />}
+                          {activity.type === 'appointment' && <Schedule color="warning" />}
+                          {activity.type === 'system' && <SecurityIcon color="error" />}
+                          <Typography variant="subtitle2">{activity.action}</Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">{activity.description}</Typography>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              ) : (
+                <List>
+                  {recentActivity.map((activity) => (
+                    <ListItem
+                      key={activity.id}
+                      secondaryAction={
+                        <IconButton
+                          edge="end"
+                          aria-label="view"
+                          onClick={() => {
+                            if (activity.type === 'user') {
+                              setActiveTab(1);
+                            } else if (activity.type === 'patient') {
+                              console.log('View patient:', activity);
+                            } else if (activity.type === 'appointment') {
+                              console.log('View appointment:', activity);
+                            }
+                          }}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      }
+                    >
+                      <ListItemIcon>
+                        {activity.type === 'user' && <PersonAddIcon color="primary" />}
+                        {activity.type === 'patient' && <EditIcon color="info" />}
+                        {activity.type === 'appointment' && <Schedule color="warning" />}
+                        {activity.type === 'system' && <SecurityIcon color="error" />}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={activity.action}
+                        secondary={activity.description}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )
             )}
           </Paper>
         </Grid>
@@ -590,7 +629,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
   const UserManagement = () => (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', gap: 1.5, mb: 3 }}>
         <Typography variant="h5">User Management</Typography>
         <Button
           variant="contained"
@@ -600,91 +639,152 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             setEditUserData({});
             setUserDialogOpen(true);
           }}
+          fullWidth={isMobile}
         >
           Add User
         </Button>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>User</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Last Login</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {_users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    No users found
+      {isMobile ? (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+          {_users.length === 0 ? (
+            <Paper sx={{ p: 3, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">No users found</Typography>
+            </Paper>
+          ) : (
+            _users.map((user: any) => (
+              <Card key={user.id}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                    <Avatar>
+                      {user.full_name
+                        ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                        : user.username.substring(0, 2).toUpperCase()}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle1">{user.full_name || user.username}</Typography>
+                      <Typography variant="caption" color="text.secondary">{user.email}</Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+                    <Chip
+                      label={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                      color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'}
+                      size="small"
+                    />
+                    <Chip
+                      label={user.is_active ? 'Active' : 'Inactive'}
+                      color={user.is_active ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Last login: {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
                   </Typography>
-                </TableCell>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
+                      <LockIcon />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        setUserMenuAnchorEl(e.currentTarget);
+                        setSelectedMenuUserId(user.id);
+                      }}
+                    >
+                      <MoreIcon />
+                    </IconButton>
+                  </Box>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>User</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Last Login</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ) : (
-              _users.map((user: any) => {
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ mr: 2 }}>
-                          {user.full_name 
-                            ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase() 
-                            : user.username.substring(0, 2).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">{user.full_name || user.username}</Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {user.email}
-                          </Typography>
+            </TableHead>
+            <TableBody>
+              {_users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                      No users found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                _users.map((user: any) => {
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ mr: 2 }}>
+                            {user.full_name
+                              ? user.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+                              : user.username.substring(0, 2).toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2">{user.full_name || user.username}</Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              {user.email}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={user.role.charAt(0).toUpperCase() + user.role.slice(1)} 
-                        color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'} 
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={user.is_active ? 'Active' : 'Inactive'} 
-                        color={user.is_active ? 'success' : 'default'} 
-                        size="small" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
-                    </TableCell>
-                    <TableCell>
-                      <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
-                        <LockIcon />
-                      </IconButton>
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => {
-                          setUserMenuAnchorEl(e.currentTarget);
-                          setSelectedMenuUserId(user.id);
-                        }}
-                      >
-                        <MoreIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          color={user.role === 'admin' ? 'primary' : user.role === 'therapist' ? 'info' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.is_active ? 'Active' : 'Inactive'}
+                          color={user.is_active ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        <IconButton onClick={() => handleUserAction('edit', user.id)} size="small">
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton onClick={() => handleUserAction('lock', user.id)} size="small">
+                          <LockIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            setUserMenuAnchorEl(e.currentTarget);
+                            setSelectedMenuUserId(user.id);
+                          }}
+                        >
+                          <MoreIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
       
       {/* User action menu - rendered outside the map loop */}
       {userMenuAnchorEl && (
@@ -788,7 +888,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
               <ListItem>
                 <ListItemText primary="Database backup" secondary="Last backup: 6 hours ago" />
                 <ListItemSecondaryAction>
-                  <Button variant="outlined" size="small">
+                  <Button variant="outlined" size="small" fullWidth={isMobile}>
                     Backup Now
                   </Button>
                 </ListItemSecondaryAction>
@@ -796,7 +896,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
               <ListItem>
                 <ListItemText primary="System logs" secondary="View and download system logs" />
                 <ListItemSecondaryAction>
-                  <Button variant="outlined" size="small">
+                  <Button variant="outlined" size="small" fullWidth={isMobile}>
                     View Logs
                   </Button>
                 </ListItemSecondaryAction>
@@ -804,7 +904,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
               <ListItem>
                 <ListItemText primary="Audit trail" secondary="HIPAA compliance audit logs" />
                 <ListItemSecondaryAction>
-                  <Button variant="outlined" size="small">
+                  <Button variant="outlined" size="small" fullWidth={isMobile}>
                     Generate Report
                   </Button>
                 </ListItemSecondaryAction>
@@ -846,7 +946,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       </Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}>
+        <Tabs
+          value={activeTab}
+          onChange={(_event: React.SyntheticEvent, newValue: number) => setActiveTab(newValue)}
+          variant={isMobile ? 'scrollable' : 'standard'}
+          scrollButtons={isMobile ? 'auto' : false}
+          allowScrollButtonsMobile
+        >
           {tabPanels.map((panel, index) => (
             <Tab
               key={index}

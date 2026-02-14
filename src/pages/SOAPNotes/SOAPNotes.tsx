@@ -24,6 +24,8 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add,
@@ -65,6 +67,8 @@ interface SOAPNote {
 }
 
 const SOAPNotes: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [soapNotes, setSoapNotes] = useState<SOAPNote[]>([]);
   const [stats, setStats] = useState({
     completedThisWeek: 0,
@@ -220,7 +224,7 @@ const SOAPNotes: React.FC = () => {
         </Alert>
       )}
       
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
           SOAP Notes & Clinical Documentation
         </Typography>
@@ -229,6 +233,7 @@ const SOAPNotes: React.FC = () => {
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
           disabled={loading}
+          fullWidth={isMobile}
         >
           New SOAP Note
         </Button>
@@ -236,7 +241,7 @@ const SOAPNotes: React.FC = () => {
 
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={6} md={4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Assignment color="success" sx={{ fontSize: 40, mb: 1 }} />
@@ -249,7 +254,7 @@ const SOAPNotes: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={6} md={4}>
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Edit color="warning" sx={{ fontSize: 40, mb: 1 }} />
@@ -279,6 +284,56 @@ const SOAPNotes: React.FC = () => {
 
       {/* SOAP Notes Table */}
       <Paper>
+        {isMobile ? (
+          <Box sx={{ p: 2, display: 'grid', gap: 1.5 }}>
+            {loading && soapNotes.length === 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : soapNotes.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                No SOAP notes found. Create your first note to get started.
+              </Typography>
+            ) : (
+              soapNotes.map((note) => (
+                <Card key={note.id} variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle2">{format(new Date(note.session_date), 'MMM dd, yyyy')}</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5 }}>{note.patient_name}</Typography>
+                    <Typography variant="caption" color="text.secondary">{note.therapist_name}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      {note.chief_complaint || '-'}
+                    </Typography>
+                    <Box sx={{ mt: 1 }}>
+                      <Chip
+                        label={note.status.charAt(0).toUpperCase() + note.status.slice(1)}
+                        color={getStatusColor(note.status) as any}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                      Updated {format(new Date(note.updated_at), 'MMM dd, yyyy HH:mm')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                      <IconButton size="small" color="primary" onClick={() => handleOpenDialog(note)} disabled={loading}>
+                        <Edit />
+                      </IconButton>
+                      <IconButton size="small" color="info" onClick={() => handleOpenDialog(note)} disabled={loading}>
+                        <Visibility />
+                      </IconButton>
+                      {note.status === 'draft' && (
+                        <IconButton size="small" color="success" onClick={() => handleFinalize(note.id)} disabled={loading} title="Finalize Note">
+                          <CheckCircle />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </Box>
+        ) : (
         <TableContainer>
           <Table>
             <TableHead>
@@ -362,6 +417,7 @@ const SOAPNotes: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        )}
       </Paper>
 
       {/* SOAP Note Dialog */}

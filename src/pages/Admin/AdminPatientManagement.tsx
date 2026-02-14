@@ -18,22 +18,32 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  DialogContentText,
   Grid,
   Card,
   CardContent,
   Avatar,
   Alert,
   Snackbar,
-  Divider,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  type ChipProps,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Search,
-  Visibility,
   Edit,
+  MoreVert,
   PersonAdd,
   Refresh,
   EmailOutlined,
+  DeleteOutline,
+  CheckCircleOutline,
 } from '@mui/icons-material';
+import axios from 'axios';
 import AddPatientForm from '../../components/AddPatientForm';
 import { apiService } from '../../services/apiService';
 
@@ -65,6 +75,21 @@ interface PaginatedResponse<T> {
   previous: string | null;
   results: T[];
 }
+
+interface ResendEmailData {
+  email?: string;
+}
+
+type PatientUpdatePayload = {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string;
+  gender: string;
+  status: string;
+  admission_date: string;
+};
 
 // Form data interface
 interface PatientFormData {
@@ -111,12 +136,13 @@ interface PatientFormData {
 }
 
 const AdminPatientManagement: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [patients, setPatients] = useState<BackendPatient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<BackendPatient[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [addPatientOpen, setAddPatientOpen] = useState(false);
-  const [viewPatientOpen, setViewPatientOpen] = useState(false);
   const [editPatientOpen, setEditPatientOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<BackendPatient | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
@@ -124,6 +150,45 @@ const AdminPatientManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [actionAnchorEl, setActionAnchorEl] = useState<null | HTMLElement>(null);
+  const [actionPatient, setActionPatient] = useState<BackendPatient | null>(null);
+  const [removePatientOpen, setRemovePatientOpen] = useState(false);
+  const [completePatientOpen, setCompletePatientOpen] = useState(false);
+
+  const getErrorMessage = (error: unknown, fallback: string): string => {
+    if (axios.isAxiosError(error)) {
+      const data: unknown = error.response?.data;
+      if (data && typeof data === 'object') {
+        const responseData = data as Record<string, unknown>;
+
+        const detail = responseData.detail;
+        if (typeof detail === 'string' && detail) {
+          return detail;
+        }
+
+        const directError = responseData.error;
+        if (typeof directError === 'string' && directError) {
+          return directError;
+        }
+
+        const emailWrite = responseData.email_write;
+        if (Array.isArray(emailWrite) && typeof emailWrite[0] === 'string') {
+          return emailWrite[0];
+        }
+
+        const email = responseData.email;
+        if (Array.isArray(email) && typeof email[0] === 'string') {
+          return email[0];
+        }
+      }
+    }
+
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return fallback;
+  };
 
   // Load patients from API
   const loadPatients = async () => {
@@ -162,10 +227,9 @@ const AdminPatientManagement: React.FC = () => {
       setFilteredPatients(patientsData);
       console.log('✅ State updated');
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error loading patients:', error);
-      console.error('❌ Error response:', error.response);
-      setErrorMessage(`Failed to load patients: ${error.message || 'Unknown error'}`);
+      setErrorMessage(`Failed to load patients: ${getErrorMessage(error, 'Unknown error')}`);
       setShowError(true);
       setPatients([]);
       setFilteredPatients([]);
@@ -175,26 +239,13 @@ const AdminPatientManagement: React.FC = () => {
     }
   };
 
-  // Open view patient dialog
-  const handleViewPatient = async (patientId: string) => {
-    try {
-      const response = await apiService.get(`/patients/${patientId}/`);
-      setSelectedPatient(response.data as BackendPatient);
-      setViewPatientOpen(true);
-    } catch (error: any) {
-      console.error('❌ Error loading patient details:', error);
-      setErrorMessage('Failed to load patient details');
-      setShowError(true);
-    }
-  };
-
   // Open edit patient dialog
   const handleEditPatient = async (patientId: string) => {
     try {
       const response = await apiService.get(`/patients/${patientId}/`);
       setSelectedPatient(response.data as BackendPatient);
       setEditPatientOpen(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error loading patient details:', error);
       setErrorMessage('Failed to load patient details');
       setShowError(true);
@@ -202,7 +253,7 @@ const AdminPatientManagement: React.FC = () => {
   };
 
   // Handle patient update
-  const handleUpdatePatient = async (formData: any) => {
+  const handleUpdatePatient = async (formData: PatientUpdatePayload) => {
     try {
       if (!selectedPatient) return;
       
@@ -211,8 +262,8 @@ const AdminPatientManagement: React.FC = () => {
       setShowSuccess(true);
       setEditPatientOpen(false);
       setSelectedPatient(null);
-      loadPatients(); // Reload the patient list
-    } catch (error: any) {
+      void loadPatients(); // Reload the patient list
+    } catch (error: unknown) {
       console.error('❌ Error updating patient:', error);
       setErrorMessage('Failed to update patient');
       setShowError(true);
@@ -222,25 +273,92 @@ const AdminPatientManagement: React.FC = () => {
   // Resend welcome email to patient
   const handleResendEmail = async (patientId: string) => {
     try {
-      const response = await apiService.post(`/patients/${patientId}/resend_welcome_email/`);
+      const response = await apiService.post<ResendEmailData>(`/patients/${patientId}/resend_welcome_email/`);
       
-      if (response.data && (response.data as any).email) {
-        setSuccessMessage(`Registration email sent successfully to ${(response.data as any).email}`);
+      if (response.data?.email) {
+        setSuccessMessage(`Registration email sent successfully to ${response.data.email}`);
         setShowSuccess(true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error resending email:', error);
-      setErrorMessage(
-        error.response?.data?.error || 
-        'Failed to send registration email. Please try again.'
-      );
+      setErrorMessage(getErrorMessage(error, 'Failed to send registration email. Please try again.'));
       setShowError(true);
+    }
+  };
+
+  const handleOpenActionsMenu = (event: React.MouseEvent<HTMLElement>, patient: BackendPatient) => {
+    setActionAnchorEl(event.currentTarget);
+    setActionPatient(patient);
+  };
+
+  const handleCloseActionsMenu = () => {
+    setActionAnchorEl(null);
+  };
+
+  const handleMenuResendEmail = async () => {
+    if (!actionPatient) return;
+    await handleResendEmail(actionPatient.id);
+    handleCloseActionsMenu();
+  };
+
+  const handleMenuEditPatient = async () => {
+    if (!actionPatient) return;
+    await handleEditPatient(actionPatient.id);
+    handleCloseActionsMenu();
+  };
+
+  const handleMenuRemovePatient = () => {
+    setRemovePatientOpen(true);
+    handleCloseActionsMenu();
+  };
+
+  const handleConfirmRemovePatient = async () => {
+    if (!actionPatient) return;
+
+    try {
+      await apiService.delete(`/patients/${actionPatient.id}/`);
+      setSuccessMessage('Patient removed successfully');
+      setShowSuccess(true);
+      await loadPatients();
+    } catch (error: unknown) {
+      console.error('❌ Error removing patient:', error);
+      setErrorMessage(getErrorMessage(error, 'Failed to remove patient'));
+      setShowError(true);
+    } finally {
+      setRemovePatientOpen(false);
+      setActionPatient(null);
+    }
+  };
+
+  const handleMenuCompletePatient = () => {
+    setCompletePatientOpen(true);
+    handleCloseActionsMenu();
+  };
+
+  const handleConfirmCompletePatient = async () => {
+    if (!actionPatient) return;
+
+    try {
+      await apiService.patch(`/patients/${actionPatient.id}/`, {
+        status: 'discharged',
+        discharge_date: new Date().toISOString().split('T')[0],
+      });
+      setSuccessMessage('Patient marked complete successfully');
+      setShowSuccess(true);
+      await loadPatients();
+    } catch (error: unknown) {
+      console.error('❌ Error completing patient:', error);
+      setErrorMessage(getErrorMessage(error, 'Failed to mark patient complete'));
+      setShowError(true);
+    } finally {
+      setCompletePatientOpen(false);
+      setActionPatient(null);
     }
   };
 
   // Load patients on mount
   useEffect(() => {
-    loadPatients();
+    void loadPatients();
   }, []);
 
   // Filter patients when search or status changes
@@ -319,13 +437,9 @@ const AdminPatientManagement: React.FC = () => {
       // Reload patients
       await loadPatients();
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error creating patient:', error);
-      const errorMsg = error.response?.data?.email_write?.[0] ||
-                      error.response?.data?.email?.[0] || 
-                      error.response?.data?.detail || 
-                      error.message || 
-                      'Failed to create patient';
+      const errorMsg = getErrorMessage(error, 'Failed to create patient');
       setErrorMessage(errorMsg);
       setShowError(true);
     }
@@ -357,7 +471,7 @@ const AdminPatientManagement: React.FC = () => {
   };
 
   // Get status color
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): ChipProps['color'] => {
     switch (status.toLowerCase()) {
       case 'active':
         return 'success';
@@ -373,18 +487,19 @@ const AdminPatientManagement: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 1.5, sm: 3 } }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
           Patient Management
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 1.5, flexDirection: { xs: 'column', sm: 'row' } }}>
           <Button
             variant="outlined"
             startIcon={<Refresh />}
-            onClick={loadPatients}
+            onClick={() => void loadPatients()}
             disabled={loading}
+            fullWidth={isMobile}
           >
             Refresh
           </Button>
@@ -392,6 +507,7 @@ const AdminPatientManagement: React.FC = () => {
             variant="contained"
             startIcon={<PersonAdd />}
             onClick={() => setAddPatientOpen(true)}
+            fullWidth={isMobile}
           >
             Add Patient
           </Button>
@@ -400,7 +516,7 @@ const AdminPatientManagement: React.FC = () => {
 
       {/* Statistics Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom variant="body2">
@@ -412,7 +528,7 @@ const AdminPatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom variant="body2">
@@ -424,7 +540,7 @@ const AdminPatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom variant="body2">
@@ -436,7 +552,7 @@ const AdminPatientManagement: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={6} md={3}>
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom variant="body2">
@@ -492,131 +608,184 @@ const AdminPatientManagement: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* Patients Table */}
-      <Paper>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Patient</TableCell>
-                <TableCell>Patient #</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Date of Birth</TableCell>
-                <TableCell>Gender</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Admission Date</TableCell>
-                <TableCell>Therapist</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {(() => {
-                console.log('🎨 TABLE RENDER - loading:', loading);
-                console.log('🎨 TABLE RENDER - filteredPatients.length:', filteredPatients.length);
-                console.log('🎨 TABLE RENDER - patients.length:', patients.length);
-                console.log('🎨 TABLE RENDER - filteredPatients:', filteredPatients);
-                return null;
-              })()}
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <Typography>Loading patients...</Typography>
-                  </TableCell>
-                </TableRow>
-              ) : filteredPatients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <Typography color="text.secondary">
-                      {patients.length === 0 ? 'No patients found. Click "Add Patient" to create one.' : 'No patients match your search criteria.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPatients.map((patient) => {
-                  console.log('🎨 Rendering patient row:', patient.first_name, patient.last_name);
-                  return (
-                  <TableRow key={patient.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2">
-                            {patient.first_name} {patient.last_name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Age: {calculateAge(patient.date_of_birth)}
-                          </Typography>
-                        </Box>
+      {/* Patients List */}
+      {isMobile ? (
+        <Box sx={{ display: 'grid', gap: 1.5 }}>
+          {loading ? (
+            <Paper sx={{ p: 2.5, textAlign: 'center' }}>
+              <Typography>Loading patients...</Typography>
+            </Paper>
+          ) : filteredPatients.length === 0 ? (
+            <Paper sx={{ p: 2.5, textAlign: 'center' }}>
+              <Typography color="text.secondary">
+                {patients.length === 0 ? 'No patients found. Click "Add Patient" to create one.' : 'No patients match your search criteria.'}
+              </Typography>
+            </Paper>
+          ) : (
+            filteredPatients.map((patient) => (
+              <Card key={patient.id}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Avatar sx={{ bgcolor: 'primary.main' }}>
+                        {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1">{patient.first_name} {patient.last_name}</Typography>
+                        <Typography variant="caption" color="text.secondary">#{patient.patient_number} • Age {calculateAge(patient.date_of_birth)}</Typography>
                       </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                        {patient.patient_number}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{patient.phone}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {patient.email}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(patient.date_of_birth).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : patient.gender === 'O' ? 'Other' : 'Not specified'}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
-                        color={getStatusColor(patient.status) as any}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {new Date(patient.admission_date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {patient.primary_therapist_name || 'Not assigned'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton 
-                        size="small" 
-                        color="primary" 
-                        title="View Details"
-                        onClick={() => handleViewPatient(patient.id)}
-                      >
-                        <Visibility />
-                      </IconButton>
-                      <IconButton 
-                        size="small" 
-                        color="info" 
-                        title="Edit"
-                        onClick={() => handleEditPatient(patient.id)}
-                      >
-                        <Edit />
-                      </IconButton>
-                      <IconButton 
-                        size="small" 
-                        color="success" 
-                        title="Resend Welcome Email"
-                        onClick={() => handleResendEmail(patient.id)}
-                      >
-                        <EmailOutlined />
-                      </IconButton>
+                    </Box>
+                    <IconButton size="small" onClick={(event) => handleOpenActionsMenu(event, patient)}>
+                      <MoreVert />
+                    </IconButton>
+                  </Box>
+
+                  <Chip
+                    label={patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
+                    color={getStatusColor(patient.status)}
+                    size="small"
+                    sx={{ mb: 1.25 }}
+                  />
+
+                  <Typography variant="body2"><strong>Email:</strong> {patient.email || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>Phone:</strong> {patient.phone || 'N/A'}</Typography>
+                  <Typography variant="body2"><strong>DOB:</strong> {new Date(patient.date_of_birth).toLocaleDateString()}</Typography>
+                  <Typography variant="body2"><strong>Admission:</strong> {new Date(patient.admission_date).toLocaleDateString()}</Typography>
+                  <Typography variant="body2"><strong>Therapist:</strong> {patient.primary_therapist_name || 'Not assigned'}</Typography>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Box>
+      ) : (
+        <Paper>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Patient</TableCell>
+                  <TableCell>Patient #</TableCell>
+                  <TableCell>Contact</TableCell>
+                  <TableCell>Date of Birth</TableCell>
+                  <TableCell>Gender</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Admission Date</TableCell>
+                  <TableCell>Therapist</TableCell>
+                  <TableCell align="center">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center">
+                      <Typography>Loading patients...</Typography>
                     </TableCell>
                   </TableRow>
-                );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ) : filteredPatients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center">
+                      <Typography color="text.secondary">
+                        {patients.length === 0 ? 'No patients found. Click "Add Patient" to create one.' : 'No patients match your search criteria.'}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPatients.map((patient) => (
+                    <TableRow key={patient.id} hover>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ bgcolor: 'primary.main' }}>
+                            {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="subtitle2">
+                              {patient.first_name} {patient.last_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Age: {calculateAge(patient.date_of_birth)}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                          {patient.patient_number}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{patient.phone}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {patient.email}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(patient.date_of_birth).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : patient.gender === 'O' ? 'Other' : 'Not specified'}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
+                          color={getStatusColor(patient.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {new Date(patient.admission_date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {patient.primary_therapist_name || 'Not assigned'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <IconButton
+                          size="small"
+                          onClick={(event) => handleOpenActionsMenu(event, patient)}
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
+
+      <Menu
+        anchorEl={actionAnchorEl}
+        open={Boolean(actionAnchorEl)}
+        onClose={handleCloseActionsMenu}
+      >
+        <MenuItem onClick={() => void handleMenuResendEmail()}>
+          <ListItemIcon>
+            <EmailOutlined fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Resend Email</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => void handleMenuEditPatient()}>
+          <ListItemIcon>
+            <Edit fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit Patient</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleMenuCompletePatient}>
+          <ListItemIcon>
+            <CheckCircleOutline fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Complete</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleMenuRemovePatient} sx={{ color: 'error.main' }}>
+          <ListItemIcon>
+            <DeleteOutline fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Remove Patient</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Add Patient Dialog */}
       <Dialog
@@ -628,116 +797,10 @@ const AdminPatientManagement: React.FC = () => {
         <AddPatientForm
           open={addPatientOpen}
           onClose={() => setAddPatientOpen(false)}
-          onSubmit={handleAddPatient}
+          onSubmit={(formData) => {
+            void handleAddPatient(formData);
+          }}
         />
-      </Dialog>
-
-      {/* View Patient Dialog */}
-      <Dialog
-        open={viewPatientOpen}
-        onClose={() => {
-          setViewPatientOpen(false);
-          setSelectedPatient(null);
-        }}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56 }}>
-              {selectedPatient?.first_name?.charAt(0)}{selectedPatient?.last_name?.charAt(0)}
-            </Avatar>
-            <Box>
-              <Typography variant="h5">
-                {selectedPatient?.first_name} {selectedPatient?.last_name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Patient #{selectedPatient?.patient_number}
-              </Typography>
-            </Box>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>Personal Information</Typography>
-              <Divider sx={{ mb: 2 }} />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Email</Typography>
-              <Typography variant="body1">{selectedPatient?.email || 'N/A'}</Typography>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Phone</Typography>
-              <Typography variant="body1">{selectedPatient?.phone || 'N/A'}</Typography>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Date of Birth</Typography>
-              <Typography variant="body1">
-                {selectedPatient?.date_of_birth ? new Date(selectedPatient.date_of_birth).toLocaleDateString() : 'N/A'}
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Gender</Typography>
-              <Typography variant="body1">
-                {selectedPatient?.gender === 'M' ? 'Male' : 
-                 selectedPatient?.gender === 'F' ? 'Female' : 
-                 selectedPatient?.gender === 'O' ? 'Other' : 'Not specified'}
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Status</Typography>
-              <Chip
-                label={selectedPatient?.status ? selectedPatient.status.charAt(0).toUpperCase() + selectedPatient.status.slice(1) : 'N/A'}
-                color={selectedPatient?.status ? getStatusColor(selectedPatient.status) as any : 'default'}
-                size="small"
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="body2" color="text.secondary">Admission Date</Typography>
-              <Typography variant="body1">
-                {selectedPatient?.admission_date ? new Date(selectedPatient.admission_date).toLocaleDateString() : 'N/A'}
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <Typography variant="body2" color="text.secondary">Primary Therapist</Typography>
-              <Typography variant="body1">{selectedPatient?.primary_therapist_name || 'Not assigned'}</Typography>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <Typography variant="body2" color="text.secondary">Created At</Typography>
-              <Typography variant="body1">
-                {selectedPatient?.created_at ? new Date(selectedPatient.created_at).toLocaleString() : 'N/A'}
-              </Typography>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setViewPatientOpen(false);
-            setSelectedPatient(null);
-          }}>
-            Close
-          </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              setViewPatientOpen(false);
-              if (selectedPatient) {
-                handleEditPatient(selectedPatient.id);
-              }
-            }}
-          >
-            Edit Patient
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* Edit Patient Dialog */}
@@ -859,10 +922,46 @@ const AdminPatientManagement: React.FC = () => {
                 status: (document.getElementById('edit-status') as HTMLSelectElement)?.value,
                 admission_date: (document.getElementById('edit-admission') as HTMLInputElement)?.value,
               };
-              handleUpdatePatient(formData);
+              void handleUpdatePatient(formData);
             }}
           >
             Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={removePatientOpen}
+        onClose={() => setRemovePatientOpen(false)}
+      >
+        <DialogTitle>Remove Patient</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to remove {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this patient'}?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemovePatientOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => void handleConfirmRemovePatient()}>
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={completePatientOpen}
+        onClose={() => setCompletePatientOpen(false)}
+      >
+        <DialogTitle>Complete Patient</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Mark {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this patient'} as complete? This will set status to discharged.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCompletePatientOpen(false)}>Cancel</Button>
+          <Button color="success" variant="contained" onClick={() => void handleConfirmCompletePatient()}>
+            Complete
           </Button>
         </DialogActions>
       </Dialog>
