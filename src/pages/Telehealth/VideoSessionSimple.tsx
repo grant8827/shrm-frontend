@@ -53,7 +53,6 @@ const VideoSession: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
-  const [participantCount, setParticipantCount] = useState(0);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -64,12 +63,14 @@ const VideoSession: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptText, setTranscriptText] = useState<string[]>([]);
   const [showTranscript, setShowTranscript] = useState(false);
-  const [isInitiator, setIsInitiator] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSpeechDetected, setIsSpeechDetected] = useState(false);
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const participantCountRef = useRef(0);
+  const isInitiatorRef = useRef(false);
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -127,11 +128,30 @@ const VideoSession: React.FC = () => {
   const startSession = async () => {
     try {
       console.log('[VIDEO] Starting session with room_id:', roomId);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('Camera/microphone is not supported in this browser. Please use a modern browser.');
+        return;
+      }
+
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+      if (!window.isSecureContext && !isLocalhost) {
+        showError('Camera/microphone requires HTTPS on mobile. Open this session over https://');
+        return;
+      }
       
       // Request media permissions
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
       
       localStreamRef.current = stream;
@@ -150,8 +170,16 @@ const VideoSession: React.FC = () => {
       setSessionStartTime(new Date());
       showSuccess('Connected to session');
       
-    } catch (error) {
-      showError('Failed to access camera/microphone');
+    } catch (error: any) {
+      if (error?.name === 'NotAllowedError') {
+        showError('Camera/microphone permission denied. Please allow access in browser settings.');
+      } else if (error?.name === 'NotFoundError') {
+        showError('No camera or microphone found on this device.');
+      } else if (error?.name === 'NotReadableError') {
+        showError('Camera or microphone is being used by another app.');
+      } else {
+        showError('Failed to access camera/microphone');
+      }
       console.error('[VIDEO] Media error:', error);
     }
   };
@@ -180,6 +208,9 @@ const VideoSession: React.FC = () => {
           remoteVideoRef.current.srcObject = event.streams[0];
           remoteStreamRef.current = event.streams[0];
           setIsRemoteVideoReady(true);
+          remoteVideoRef.current.play().catch((playError) => {
+            console.warn('[VIDEO] Remote autoplay blocked:', playError);
+          });
           console.log('[VIDEO] Remote video stream set from event.streams');
         }
       } else {
@@ -192,6 +223,9 @@ const VideoSession: React.FC = () => {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStreamRef.current;
           setIsRemoteVideoReady(true);
+          remoteVideoRef.current.play().catch((playError) => {
+            console.warn('[VIDEO] Remote autoplay blocked:', playError);
+          });
           console.log('[VIDEO] Remote video stream set manually');
         }
       }
@@ -242,8 +276,8 @@ const VideoSession: React.FC = () => {
     }
     
     // Use the correct WebSocket URL - always connect to backend
-    const wsHost = import.meta.env.VITE_WS_HOST || 'localhost:8000';
-    const wsProtocol = import.meta.env.PROD ? 'wss' : 'ws';
+    const wsHost = import.meta.env.VITE_WS_HOST || window.location.host;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 
     const wsUrl = `${wsProtocol}://${wsHost}/ws/video/${roomId}/`;
     
@@ -274,29 +308,23 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] WebSocket message:', data.type, data);
       
       switch (data.type) {
-        case 'participant_count':
+        case 'participant_count': {
           const count = data.count;
           console.log('[VIDEO] Participant count:', count);
-          setParticipantCount(count);
+          participantCountRef.current = count;
           
-          // If there are already 2 participants (including us), we should initiate
-          if (count >= 2 && !isInitiator) {
-            console.log('[VIDEO] I am participant #' + count + ' - initiating offer');
-            setIsInitiator(true);
-            // Small delay to ensure both peers are ready
-            setTimeout(() => createOffer(), 500);
-          }
           break;
+        }
           
         case 'participant_joined':
           console.log('[VIDEO] Another participant joined');
           showSuccess('Another participant joined');
-          setParticipantCount(prev => prev + 1);
+          participantCountRef.current += 1;
           
-          // If we're the first participant and someone just joined, create offer
-          if (!isInitiator && participantCount === 1) {
+          // Existing participant initiates when new participant joins
+          if (!isInitiatorRef.current) {
             console.log('[VIDEO] First participant creating offer for newcomer');
-            setIsInitiator(true);
+            isInitiatorRef.current = true;
             setTimeout(() => createOffer(), 500);
           }
           break;
@@ -363,6 +391,7 @@ const VideoSession: React.FC = () => {
     try {
       console.log('[VIDEO] Setting remote description from offer');
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      await flushPendingIceCandidates();
       
       console.log('[VIDEO] Creating answer');
       const answer = await peerConnectionRef.current.createAnswer();
@@ -388,6 +417,7 @@ const VideoSession: React.FC = () => {
     try {
       console.log('[VIDEO] Setting remote description from answer');
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      await flushPendingIceCandidates();
       console.log('[VIDEO] Answer applied successfully');
     } catch (error) {
       console.error('[VIDEO] Error handling answer:', error);
@@ -406,10 +436,29 @@ const VideoSession: React.FC = () => {
         await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
         console.log('[VIDEO] ICE candidate added successfully');
       } else {
-        console.warn('[VIDEO] Received ICE candidate before remote description, ignoring');
+        console.warn('[VIDEO] Received ICE candidate before remote description, queuing');
+        pendingIceCandidatesRef.current.push(candidate);
       }
     } catch (error) {
       console.error('[VIDEO] Error adding ICE candidate:', error);
+    }
+  };
+
+  const flushPendingIceCandidates = async () => {
+    if (!peerConnectionRef.current || !peerConnectionRef.current.remoteDescription) {
+      return;
+    }
+
+    while (pendingIceCandidatesRef.current.length > 0) {
+      const nextCandidate = pendingIceCandidatesRef.current.shift();
+      if (!nextCandidate) {
+        continue;
+      }
+      try {
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(nextCandidate));
+      } catch (error) {
+        console.error('[VIDEO] Error applying queued ICE candidate:', error);
+      }
     }
   };
 
@@ -441,6 +490,10 @@ const VideoSession: React.FC = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
+
+    pendingIceCandidatesRef.current = [];
+    participantCountRef.current = 0;
+    isInitiatorRef.current = false;
   };
 
   const toggleCamera = () => {
