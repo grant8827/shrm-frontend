@@ -71,36 +71,64 @@ const VideoSession: React.FC = () => {
   const participantCountRef = useRef(0);
   const isInitiatorRef = useRef(false);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const lastIceRestartAtRef = useRef(0);
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
 
-  // ICE servers configuration with TURN fallback
-  const iceServers = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
-      // Free TURN servers (use your own in production)
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-    ],
-    iceCandidatePoolSize: 10,
+  const buildIceConfiguration = (): RTCConfiguration => {
+    const configuredStunUrls = (import.meta.env.VITE_STUN_URLS as string | undefined)
+      ?.split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    const configuredTurnUrls = (import.meta.env.VITE_TURN_URLS as string | undefined)
+      ?.split(',')
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    const turnUsername = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
+    const turnCredential = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+
+    const stunUrls = configuredStunUrls && configuredStunUrls.length > 0
+      ? configuredStunUrls
+      : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'];
+
+    const servers: RTCIceServer[] = stunUrls.map((url) => ({ urls: url }));
+
+    if (configuredTurnUrls && configuredTurnUrls.length > 0 && turnUsername && turnCredential) {
+      servers.push({
+        urls: configuredTurnUrls,
+        username: turnUsername,
+        credential: turnCredential,
+      });
+    } else {
+      servers.push(
+        {
+          urls: 'turn:openrelay.metered.ca:80?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:3478?transport=udp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        }
+      );
+    }
+
+    const forceRelay = (import.meta.env.VITE_WEBRTC_FORCE_RELAY as string | undefined) === 'true';
+
+    return {
+      iceServers: servers,
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: forceRelay ? 'relay' : 'all',
+    };
   };
 
   // Fetch session details and get room_id
@@ -209,7 +237,7 @@ const VideoSession: React.FC = () => {
   const initializePeerConnection = () => {
     console.log('[VIDEO] Initializing peer connection');
     
-    const peerConnection = new RTCPeerConnection(iceServers);
+    const peerConnection = new RTCPeerConnection(buildIceConfiguration());
     peerConnectionRef.current = peerConnection;
     
     // Add local stream tracks to peer connection
@@ -227,7 +255,9 @@ const VideoSession: React.FC = () => {
       // Use the stream from the event if available
       if (event.streams && event.streams[0]) {
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+          if (remoteVideoRef.current.srcObject !== event.streams[0]) {
+            remoteVideoRef.current.srcObject = event.streams[0];
+          }
           remoteStreamRef.current = event.streams[0];
           setIsRemoteVideoReady(true);
           
@@ -273,6 +303,10 @@ const VideoSession: React.FC = () => {
         }
       }
     };
+
+    peerConnection.onicecandidateerror = (event) => {
+      console.warn('[VIDEO] ICE candidate error:', event.errorCode, event.errorText, event.url);
+    };
     
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
@@ -295,11 +329,12 @@ const VideoSession: React.FC = () => {
       } else if (peerConnection.connectionState === 'failed') {
         showError('Connection failed - trying to reconnect...');
         console.error('[VIDEO] Connection failed, attempting ICE restart');
-        // Attempt ICE restart
-        if (isInitiatorRef.current) {
+        const now = Date.now();
+        if (isInitiatorRef.current && now - lastIceRestartAtRef.current > 5000) {
+          lastIceRestartAtRef.current = now;
           setTimeout(() => {
             console.log('[VIDEO] Attempting ICE restart');
-            createOffer();
+            void createOffer(true);
           }, 1000);
         }
       }
@@ -375,7 +410,9 @@ const VideoSession: React.FC = () => {
           // This ensures connection is established regardless of join order
           console.log('[VIDEO] Creating offer for new participant');
           isInitiatorRef.current = true;
-          setTimeout(() => createOffer(), 500);
+          setTimeout(() => {
+            void createOffer();
+          }, 500);
           break;
           
         case 'offer':
@@ -414,11 +451,11 @@ const VideoSession: React.FC = () => {
     };
   };
 
-  const createOffer = async () => {
+  const createOffer = async (iceRestart = false) => {
     if (!peerConnectionRef.current || !websocketRef.current) return;
     
     try {
-      const offer = await peerConnectionRef.current.createOffer();
+      const offer = await peerConnectionRef.current.createOffer({ iceRestart });
       await peerConnectionRef.current.setLocalDescription(offer);
       
       console.log('[VIDEO] Sending offer');
