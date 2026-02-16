@@ -482,8 +482,7 @@ const VideoSession: React.FC = () => {
     
     try {
       // Always queue candidates if remote description isn't set yet
-      if (!peerConnectionRef.current.remoteDescription || 
-          peerConnectionRef.current.remoteDescription.type === '') {
+      if (!peerConnectionRef.current.remoteDescription) {
         console.warn('[VIDEO] Received ICE candidate before remote description, queuing');
         pendingIceCandidatesRef.current.push(candidate);
       } else {
