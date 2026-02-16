@@ -241,6 +241,14 @@ const TelehealthDashboard: React.FC = () => {
     navigate(`/telehealth/session/${sessionId}`);
   };
 
+  const handleOpenTranscriptsPage = (sessionId?: string) => {
+    if (sessionId) {
+      navigate(`/telehealth/transcripts?sessionId=${encodeURIComponent(sessionId)}`);
+      return;
+    }
+    navigate('/telehealth/transcripts');
+  };
+
   const handleCopySessionLink = (session: TelehealthSession) => {
     const link = `${window.location.origin}${session.sessionUrl}`;
     navigator.clipboard.writeText(link);
@@ -355,10 +363,21 @@ const TelehealthDashboard: React.FC = () => {
               <Typography color="text.secondary" variant="body2">
                 Completed Sessions
               </Typography>
+              {user && ['admin', 'therapist'].includes(user.role) && (
+                <Button
+                  size="small"
+                  variant="text"
+                  startIcon={<Transcribe />}
+                  onClick={() => handleOpenTranscriptsPage()}
+                  sx={{ mt: 1, px: 0 }}
+                >
+                  Transcripts
+                </Button>
+              )}
             </CardContent>
           </Card>
         </Grid>
-        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+        {user && ['admin', 'therapist'].includes(user.role) && (
           <Grid item xs={12} md={3}>
             <Card>
               <CardContent>
@@ -577,7 +596,11 @@ const TelehealthDashboard: React.FC = () => {
                     <Button size="small" startIcon={<PlayArrow />}>
                       View Recording
                     </Button>
-                    <Button size="small" startIcon={<Transcribe />}>
+                    <Button
+                      size="small"
+                      startIcon={<Transcribe />}
+                      onClick={() => handleOpenTranscriptsPage(session.id)}
+                    >
                       View Transcript
                     </Button>
                   </CardActions>

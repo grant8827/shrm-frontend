@@ -33,6 +33,7 @@ import Messages from './pages/Messages/Messages';
 import SOAPNotes from './pages/SOAPNotes/SOAPNotes';
 import Telehealth from './pages/Telehealth/Telehealth';
 import TelehealthDashboard from './pages/Telehealth/TelehealthDashboard';
+import TelehealthTranscripts from './pages/Telehealth/TelehealthTranscripts';
 import VideoSession from './pages/Telehealth/VideoSessionSimple';
 import JoinSession from './pages/Telehealth/JoinSession';
 import Reports from './pages/Reports/Reports';
@@ -164,6 +165,14 @@ function App() {
                   <Route path="/appointments" element={<AppointmentScheduling />} />
                   <Route path="/telehealth" element={<Telehealth />} />
                   <Route path="/telehealth/dashboard" element={<TelehealthDashboard />} />
+                  <Route
+                    path="/telehealth/transcripts"
+                    element={
+                      <ProtectedRoute requiredRole={["admin", "therapist"]}>
+                        <TelehealthTranscripts />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/telehealth/session/:sessionId" element={<VideoSession />} />
                   <Route path="/telehealth/join/:roomId" element={<JoinSession />} />
                   
