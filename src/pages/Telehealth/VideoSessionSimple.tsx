@@ -96,9 +96,13 @@ const VideoSession: React.FC = () => {
 
     const servers: RTCIceServer[] = stunUrls.map((url) => ({ urls: url }));
 
-    if (configuredTurnUrls && configuredTurnUrls.length > 0 && turnUsername && turnCredential) {
+    const hasDedicatedTurn = Boolean(
+      configuredTurnUrls && configuredTurnUrls.length > 0 && turnUsername && turnCredential
+    );
+
+    if (hasDedicatedTurn) {
       servers.push({
-        urls: configuredTurnUrls,
+        urls: configuredTurnUrls!,
         username: turnUsername,
         credential: turnCredential,
       });
@@ -113,16 +117,16 @@ const VideoSession: React.FC = () => {
           urls: 'turn:openrelay.metered.ca:443?transport=tcp',
           username: 'openrelayproject',
           credential: 'openrelayproject',
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:3478?transport=udp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
         }
       );
     }
 
-    const forceRelay = (import.meta.env.VITE_WEBRTC_FORCE_RELAY as string | undefined) === 'true';
+    const wantsRelay = (import.meta.env.VITE_WEBRTC_FORCE_RELAY as string | undefined) === 'true';
+    const forceRelay = wantsRelay && hasDedicatedTurn;
+
+    if (wantsRelay && !hasDedicatedTurn) {
+      console.warn('[VIDEO] VITE_WEBRTC_FORCE_RELAY=true ignored because dedicated TURN credentials are not configured. Falling back to mixed ICE (all).');
+    }
 
     return {
       iceServers: servers,
