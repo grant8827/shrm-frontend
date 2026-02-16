@@ -75,12 +75,32 @@ const VideoSession: React.FC = () => {
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
 
-  // ICE servers configuration
+  // ICE servers configuration with TURN fallback
   const iceServers = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // Free TURN servers (use your own in production)
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
     ],
+    iceCandidatePoolSize: 10,
   };
 
   // Fetch session details and get room_id
@@ -273,8 +293,15 @@ const VideoSession: React.FC = () => {
       } else if (peerConnection.connectionState === 'disconnected') {
         showError('Participant disconnected');
       } else if (peerConnection.connectionState === 'failed') {
-        showError('Connection failed');
-        console.error('[VIDEO] Connection failed');
+        showError('Connection failed - trying to reconnect...');
+        console.error('[VIDEO] Connection failed, attempting ICE restart');
+        // Attempt ICE restart
+        if (isInitiatorRef.current) {
+          setTimeout(() => {
+            console.log('[VIDEO] Attempting ICE restart');
+            createOffer();
+          }, 1000);
+        }
       }
     };
     
@@ -454,12 +481,14 @@ const VideoSession: React.FC = () => {
     }
     
     try {
-      if (peerConnectionRef.current.remoteDescription) {
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
-        console.log('[VIDEO] ICE candidate added successfully');
-      } else {
+      // Always queue candidates if remote description isn't set yet
+      if (!peerConnectionRef.current.remoteDescription || 
+          peerConnectionRef.current.remoteDescription.type === '') {
         console.warn('[VIDEO] Received ICE candidate before remote description, queuing');
         pendingIceCandidatesRef.current.push(candidate);
+      } else {
+        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('[VIDEO] ICE candidate added successfully');
       }
     } catch (error) {
       console.error('[VIDEO] Error adding ICE candidate:', error);
