@@ -364,21 +364,32 @@ const VideoSession: React.FC = () => {
       return;
     }
     
-    // Resolve WebSocket host/protocol with production-safe fallbacks
+    // Resolve WebSocket URL with explicit base URL first, then API URL, then host fallback
+    const configuredWsBaseUrl = import.meta.env.VITE_WS_BASE_URL as string | undefined;
     const configuredWsHost = import.meta.env.VITE_WS_HOST as string | undefined;
     const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
-    let wsHost = configuredWsHost || window.location.host;
     let wsProtocol: 'ws' | 'wss' = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    let wsHost = window.location.host;
 
-    if (!configuredWsHost && configuredApiBaseUrl) {
+    if (configuredWsBaseUrl) {
+      try {
+        const wsBase = new URL(configuredWsBaseUrl);
+        wsProtocol = wsBase.protocol === 'wss:' ? 'wss' : 'ws';
+        wsHost = wsBase.host;
+      } catch (urlError) {
+        console.warn('[VIDEO] Invalid VITE_WS_BASE_URL:', urlError);
+      }
+    } else if (configuredApiBaseUrl) {
       try {
         const apiUrl = new URL(configuredApiBaseUrl);
-        wsHost = apiUrl.host;
         wsProtocol = apiUrl.protocol === 'https:' ? 'wss' : 'ws';
+        wsHost = apiUrl.host;
       } catch (urlError) {
         console.warn('[VIDEO] Invalid VITE_API_BASE_URL for WS fallback:', urlError);
       }
+    } else if (configuredWsHost) {
+      wsHost = configuredWsHost;
     }
 
     const wsUrl = `${wsProtocol}://${wsHost}/ws/video/${roomId}/`;
