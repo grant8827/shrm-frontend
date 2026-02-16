@@ -134,18 +134,18 @@ const VideoSession: React.FC = () => {
         return;
       }
 
-      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-      if (!window.isSecureContext && !isLocalhost) {
-        showError('Camera/microphone requires HTTPS on mobile. Open this session over https://');
+      // Check for secure context (HTTPS or localhost)
+      if (!window.isSecureContext) {
+        showError('Camera/microphone requires HTTPS. Please access this page using https://');
         return;
       }
       
-      // Request media permissions
+      // Request media permissions with mobile-friendly constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
         },
         audio: {
           echoCancellation: true,
@@ -171,16 +171,18 @@ const VideoSession: React.FC = () => {
       showSuccess('Connected to session');
       
     } catch (error: any) {
-      if (error?.name === 'NotAllowedError') {
-        showError('Camera/microphone permission denied. Please allow access in browser settings.');
-      } else if (error?.name === 'NotFoundError') {
-        showError('No camera or microphone found on this device.');
-      } else if (error?.name === 'NotReadableError') {
-        showError('Camera or microphone is being used by another app.');
-      } else {
-        showError('Failed to access camera/microphone');
-      }
       console.error('[VIDEO] Media error:', error);
+      if (error?.name === 'NotAllowedError') {
+        showError('Camera/microphone permission denied. Please tap "Allow" when prompted, or check your browser settings.');
+      } else if (error?.name === 'NotFoundError') {
+        showError('No camera or microphone found. Please connect a camera/microphone and try again.');
+      } else if (error?.name === 'NotReadableError') {
+        showError('Camera/microphone is in use by another app. Please close other apps and try again.');
+      } else if (error?.name === 'NotSupportedError') {
+        showError('Camera/microphone not supported. Please use HTTPS or check device compatibility.');
+      } else {
+        showError(`Failed to access camera/microphone: ${error?.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -208,9 +210,20 @@ const VideoSession: React.FC = () => {
           remoteVideoRef.current.srcObject = event.streams[0];
           remoteStreamRef.current = event.streams[0];
           setIsRemoteVideoReady(true);
-          remoteVideoRef.current.play().catch((playError) => {
-            console.warn('[VIDEO] Remote autoplay blocked:', playError);
-          });
+          
+          // Handle mobile autoplay restrictions
+          const playPromise = remoteVideoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((playError) => {
+              console.warn('[VIDEO] Remote autoplay blocked, user interaction required:', playError);
+              // Add click handler to play on user interaction
+              const playOnClick = () => {
+                remoteVideoRef.current?.play();
+                document.removeEventListener('click', playOnClick);
+              };
+              document.addEventListener('click', playOnClick);
+            });
+          }
           console.log('[VIDEO] Remote video stream set from event.streams');
         }
       } else {
@@ -223,9 +236,19 @@ const VideoSession: React.FC = () => {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStreamRef.current;
           setIsRemoteVideoReady(true);
-          remoteVideoRef.current.play().catch((playError) => {
-            console.warn('[VIDEO] Remote autoplay blocked:', playError);
-          });
+          
+          // Handle mobile autoplay restrictions
+          const playPromise = remoteVideoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((playError) => {
+              console.warn('[VIDEO] Remote autoplay blocked, user interaction required:', playError);
+              const playOnClick = () => {
+                remoteVideoRef.current?.play();
+                document.removeEventListener('click', playOnClick);
+              };
+              document.addEventListener('click', playOnClick);
+            });
+          }
           console.log('[VIDEO] Remote video stream set manually');
         }
       }
@@ -275,9 +298,22 @@ const VideoSession: React.FC = () => {
       return;
     }
     
-    // Use the correct WebSocket URL - always connect to backend
-    const wsHost = import.meta.env.VITE_WS_HOST || window.location.host;
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    // Resolve WebSocket host/protocol with production-safe fallbacks
+    const configuredWsHost = import.meta.env.VITE_WS_HOST as string | undefined;
+    const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+
+    let wsHost = configuredWsHost || window.location.host;
+    let wsProtocol: 'ws' | 'wss' = window.location.protocol === 'https:' ? 'wss' : 'ws';
+
+    if (!configuredWsHost && configuredApiBaseUrl) {
+      try {
+        const apiUrl = new URL(configuredApiBaseUrl);
+        wsHost = apiUrl.host;
+        wsProtocol = apiUrl.protocol === 'https:' ? 'wss' : 'ws';
+      } catch (urlError) {
+        console.warn('[VIDEO] Invalid VITE_API_BASE_URL for WS fallback:', urlError);
+      }
+    }
 
     const wsUrl = `${wsProtocol}://${wsHost}/ws/video/${roomId}/`;
     
@@ -290,12 +326,7 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] WebSocket connected');
       showSuccess('Connected to session server');
       
-      // Request current participant count first
-      ws.send(JSON.stringify({
-        type: 'request_participant_count'
-      }));
-      
-      // Then notify server that we joined
+      // Notify server that we joined
       ws.send(JSON.stringify({
         type: 'participant_joined',
         user_id: user?.id,
@@ -308,25 +339,16 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] WebSocket message:', data.type, data);
       
       switch (data.type) {
-        case 'participant_count': {
-          const count = data.count;
-          console.log('[VIDEO] Participant count:', count);
-          participantCountRef.current = count;
-          
-          break;
-        }
-          
         case 'participant_joined':
           console.log('[VIDEO] Another participant joined');
           showSuccess('Another participant joined');
           participantCountRef.current += 1;
           
-          // Existing participant initiates when new participant joins
-          if (!isInitiatorRef.current) {
-            console.log('[VIDEO] First participant creating offer for newcomer');
-            isInitiatorRef.current = true;
-            setTimeout(() => createOffer(), 500);
-          }
+          // Always create offer when another participant joins
+          // This ensures connection is established regardless of join order
+          console.log('[VIDEO] Creating offer for new participant');
+          isInitiatorRef.current = true;
+          setTimeout(() => createOffer(), 500);
           break;
           
         case 'offer':

@@ -27,6 +27,12 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path
       },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+      },
       '/admin': {
         target: 'http://localhost:8000',
         changeOrigin: true,

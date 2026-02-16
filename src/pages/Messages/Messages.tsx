@@ -67,6 +67,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { messageService } from '../../services/messageService';
 import { apiClient } from '../../services/apiClient';
+import { UserRole } from '../../types';
 
 // Message interfaces
 interface Message {
@@ -131,6 +132,185 @@ interface MessageFormData {
   scheduledSend?: Date;
 }
 
+interface ApiUser {
+  id: string;
+  full_name?: string;
+  username?: string;
+  role?: string;
+  is_online?: boolean;
+}
+
+interface ThreadLike {
+  id: string;
+  subject?: string;
+  participants: unknown[];
+  updated_at: string;
+}
+
+interface ThreadMessageLike {
+  id: string;
+  sender?: {
+    id?: string;
+    full_name?: string;
+    username?: string;
+    role?: string;
+  };
+  content: string;
+  created_at: string;
+  is_read: boolean;
+  is_starred: boolean;
+  priority?: Message['priority'];
+  attachments?: Attachment[];
+}
+
+interface SendMessageResponse {
+  thread?: {
+    id?: string;
+  };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const stringFrom = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
+
+const booleanFrom = (value: unknown, fallback = false): boolean =>
+  typeof value === 'boolean' ? value : fallback;
+
+const toSenderRole = (value: unknown): Message['senderRole'] => {
+  switch (value) {
+    case 'admin':
+    case 'therapist':
+    case 'staff':
+      return value;
+    case 'patient':
+    case 'client':
+      return 'patient';
+    default:
+      return 'patient';
+  }
+};
+
+const toParticipantRole = (value: unknown): Participant['role'] => {
+  switch (value) {
+    case 'admin':
+    case 'therapist':
+    case 'staff':
+      return value;
+    case 'patient':
+    case 'client':
+      return 'patient';
+    default:
+      return 'patient';
+  }
+};
+
+const toPriority = (value: unknown): Message['priority'] => {
+  switch (value) {
+    case 'low':
+    case 'normal':
+    case 'high':
+    case 'urgent':
+      return value;
+    default:
+      return 'normal';
+  }
+};
+
+const mapApiUser = (user: ApiUser): { id: string; name: string; role: string; isOnline: boolean } => ({
+  id: user.id,
+  name: user.full_name || user.username || 'Unknown User',
+  role: user.role || 'client',
+  isOnline: user.is_online || false,
+});
+
+const parseAuthUsersPayload = (payload: unknown): { users: ApiUser[]; next: string | null } => {
+  if (Array.isArray(payload)) {
+    const users = payload.filter((item): item is ApiUser => isRecord(item) && typeof item.id === 'string');
+    return { users, next: null };
+  }
+
+  if (isRecord(payload)) {
+    const rawResults = Array.isArray(payload.results) ? payload.results : [];
+    const users = rawResults.filter((item): item is ApiUser => isRecord(item) && typeof item.id === 'string');
+    const next = typeof payload.next === 'string' ? payload.next : null;
+    return { users, next };
+  }
+
+  return { users: [], next: null };
+};
+
+const parseParticipant = (value: unknown): Participant | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const id = stringFrom(value.id);
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    name: stringFrom(value.full_name) || stringFrom(value.username) || 'Unknown',
+    role: toParticipantRole(value.role),
+    isOnline: booleanFrom(value.is_online),
+  };
+};
+
+const parseThreadLike = (thread: unknown): ThreadLike | null => {
+  if (!isRecord(thread)) {
+    return null;
+  }
+
+  const id = stringFrom(thread.id);
+  const updatedAt = stringFrom(thread.updated_at);
+  if (!id || !updatedAt) {
+    return null;
+  }
+
+  return {
+    id,
+    subject: stringFrom(thread.subject),
+    participants: Array.isArray(thread.participants) ? thread.participants : [],
+    updated_at: updatedAt,
+  };
+};
+
+const parseThreadMessageLike = (message: unknown): ThreadMessageLike | null => {
+  if (!isRecord(message)) {
+    return null;
+  }
+
+  const id = stringFrom(message.id);
+  const content = stringFrom(message.content);
+  const createdAt = stringFrom(message.created_at);
+  if (!id || !createdAt) {
+    return null;
+  }
+
+  const sender = isRecord(message.sender)
+    ? {
+        id: stringFrom(message.sender.id),
+        full_name: stringFrom(message.sender.full_name),
+        username: stringFrom(message.sender.username),
+        role: stringFrom(message.sender.role),
+      }
+    : undefined;
+
+  return {
+    id,
+    sender,
+    content,
+    created_at: createdAt,
+    is_read: booleanFrom(message.is_read),
+    is_starred: booleanFrom(message.is_starred),
+    priority: toPriority(message.priority),
+    attachments: Array.isArray(message.attachments) ? (message.attachments as Attachment[]) : [],
+  };
+};
+
 const Messages: React.FC = () => {
   const { state } = useAuth();
   const theme = useTheme();
@@ -154,88 +334,70 @@ const Messages: React.FC = () => {
         console.log('Auth token exists:', !!localStorage.getItem('access_token'));
         
         // For admin users, load ALL users from the system
-        if (state.user?.role === 'admin') {
+        if (state.user?.role === UserRole.ADMIN) {
           // Fetch all users with pagination handling
-          let allUsers: any[] = [];
+          let allUsers: ApiUser[] = [];
           let nextUrl: string | null = '/auth/';
           
           // Keep fetching until no more pages
           while (nextUrl) {
             console.log('Fetching users from:', nextUrl);
             try {
-              const apiResponse: any = await apiClient.get(nextUrl);
+              const apiResponse: { data: unknown } = await apiClient.get(nextUrl);
               console.log('API Response:', apiResponse);
-              const pageUsers = apiResponse.data.results || apiResponse.data;
+              const { users: pageUsers, next } = parseAuthUsersPayload(apiResponse.data);
               console.log('Page users:', pageUsers);
-              
-              if (Array.isArray(pageUsers)) {
-                allUsers = [...allUsers, ...pageUsers];
-              } else if (pageUsers) {
-                allUsers = [pageUsers];
-              }
+              allUsers = [...allUsers, ...pageUsers];
               
               // Check for next page
-              nextUrl = apiResponse.data.next || null;
+              nextUrl = next;
             } catch (apiError: unknown) {
               console.error('API call failed:', apiError);
-              if (apiError && typeof apiError === 'object' && 'response' in apiError) {
-                const error = apiError as any;
-                console.error('Response status:', error.response?.status);
-                console.error('Response data:', error.response?.data);
-              }
               throw apiError;
             }
           }
           
-          const users = allUsers.map((user: any) => ({
-            id: user.id,
-              // Always use full_name from backend - first_name/last_name are encrypted!
-              name: user.full_name || user.username || 'Unknown User',
-              role: user.role || 'client',
-              isOnline: user.is_online || false,
-          }));
+          const users = allUsers.map(mapApiUser);
           
           console.log(`Admin: Loaded ${users.length} total users:`, users);
           setAvailableUsers(users);
         } else {
           // For non-admin users, load users from first page only
           console.log('Fetching users from /auth/');
-          const response = await apiClient.get('/auth/');
+          const response: { data: unknown } = await apiClient.get('/auth/');
           console.log('API Response:', response);
-          const users = (response.data.results || response.data).map((user: any) => ({
-            id: user.id,
-            // Always use full_name from backend - first_name/last_name are encrypted!
-            name: user.full_name || user.username || 'Unknown User',
-            role: user.role,
-            isOnline: user.is_online || false
-          }));
+          const { users: pageUsers } = parseAuthUsersPayload(response.data);
+          const users = pageUsers.map(mapApiUser);
           console.log(`Non-admin: Loaded ${users.length} users:`, users);
           setAvailableUsers(users);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to load users from API:', error);
-        console.error('Error details:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
-        });
         
         // Fallback: Try to load users from existing message threads
         try {
           console.log('Trying fallback: loading users from message threads...');
           const threads = await messageService.getThreads();
-          const uniqueUsers = new Map<string, any>();
+          const uniqueUsers = new Map<string, { id: string; name: string; role: string; isOnline: boolean }>();
           
-          threads.forEach((thread: any) => {
-            thread.participants.forEach((participant: any) => {
-              if (!uniqueUsers.has(participant.id)) {
-                uniqueUsers.set(participant.id, {
-                  id: participant.id,
-                  name: participant.full_name || participant.username || 'Unknown',
-                  role: participant.role || 'unknown',
-                  isOnline: participant.is_online || false
-                });
+          threads.forEach((thread) => {
+            const rawParticipants = Array.isArray(thread.participants) ? thread.participants : [];
+            rawParticipants.forEach((participantValue: unknown) => {
+              if (!isRecord(participantValue)) {
+                return;
               }
+
+              const participantId = stringFrom(participantValue.id);
+              if (!participantId || uniqueUsers.has(participantId)) {
+                return;
+              }
+
+              uniqueUsers.set(participantId, {
+                id: participantId,
+                name: stringFrom(participantValue.full_name) || stringFrom(participantValue.username) || 'Unknown',
+                role: stringFrom(participantValue.role, 'unknown'),
+                isOnline: booleanFrom(participantValue.is_online),
+              });
             });
           });
           
@@ -252,7 +414,7 @@ const Messages: React.FC = () => {
     };
 
     if (state.user?.id) {
-      loadUsers();
+      void loadUsers();
     }
   }, [state.user?.id, state.user?.role]);
 
@@ -267,42 +429,54 @@ const Messages: React.FC = () => {
         const loadedConversations: Conversation[] = [];
         const allMessages: Message[] = [];
         
-        for (const thread of threads) {
+        for (const rawThread of threads) {
+          const thread = parseThreadLike(rawThread);
+          if (!thread) {
+            continue;
+          }
+
           const threadMessages = await messageService.getMessages(thread.id);
+          const parsedThreadMessages = threadMessages
+            .map((rawMessage) => parseThreadMessageLike(rawMessage))
+            .filter((message): message is ThreadMessageLike => message !== null);
+
+          const parsedParticipants = thread.participants
+            .map((participant) => parseParticipant(participant))
+            .filter((participant): participant is Participant => participant !== null);
           
           // Convert backend messages to frontend Message type
-          const convertedMessages = threadMessages.map((msg: any) => ({
-            id: msg.id,
+          const convertedMessages = parsedThreadMessages.map((msg) => {
+            const senderId = stringFrom(msg.sender?.id);
+            const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
+
+            return {
+              id: msg.id,
             threadId: thread.id,
-            senderId: msg.sender?.id || '',
-            senderName: msg.sender?.full_name || msg.sender?.username || '',
-            senderRole: msg.sender?.role as Message['senderRole'] || 'patient',
-            receiverId: thread.participants.find((p: any) => p.id !== msg.sender?.id)?.id || '',
-            receiverName: thread.participants.find((p: any) => p.id !== msg.sender?.id)?.full_name || thread.participants.find((p: any) => p.id !== msg.sender?.id)?.username || '',
+            senderId,
+            senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+            senderRole: toSenderRole(msg.sender?.role),
+            receiverId: otherParticipant?.id || '',
+            receiverName: otherParticipant?.name || '',
             subject: thread.subject || 'No Subject',
             content: msg.content,
             timestamp: msg.created_at,
             isRead: msg.is_read,
             isStarred: msg.is_starred,
             isArchived: false,
-            priority: msg.priority as Message['priority'],
+            priority: toPriority(msg.priority),
             attachments: msg.attachments || [],
             isEncrypted: true,
             deliveryStatus: 'sent' as Message['deliveryStatus'],
             tags: [],
-          }));
+            };
+          });
           
           allMessages.push(...convertedMessages);
           
           // Create conversation from thread
           if (convertedMessages.length > 0) {
             const lastMessage = convertedMessages[convertedMessages.length - 1];
-            const participants: Participant[] = thread.participants.map((p: any) => ({
-              id: p.id,
-              name: p.full_name || p.username || 'Unknown',
-              role: p.role as Participant['role'],
-              isOnline: p.is_online || false,
-            }));
+            const participants = parsedParticipants;
             
             const unreadCount = convertedMessages.filter(
               (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
@@ -337,7 +511,7 @@ const Messages: React.FC = () => {
     };
 
     if (state.user?.id) {
-      loadMessagesAndConversations();
+      void loadMessagesAndConversations();
     }
   }, [state.user?.id]);
 
@@ -413,40 +587,52 @@ const Messages: React.FC = () => {
       const loadedConversations: Conversation[] = [];
       const allMessages: Message[] = [];
       
-      for (const thread of threads) {
+      for (const rawThread of threads) {
+        const thread = parseThreadLike(rawThread);
+        if (!thread) {
+          continue;
+        }
+
         const threadMessages = await messageService.getMessages(thread.id);
+        const parsedThreadMessages = threadMessages
+          .map((rawMessage) => parseThreadMessageLike(rawMessage))
+          .filter((message): message is ThreadMessageLike => message !== null);
+
+        const parsedParticipants = thread.participants
+          .map((participant) => parseParticipant(participant))
+          .filter((participant): participant is Participant => participant !== null);
         
-        const convertedMessages = threadMessages.map((msg: any) => ({
-          id: msg.id,
+        const convertedMessages = parsedThreadMessages.map((msg) => {
+          const senderId = stringFrom(msg.sender?.id);
+          const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
+
+          return {
+            id: msg.id,
           threadId: thread.id,
-          senderId: msg.sender?.id || '',
-          senderName: msg.sender?.full_name || msg.sender?.username || '',
-          senderRole: msg.sender?.role as Message['senderRole'] || 'patient',
-          receiverId: thread.participants.find((p: any) => p.id !== msg.sender?.id)?.id || '',
-          receiverName: thread.participants.find((p: any) => p.id !== msg.sender?.id)?.full_name || thread.participants.find((p: any) => p.id !== msg.sender?.id)?.username || '',
+          senderId,
+          senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+          senderRole: toSenderRole(msg.sender?.role),
+          receiverId: otherParticipant?.id || '',
+          receiverName: otherParticipant?.name || '',
           subject: thread.subject || 'No Subject',
           content: msg.content,
           timestamp: msg.created_at,
           isRead: msg.is_read,
           isStarred: msg.is_starred,
           isArchived: false,
-          priority: msg.priority as Message['priority'],
+          priority: toPriority(msg.priority),
           attachments: msg.attachments || [],
           isEncrypted: true,
           deliveryStatus: 'sent' as Message['deliveryStatus'],
           tags: [],
-        }));
+          };
+        });
         
         allMessages.push(...convertedMessages);
         
         if (convertedMessages.length > 0) {
           const lastMessage = convertedMessages[convertedMessages.length - 1];
-          const participants: Participant[] = thread.participants.map((p: any) => ({
-            id: p.id,
-            name: p.full_name || p.username || 'Unknown',
-            role: p.role as Participant['role'],
-            isOnline: p.is_online || false,
-          }));
+          const participants = parsedParticipants;
           
           const unreadCount = convertedMessages.filter(
             (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
@@ -586,8 +772,7 @@ const Messages: React.FC = () => {
         priority: formData.priority,
       });
 
-      // Convert backend response to frontend Message type
-      const apiResponse = response as any; // Type assertion for API response structure
+      const apiResponse = response as SendMessageResponse;
 
       // Reload conversations and messages to get the updated data from backend
       await reloadConversations();
@@ -742,22 +927,22 @@ const Messages: React.FC = () => {
       {/* Role-based Messaging Info */}
       <Paper sx={{ p: 2, mb: 2, bgcolor: 'info.light' }}>
         <Typography variant="body2">
-          {state.user?.role === 'admin' && (
+          {state.user?.role === UserRole.ADMIN && (
             <>
               <strong>Admin Messaging:</strong> You can send secure messages to all therapists, patients, and staff members.
             </>
           )}
-          {state.user?.role === 'therapist' && (
+          {state.user?.role === UserRole.THERAPIST && (
             <>
               <strong>Therapist Messaging:</strong> You can send secure messages to your assigned patients, administrators, and staff members.
             </>
           )}
-          {state.user?.role === 'client' && (
+          {state.user?.role === UserRole.CLIENT && (
             <>
               <strong>Patient Messaging:</strong> You can send secure messages to your assigned therapist and administrators.
             </>
           )}
-          {state.user?.role === 'staff' && (
+          {state.user?.role === UserRole.STAFF && (
             <>
               <strong>Staff Messaging:</strong> You can send secure messages to administrators and therapists.
             </>
@@ -788,7 +973,7 @@ const Messages: React.FC = () => {
         
         <Tabs
           value={tabValue}
-          onChange={(_, newValue) => setTabValue(newValue)}
+          onChange={(_event: React.SyntheticEvent, newValue: number) => setTabValue(newValue)}
           sx={{ mt: 2 }}
           variant={isMobile ? 'scrollable' : 'standard'}
           scrollButtons={isMobile ? 'auto' : false}
@@ -1023,7 +1208,7 @@ const Messages: React.FC = () => {
                                 <Chip 
                                   label={message.priority}
                                   size="small"
-                                  color={getPriorityColor(message.priority) as any}
+                                  color={getPriorityColor(message.priority)}
                                 />
                               )}
                               {message.isEncrypted && <Lock fontSize="small" color="primary" />}
@@ -1094,7 +1279,7 @@ const Messages: React.FC = () => {
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        handleQuickReply();
+                        void handleQuickReply();
                       }
                     }}
                     disabled={isSendingQuickReply}
@@ -1103,7 +1288,9 @@ const Messages: React.FC = () => {
                         <InputAdornment position="end">
                           <IconButton 
                             color="primary"
-                            onClick={handleQuickReply}
+                            onClick={() => {
+                              void handleQuickReply();
+                            }}
                             disabled={!quickReply.trim() || isSendingQuickReply}
                           >
                             {isSendingQuickReply ? <CircularProgress size={20} /> : <Send />}
@@ -1216,10 +1403,10 @@ const Messages: React.FC = () => {
               <Box sx={{ mb: 2, mt: 1, p: 1.5, bgcolor: 'info.light', borderRadius: 1 }}>
                 <Typography variant="caption" display="block">
                   <strong>Available Recipients ({availableRecipients.length}):</strong>{' '}
-                  {state.user?.role === 'admin' && 'All users in the system'}
-                  {state.user?.role === 'therapist' && 'Your assigned patients, admins, and staff'}
-                  {state.user?.role === 'client' && 'Your therapist and admins'}
-                  {state.user?.role === 'staff' && 'Admins and therapists'}
+                  {state.user?.role === UserRole.ADMIN && 'All users in the system'}
+                  {state.user?.role === UserRole.THERAPIST && 'Your assigned patients, admins, and staff'}
+                  {state.user?.role === UserRole.CLIENT && 'Your therapist and admins'}
+                  {state.user?.role === UserRole.STAFF && 'Admins and therapists'}
                 </Typography>
               </Box>
               <Grid container spacing={3}>
@@ -1346,7 +1533,9 @@ const Messages: React.FC = () => {
           <Button onClick={handleCloseCompose}>Cancel</Button>
           <Button 
             variant="contained" 
-            onClick={handleSendMessage}
+            onClick={() => {
+              void handleSendMessage();
+            }}
             disabled={isLoading || !formData.receiverId || !formData.subject || !formData.content}
             startIcon={isLoading ? <CircularProgress size={20} /> : <Send />}
           >
