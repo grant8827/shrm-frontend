@@ -661,6 +661,8 @@ const VideoSession: React.FC = () => {
 
   const toggleTranscription = async () => {
     if (!sessionId) return;
+
+    const speakerLabel = user?.role === 'client' ? 'Patient' : 'Therapist';
     
     try {
       if (!isTranscribing) {
@@ -732,7 +734,7 @@ const VideoSession: React.FC = () => {
           
           if (finalText) {
             const timestamp = new Date().toLocaleTimeString();
-            const entry = `[${timestamp}] ${finalText.trim()}`;
+            const entry = `[${timestamp}] [${speakerLabel}] ${finalText.trim()}`;
             console.log('[TRANSCRIBE] Adding to transcript:', entry);
             setTranscriptText(prev => [...prev, entry]);
             setInterimTranscript(''); // Clear interim when final text is added
