@@ -72,6 +72,7 @@ const VideoSession: React.FC = () => {
   const isInitiatorRef = useRef(false);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const lastIceRestartAtRef = useRef(0);
+  const iceRestartAttemptsRef = useRef(0);
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -92,7 +93,12 @@ const VideoSession: React.FC = () => {
 
     const stunUrls = configuredStunUrls && configuredStunUrls.length > 0
       ? configuredStunUrls
-      : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'];
+      : [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+          'stun:stun.cloudflare.com:3478',
+        ];
 
     const servers: RTCIceServer[] = stunUrls.map((url) => ({ urls: url }));
 
@@ -107,18 +113,17 @@ const VideoSession: React.FC = () => {
         credential: turnCredential,
       });
     } else {
-      servers.push(
-        {
-          urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject',
-        }
-      );
+      servers.push({
+        urls: [
+          'turn:openrelay.metered.ca:80?transport=tcp',
+          'turn:openrelay.metered.ca:443?transport=tcp',
+          'turn:openrelay.metered.ca:443?transport=udp',
+          'turn:openrelay.metered.ca:3478?transport=udp',
+          'turns:openrelay.metered.ca:443?transport=tcp',
+        ],
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      });
     }
 
     const wantsRelay = (import.meta.env.VITE_WEBRTC_FORCE_RELAY as string | undefined) === 'true';
@@ -327,6 +332,7 @@ const VideoSession: React.FC = () => {
     peerConnection.onconnectionstatechange = () => {
       console.log('[VIDEO] Connection state:', peerConnection.connectionState);
       if (peerConnection.connectionState === 'connected') {
+        iceRestartAttemptsRef.current = 0;
         showSuccess('Connected to other participant');
       } else if (peerConnection.connectionState === 'disconnected') {
         showError('Participant disconnected');
@@ -334,12 +340,16 @@ const VideoSession: React.FC = () => {
         showError('Connection failed - trying to reconnect...');
         console.error('[VIDEO] Connection failed, attempting ICE restart');
         const now = Date.now();
-        if (isInitiatorRef.current && now - lastIceRestartAtRef.current > 5000) {
+        const canRestart = iceRestartAttemptsRef.current < 3;
+        if (isInitiatorRef.current && canRestart && now - lastIceRestartAtRef.current > 8000) {
           lastIceRestartAtRef.current = now;
+          iceRestartAttemptsRef.current += 1;
           setTimeout(() => {
-            console.log('[VIDEO] Attempting ICE restart');
+            console.log('[VIDEO] Attempting ICE restart', iceRestartAttemptsRef.current);
             void createOffer(true);
           }, 1000);
+        } else if (!canRestart) {
+          showError('Connection could not be restored. Please rejoin session or configure dedicated TURN server.');
         }
       }
     };
@@ -596,6 +606,7 @@ const VideoSession: React.FC = () => {
     pendingIceCandidatesRef.current = [];
     participantCountRef.current = 0;
     isInitiatorRef.current = false;
+    iceRestartAttemptsRef.current = 0;
   };
 
   const toggleCamera = () => {
