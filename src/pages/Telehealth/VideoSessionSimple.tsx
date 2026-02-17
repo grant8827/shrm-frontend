@@ -53,6 +53,8 @@ const VideoSession: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
+  const [mediaInitFailed, setMediaInitFailed] = useState(false);
+  const [isRetryingMedia, setIsRetryingMedia] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
 
   // Media controls
@@ -238,6 +240,7 @@ const VideoSession: React.FC = () => {
   const startSession = async () => {
     try {
       console.log('[VIDEO] Starting session with room_id:', roomId);
+      setMediaInitFailed(false);
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showError('Camera/microphone is not supported in this browser. Please use a modern browser.');
@@ -266,6 +269,7 @@ const VideoSession: React.FC = () => {
       }
       
       console.log('[VIDEO] Local stream obtained');
+      setMediaInitFailed(false);
       
       // Initialize WebRTC peer connection
       initializePeerConnection();
@@ -278,6 +282,7 @@ const VideoSession: React.FC = () => {
       
     } catch (error: any) {
       console.error('[VIDEO] Media error:', error);
+      setMediaInitFailed(true);
       if (error?.name === 'NotAllowedError') {
         showError('Camera/microphone permission denied. On mobile, also allow Camera/Microphone in browser and OS Settings, then reload this page.');
       } else if (error?.name === 'NotFoundError') {
@@ -291,6 +296,58 @@ const VideoSession: React.FC = () => {
       } else {
         showError(`Failed to access camera/microphone: ${error?.message || 'Unknown error'}`);
       }
+    }
+  };
+
+  const retryMediaAccess = async () => {
+    try {
+      setIsRetryingMedia(true);
+      setMediaInitFailed(false);
+
+      const stream = await getMediaStreamWithFallback();
+
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      localStreamRef.current = stream;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        const playPromise = localVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((playError) => {
+            console.warn('[VIDEO] Local preview autoplay blocked after retry:', playError);
+          });
+        }
+      }
+
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        const videoTrack = stream.getVideoTracks()[0] || null;
+        const audioTrack = stream.getAudioTracks()[0] || null;
+
+        const videoSender = senders.find((sender) => sender.track?.kind === 'video');
+        const audioSender = senders.find((sender) => sender.track?.kind === 'audio');
+
+        if (videoSender) {
+          await videoSender.replaceTrack(videoTrack);
+        }
+        if (audioSender) {
+          await audioSender.replaceTrack(audioTrack);
+        }
+      }
+
+      setIsCameraOn((stream.getVideoTracks()[0]?.enabled ?? false));
+      setIsMicOn((stream.getAudioTracks()[0]?.enabled ?? false));
+      showSuccess('Camera/microphone reconnected');
+    } catch (error: any) {
+      console.error('[VIDEO] Retry media error:', error);
+      setMediaInitFailed(true);
+      showError('Retry failed. Please verify browser + phone camera/microphone permissions and try again.');
+    } finally {
+      setIsRetryingMedia(false);
     }
   };
 
@@ -1204,6 +1261,18 @@ const VideoSession: React.FC = () => {
         >
           <CallEnd />
         </IconButton>
+
+        {mediaInitFailed && (
+          <Button
+            onClick={retryMediaAccess}
+            disabled={isRetryingMedia}
+            variant="contained"
+            color="warning"
+            sx={{ ml: 1 }}
+          >
+            {isRetryingMedia ? 'Retrying camera...' : 'Retry Camera'}
+          </Button>
+        )}
       </Paper>
 
       {/* End Session Dialog */}
