@@ -31,15 +31,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/apiClient';
-import {
-  LocalAudioTrack,
-  LocalVideoTrack,
-  RemoteAudioTrack,
-  RemoteVideoTrack,
-  Room,
-  RoomEvent,
-  Track,
-} from 'livekit-client';
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -55,11 +46,6 @@ const VideoSession: React.FC = () => {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
-  const livekitRoomRef = useRef<Room | null>(null);
-  const localVideoTrackRef = useRef<LocalVideoTrack | null>(null);
-  const localAudioTrackRef = useRef<LocalAudioTrack | null>(null);
-  const remoteVideoTrackRef = useRef<RemoteVideoTrack | null>(null);
-  const remoteAudioTrackRef = useRef<RemoteAudioTrack | null>(null);
 
   // Session state
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -251,113 +237,6 @@ const VideoSession: React.FC = () => {
     throw lastError;
   };
 
-  const syncRemoteMediaElement = () => {
-    const mediaStream = new MediaStream();
-
-    if (remoteVideoTrackRef.current?.mediaStreamTrack) {
-      mediaStream.addTrack(remoteVideoTrackRef.current.mediaStreamTrack);
-    }
-
-    if (remoteAudioTrackRef.current?.mediaStreamTrack) {
-      mediaStream.addTrack(remoteAudioTrackRef.current.mediaStreamTrack);
-    }
-
-    if (remoteVideoRef.current) {
-      if (mediaStream.getTracks().length > 0) {
-        remoteStreamRef.current = mediaStream;
-        remoteVideoRef.current.srcObject = mediaStream;
-        setIsRemoteVideoReady(Boolean(remoteVideoTrackRef.current));
-        const playPromise = remoteVideoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            setIsRemotePlaybackBlocked(false);
-          }).catch((playError) => {
-            console.warn('[VIDEO] Remote autoplay blocked, user interaction required:', playError);
-            setIsRemotePlaybackBlocked(true);
-          });
-        }
-      } else {
-        remoteStreamRef.current = null;
-        remoteVideoRef.current.srcObject = null;
-        setIsRemoteVideoReady(false);
-        setIsRemotePlaybackBlocked(false);
-      }
-    }
-  };
-
-  const connectLiveKit = async (stream: MediaStream) => {
-    if (!sessionId || !roomId) {
-      throw new Error('Session is missing room details.');
-    }
-
-    const tokenResponse = await apiClient.post(`/telehealth/sessions/${sessionId}/livekit_token/`);
-    const token = tokenResponse?.data?.token as string | undefined;
-    const livekitUrl = tokenResponse?.data?.url as string | undefined;
-
-    if (!token || !livekitUrl) {
-      throw new Error('LiveKit token response is invalid.');
-    }
-
-    const room = new Room({
-      adaptiveStream: true,
-      dynacast: true,
-    });
-    livekitRoomRef.current = room;
-
-    room.on(RoomEvent.ParticipantConnected, () => {
-      showSuccess('Participant joined');
-    });
-
-    room.on(RoomEvent.ParticipantDisconnected, () => {
-      showError('Participant disconnected');
-      remoteVideoTrackRef.current = null;
-      remoteAudioTrackRef.current = null;
-      syncRemoteMediaElement();
-    });
-
-    room.on(RoomEvent.TrackSubscribed, (track) => {
-      if (track.kind === Track.Kind.Video) {
-        remoteVideoTrackRef.current = track as RemoteVideoTrack;
-      }
-      if (track.kind === Track.Kind.Audio) {
-        remoteAudioTrackRef.current = track as RemoteAudioTrack;
-      }
-      syncRemoteMediaElement();
-    });
-
-    room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      if (track.kind === Track.Kind.Video) {
-        remoteVideoTrackRef.current = null;
-      }
-      if (track.kind === Track.Kind.Audio) {
-        remoteAudioTrackRef.current = null;
-      }
-      syncRemoteMediaElement();
-    });
-
-    room.on(RoomEvent.Disconnected, () => {
-      remoteVideoTrackRef.current = null;
-      remoteAudioTrackRef.current = null;
-      syncRemoteMediaElement();
-    });
-
-    await room.connect(livekitUrl, token);
-
-    const livekitParticipant = room.localParticipant;
-    const localVideoTrack = stream.getVideoTracks()[0];
-    const localAudioTrack = stream.getAudioTracks()[0];
-
-    if (localVideoTrack) {
-      localVideoTrackRef.current = new LocalVideoTrack(localVideoTrack);
-      await livekitParticipant.publishTrack(localVideoTrackRef.current);
-    }
-
-    if (localAudioTrack) {
-      localAudioTrackRef.current = new LocalAudioTrack(localAudioTrack);
-      await livekitParticipant.publishTrack(localAudioTrackRef.current);
-    }
-  };
-
   const startSession = async () => {
     try {
       console.log('[VIDEO] Starting session with room_id:', roomId);
@@ -392,8 +271,11 @@ const VideoSession: React.FC = () => {
       console.log('[VIDEO] Local stream obtained');
       setMediaInitFailed(false);
       
-      // Connect to LiveKit room and publish local tracks
-      await connectLiveKit(stream);
+      // Initialize WebRTC peer connection
+      initializePeerConnection();
+      
+      // Connect to WebSocket signaling server
+      connectWebSocket();
       
       setSessionStartTime(new Date());
       showSuccess('Connected to session');
@@ -441,32 +323,19 @@ const VideoSession: React.FC = () => {
         }
       }
 
-      if (livekitRoomRef.current) {
-        const livekitParticipant = livekitRoomRef.current.localParticipant;
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        const videoTrack = stream.getVideoTracks()[0] || null;
+        const audioTrack = stream.getAudioTracks()[0] || null;
 
-        if (localVideoTrackRef.current) {
-          livekitParticipant.unpublishTrack(localVideoTrackRef.current);
-          localVideoTrackRef.current.stop();
-          localVideoTrackRef.current = null;
+        const videoSender = senders.find((sender) => sender.track?.kind === 'video');
+        const audioSender = senders.find((sender) => sender.track?.kind === 'audio');
+
+        if (videoSender) {
+          await videoSender.replaceTrack(videoTrack);
         }
-
-        if (localAudioTrackRef.current) {
-          livekitParticipant.unpublishTrack(localAudioTrackRef.current);
-          localAudioTrackRef.current.stop();
-          localAudioTrackRef.current = null;
-        }
-
-        const nextVideoTrack = stream.getVideoTracks()[0];
-        const nextAudioTrack = stream.getAudioTracks()[0];
-
-        if (nextVideoTrack) {
-          localVideoTrackRef.current = new LocalVideoTrack(nextVideoTrack);
-          await livekitParticipant.publishTrack(localVideoTrackRef.current);
-        }
-
-        if (nextAudioTrack) {
-          localAudioTrackRef.current = new LocalAudioTrack(nextAudioTrack);
-          await livekitParticipant.publishTrack(localAudioTrackRef.current);
+        if (audioSender) {
+          await audioSender.replaceTrack(audioTrack);
         }
       }
 
@@ -853,24 +722,6 @@ const VideoSession: React.FC = () => {
 
   const cleanupSession = () => {
     console.log('[VIDEO] Cleaning up session');
-
-    if (livekitRoomRef.current) {
-      livekitRoomRef.current.disconnect();
-      livekitRoomRef.current = null;
-    }
-
-    if (localVideoTrackRef.current) {
-      localVideoTrackRef.current.stop();
-      localVideoTrackRef.current = null;
-    }
-
-    if (localAudioTrackRef.current) {
-      localAudioTrackRef.current.stop();
-      localAudioTrackRef.current = null;
-    }
-
-    remoteVideoTrackRef.current = null;
-    remoteAudioTrackRef.current = null;
     
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
@@ -1175,8 +1026,6 @@ const VideoSession: React.FC = () => {
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
-
-  void connectWebSocket;
 
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#1a1a1a' }}>
