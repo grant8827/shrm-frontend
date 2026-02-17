@@ -183,6 +183,58 @@ const VideoSession: React.FC = () => {
     }
   }, [sessionStartTime]);
 
+  const getMediaStreamWithFallback = async () => {
+    const attempts: MediaStreamConstraints[] = [
+      {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      },
+      {
+        video: {
+          facingMode: 'user',
+        },
+        audio: true,
+      },
+      {
+        video: true,
+        audio: true,
+      },
+      {
+        video: true,
+        audio: false,
+      },
+    ];
+
+    let lastError: any = null;
+
+    for (let index = 0; index < attempts.length; index += 1) {
+      try {
+        console.log(`[VIDEO] getUserMedia attempt ${index + 1}/${attempts.length}`);
+        const stream = await navigator.mediaDevices.getUserMedia(attempts[index]);
+        console.log(`[VIDEO] getUserMedia succeeded on attempt ${index + 1}`);
+        return stream;
+      } catch (error: any) {
+        lastError = error;
+        console.warn(`[VIDEO] getUserMedia attempt ${index + 1} failed:`, error?.name, error?.message);
+
+        // Permission denial should not retry with other constraints
+        if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  };
+
   const startSession = async () => {
     try {
       console.log('[VIDEO] Starting session with room_id:', roomId);
@@ -198,23 +250,19 @@ const VideoSession: React.FC = () => {
         return;
       }
       
-      // Request media permissions with mobile-friendly constraints
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      // Request media permissions with fallback constraints for mobile reliability
+      const stream = await getMediaStreamWithFallback();
       
       localStreamRef.current = stream;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        localVideoRef.current.muted = true;
+        const playPromise = localVideoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((playError) => {
+            console.warn('[VIDEO] Local preview autoplay blocked:', playError);
+          });
+        }
       }
       
       console.log('[VIDEO] Local stream obtained');
@@ -231,11 +279,13 @@ const VideoSession: React.FC = () => {
     } catch (error: any) {
       console.error('[VIDEO] Media error:', error);
       if (error?.name === 'NotAllowedError') {
-        showError('Camera/microphone permission denied. Please tap "Allow" when prompted, or check your browser settings.');
+        showError('Camera/microphone permission denied. On mobile, also allow Camera/Microphone in browser and OS Settings, then reload this page.');
       } else if (error?.name === 'NotFoundError') {
         showError('No camera or microphone found. Please connect a camera/microphone and try again.');
       } else if (error?.name === 'NotReadableError') {
-        showError('Camera/microphone is in use by another app. Please close other apps and try again.');
+        showError('Camera/microphone is in use by another app, or blocked by the device. Close other apps (Zoom/FaceTime/Meet), then retry.');
+      } else if (error?.name === 'OverconstrainedError') {
+        showError('Camera constraints not supported on this mobile device. We retried with fallback settings, please refresh and try again.');
       } else if (error?.name === 'NotSupportedError') {
         showError('Camera/microphone not supported. Please use HTTPS or check device compatibility.');
       } else {
