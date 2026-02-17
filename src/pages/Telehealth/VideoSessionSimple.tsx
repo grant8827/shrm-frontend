@@ -52,6 +52,7 @@ const VideoSession: React.FC = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
+  const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
   const [sessionData, setSessionData] = useState<any>(null);
 
   // Media controls
@@ -275,9 +276,14 @@ const VideoSession: React.FC = () => {
           if (playPromise !== undefined) {
             playPromise.catch((playError) => {
               console.warn('[VIDEO] Remote autoplay blocked, user interaction required:', playError);
+              setIsRemotePlaybackBlocked(true);
               // Add click handler to play on user interaction
               const playOnClick = () => {
-                remoteVideoRef.current?.play();
+                remoteVideoRef.current?.play().then(() => {
+                  setIsRemotePlaybackBlocked(false);
+                }).catch(() => {
+                  setIsRemotePlaybackBlocked(true);
+                });
                 document.removeEventListener('click', playOnClick);
               };
               document.addEventListener('click', playOnClick);
@@ -301,8 +307,13 @@ const VideoSession: React.FC = () => {
           if (playPromise !== undefined) {
             playPromise.catch((playError) => {
               console.warn('[VIDEO] Remote autoplay blocked, user interaction required:', playError);
+              setIsRemotePlaybackBlocked(true);
               const playOnClick = () => {
-                remoteVideoRef.current?.play();
+                remoteVideoRef.current?.play().then(() => {
+                  setIsRemotePlaybackBlocked(false);
+                }).catch(() => {
+                  setIsRemotePlaybackBlocked(true);
+                });
                 document.removeEventListener('click', playOnClick);
               };
               document.addEventListener('click', playOnClick);
@@ -366,6 +377,34 @@ const VideoSession: React.FC = () => {
     peerConnection.onicegatheringstatechange = () => {
       console.log('[VIDEO] ICE gathering state:', peerConnection.iceGatheringState);
     };
+  };
+
+  const resetPeerConnectionForNextParticipant = () => {
+    console.log('[VIDEO] Resetting peer connection for next participant');
+    pendingIceCandidatesRef.current = [];
+    isInitiatorRef.current = false;
+
+    if (peerConnectionRef.current) {
+      try {
+        peerConnectionRef.current.ontrack = null;
+        peerConnectionRef.current.onicecandidate = null;
+        peerConnectionRef.current.onconnectionstatechange = null;
+        peerConnectionRef.current.oniceconnectionstatechange = null;
+        peerConnectionRef.current.onicegatheringstatechange = null;
+        peerConnectionRef.current.close();
+      } catch (error) {
+        console.warn('[VIDEO] Error closing previous peer connection:', error);
+      }
+    }
+
+    remoteStreamRef.current = null;
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+    setIsRemoteVideoReady(false);
+    setIsRemotePlaybackBlocked(false);
+
+    initializePeerConnection();
   };
 
   const connectWebSocket = () => {
@@ -457,7 +496,7 @@ const VideoSession: React.FC = () => {
           
         case 'participant_left':
           console.log('[VIDEO] Participant left');
-          setIsRemoteVideoReady(false);
+          resetPeerConnectionForNextParticipant();
           showError('Other participant left the session');
           break;
       }
@@ -607,6 +646,7 @@ const VideoSession: React.FC = () => {
     participantCountRef.current = 0;
     isInitiatorRef.current = false;
     iceRestartAttemptsRef.current = 0;
+    setIsRemotePlaybackBlocked(false);
   };
 
   const toggleCamera = () => {
@@ -928,6 +968,15 @@ const VideoSession: React.FC = () => {
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            onLoadedMetadata={() => {
+              if (!remoteVideoRef.current) return;
+              remoteVideoRef.current.play().then(() => {
+                setIsRemotePlaybackBlocked(false);
+              }).catch((error) => {
+                console.warn('[VIDEO] Remote video still blocked on metadata load:', error);
+                setIsRemotePlaybackBlocked(true);
+              });
+            }}
             style={{
               width: '100%',
               height: '100%',
@@ -948,6 +997,31 @@ const VideoSession: React.FC = () => {
               }}
             >
               <Typography variant="h6">Waiting for other participant...</Typography>
+            </Box>
+          )}
+
+          {isRemoteVideoReady && isRemotePlaybackBlocked && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 20,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                textAlign: 'center',
+              }}
+            >
+              <Button
+                variant="contained"
+                onClick={() => {
+                  remoteVideoRef.current?.play().then(() => {
+                    setIsRemotePlaybackBlocked(false);
+                  }).catch(() => {
+                    setIsRemotePlaybackBlocked(true);
+                  });
+                }}
+              >
+                Tap to start remote audio/video
+              </Button>
             </Box>
           )}
           
