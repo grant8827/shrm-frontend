@@ -94,7 +94,7 @@ const VideoSession: React.FC = () => {
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
   const [mediaInitFailed, setMediaInitFailed] = useState(false);
   const [isRetryingMedia, setIsRetryingMedia] = useState(false);
-  const [sessionData, setSessionData] = useState<any>(null);
+  const [, setSessionData] = useState<any>(null);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
