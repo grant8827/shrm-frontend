@@ -18,13 +18,15 @@ import {
   TranscriptionState,
   SessionTranscript,
   TranscriptEntry,
-  RecordingControls
+  RecordingControls,
+  BrowserInfo,
+  DeviceCapabilities,
+  NetworkTest,
+  MediaPermissions,
+  PermissionState
 } from '../types';
 
 import {
-  BrowserInfo,
-  DeviceCapabilities,
-  NetworkTestResult,
   ConnectionStats
 } from '../types/telehealth';
 import { apiService } from './apiService';
@@ -111,7 +113,8 @@ class TelehealthService {
    * Leave a telehealth session
    */
   async leaveSession(sessionId: string): Promise<ApiResponse<void>> {
-    try {<void>(`${this.baseUrl}/sessions/${sessionId}/leave`);
+    try {
+      const response = await apiService.post<void>(`${this.baseUrl}/sessions/${sessionId}/leave`);
       
       // Disconnect WebSocket
       webSocketService.disconnect();
@@ -419,7 +422,32 @@ class TelehealthService {
       networkTest: await this.performNetworkTest(),
     };
 
-    return diagnostics;
+    // Calculate overall status based on network test results
+    let overallStatus = 'good';
+    const recommendations: string[] = [];
+
+    if (diagnostics.networkTest.latency > 200) {
+      overallStatus = 'fair';
+      recommendations.push('High latency detected. Consider a wired connection.');
+    }
+    if (diagnostics.networkTest.packetLoss > 5) {
+      overallStatus = 'poor';
+      recommendations.push('High packet loss. Check your network connection.');
+    }
+    if (!diagnostics.browserInfo.webRtcSupported) {
+      overallStatus = 'failed';
+      recommendations.push('WebRTC not supported. Please update your browser.');
+    }
+
+    // Return with required TelehealthTechnicalCheck fields
+    return {
+      id: `check-${Date.now()}`,
+      userId: 'current-user',
+      timestamp: new Date(),
+      overallStatus: overallStatus as any,
+      recommendations,
+      ...diagnostics,
+    };
   }
 
   /**
@@ -479,7 +507,11 @@ class TelehealthService {
         cameras: [],
         microphones: [],
         speakers: [],
-        permissions: {},
+        permissions: {
+          camera: PermissionState.UNKNOWN,
+          microphone: PermissionState.UNKNOWN,
+          screenShare: PermissionState.UNKNOWN,
+        },
       };
     }
   }
@@ -487,8 +519,12 @@ class TelehealthService {
   /**
    * Check media permissions
    */
-  private async checkPermissions(): Promise<{ camera?: PermissionState; microphone?: PermissionState }> {
-    const permissions: { camera?: PermissionState; microphone?: PermissionState } = {};
+  private async checkPermissions(): Promise<MediaPermissions> {
+    const permissions: MediaPermissions = {
+      camera: PermissionState.PROMPT,
+      microphone: PermissionState.PROMPT,
+      screenShare: PermissionState.PROMPT,
+    };
 
     try {
       if (navigator.permissions) {
@@ -496,14 +532,14 @@ class TelehealthService {
         // Casting to PermissionName to avoid type errors
         try {
           const camera = await navigator.permissions.query({ name: 'camera' as PermissionName });
-          permissions.camera = camera.state;
+          permissions.camera = this.mapPermissionState(camera.state);
         } catch (e) {
           // Firefox doesn't support querying camera permission
         }
 
         try {
           const microphone = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-          permissions.microphone = microphone.state;
+          permissions.microphone = this.mapPermissionState(microphone.state);
         } catch (e) {
           // Firefox doesn't support querying microphone permission
         }
@@ -516,9 +552,25 @@ class TelehealthService {
   }
 
   /**
+   * Map browser PermissionState to our enum
+   */
+  private mapPermissionState(state: globalThis.PermissionState): PermissionState {
+    switch (state) {
+      case 'granted':
+        return PermissionState.GRANTED;
+      case 'denied':
+        return PermissionState.DENIED;
+      case 'prompt':
+        return PermissionState.PROMPT;
+      default:
+        return PermissionState.UNKNOWN;
+    }
+  }
+
+  /**
    * Perform network speed test
    */
-  private async performNetworkTest(): Promise<NetworkTestResult> {
+  private async performNetworkTest(): Promise<NetworkTest> {
     const startTime = Date.now();
     
     try {
@@ -539,15 +591,19 @@ class TelehealthService {
       const connection = (navigator as unknown as { connection?: { effectiveType?: string } }).connection;
 
       return {
-        bandwidth: 0, // Would be calculated in a real implementation
+        downloadSpeed: 0, // Would be calculated in a real implementation
+        uploadSpeed: 0, // Would be calculated in a real implementation
         latency,
+        jitter: 0, // Would be calculated in a real implementation
         packetLoss: 0,
         connectionType: connection?.effectiveType || 'unknown',
       };
     } catch (error) {
       return {
-        bandwidth: 0,
+        downloadSpeed: 0,
+        uploadSpeed: 0,
         latency: 999,
+        jitter: 999,
         packetLoss: 100,
         connectionType: 'unknown',
       };

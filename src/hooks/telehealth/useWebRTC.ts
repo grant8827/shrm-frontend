@@ -1,8 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 
 interface UseWebRTCProps {
-  roomId: string | null;
-  userId: string;
   sendMessage: (message: any) => void;
   onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
   onError: (message: string) => void;
@@ -23,8 +21,6 @@ interface UseWebRTCResult {
 }
 
 export const useWebRTC = ({
-  roomId,
-  userId,
   sendMessage,
   onConnectionStateChange,
   onError,
@@ -38,7 +34,6 @@ export const useWebRTC = ({
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
   
   const iceRestartAttemptsRef = useRef(0);
-  const lastIceRestartAtRef = useRef(0);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   // Cleanup on unmount

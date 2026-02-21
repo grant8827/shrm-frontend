@@ -1,7 +1,7 @@
 // WebSocket types are defined inline to avoid unused imports
 
 export interface WebSocketMessage {
-  type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update';
+  type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update' | 'transcription';
   sessionId: string;
   participantId?: string;
   data?: any;

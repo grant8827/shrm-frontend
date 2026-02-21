@@ -97,10 +97,7 @@ const VideoSession: React.FC = () => {
     handleAnswer,
     addIceCandidate,
     closePeerConnection,
-    connectionState,
   } = useWebRTC({
-    roomId,
-    userId: user?.id || '',
     sendMessage,
     onError: showError,
   });
