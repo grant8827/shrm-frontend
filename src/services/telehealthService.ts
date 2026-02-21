@@ -23,7 +23,8 @@ import {
   DeviceCapabilities,
   NetworkTest,
   MediaPermissions,
-  PermissionState
+  PermissionState,
+  TechnicalStatus
 } from '../types';
 
 import {
