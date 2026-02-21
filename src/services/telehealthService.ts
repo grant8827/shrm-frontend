@@ -423,19 +423,19 @@ class TelehealthService {
     };
 
     // Calculate overall status based on network test results
-    let overallStatus: 'good' | 'fair' | 'poor' | 'failed' = 'good';
+    let overallStatus: TechnicalStatus = TechnicalStatus.GOOD;
     const recommendations: string[] = [];
 
     if (diagnostics.networkTest.latency > 200) {
-      overallStatus = 'fair';
+      overallStatus = TechnicalStatus.FAIR;
       recommendations.push('High latency detected. Consider a wired connection.');
     }
     if (diagnostics.networkTest.packetLoss > 5) {
-      overallStatus = 'poor';
+      overallStatus = TechnicalStatus.POOR;
       recommendations.push('High packet loss. Check your network connection.');
     }
     if (!diagnostics.browserInfo.webRtcSupported) {
-      overallStatus = 'failed';
+      overallStatus = TechnicalStatus.FAILED;
       recommendations.push('WebRTC not supported. Please update your browser.');
     }
 
@@ -693,45 +693,48 @@ class TelehealthService {
    * Setup WebSocket event listeners
    */
   private setupWebSocketListeners(): void {
-    webSocketService.on('offer', async (data: { offer: RTCSessionDescriptionInit; targetParticipantId: string }) => {
-      if (this.webRtcPeerConnection && data.offer) {
-        const answer = await this.createAnswer(data.offer);
+    webSocketService.on('offer', async (data: Record<string, unknown>) => {
+      const offerData = data as { offer: RTCSessionDescriptionInit; targetParticipantId: string };
+      if (this.webRtcPeerConnection && offerData.offer) {
+        const answer = await this.createAnswer(offerData.offer);
         if (answer) {
-          webSocketService.sendAnswer(answer, data.targetParticipantId);
+          webSocketService.sendAnswer(answer, offerData.targetParticipantId);
         }
       }
     });
 
-    webSocketService.on('answer', async (data: { answer: RTCSessionDescriptionInit }) => {
-      if (this.webRtcPeerConnection && data.answer) {
-        await this.webRtcPeerConnection.setRemoteDescription(data.answer);
+    webSocketService.on('answer', async (data: Record<string, unknown>) => {
+      const answerData = data as { answer: RTCSessionDescriptionInit };
+      if (this.webRtcPeerConnection && answerData.answer) {
+        await this.webRtcPeerConnection.setRemoteDescription(answerData.answer);
       }
     });
 
-    webSocketService.on('ice-candidate', async (data: { candidate: RTCIceCandidateInit }) => {
-      if (data.candidate) {
-        await this.addIceCandidate(data.candidate);
+    webSocketService.on('ice-candidate', async (data: Record<string, unknown>) => {
+      const candidateData = data as { candidate: RTCIceCandidateInit };
+      if (candidateData.candidate) {
+        await this.addIceCandidate(candidateData.candidate);
       }
     });
 
-    webSocketService.on('chat-message', (data: ChatMessage) => {
+    webSocketService.on('chat-message', (data: Record<string, unknown>) => {
       // Chat messages will be handled by the UI component
       console.log('Chat message received:', data);
     });
 
-    webSocketService.on('participant-joined', (data: { participantId: string; role: string }) => {
+    webSocketService.on('participant-joined', (data: Record<string, unknown>) => {
       console.log('Participant joined:', data);
     });
 
-    webSocketService.on('participant-left', (data: { participantId: string }) => {
+    webSocketService.on('participant-left', (data: Record<string, unknown>) => {
       console.log('Participant left:', data);
     });
 
-    webSocketService.on('recording-started', (data: RecordingState) => {
+    webSocketService.on('recording-started', (data: Record<string, unknown>) => {
       console.log('Recording started:', data);
     });
 
-    webSocketService.on('recording-stopped', (data: RecordingState) => {
+    webSocketService.on('recording-stopped', (data: Record<string, unknown>) => {
       console.log('Recording stopped:', data);
     });
   }
