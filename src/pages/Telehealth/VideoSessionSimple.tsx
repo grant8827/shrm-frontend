@@ -27,6 +27,7 @@ import {
   Transcribe,
   StopCircle,
 } from '@mui/icons-material';
+import PeopleIcon from '@mui/icons-material/People';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,6 +62,10 @@ const VideoSession: React.FC = () => {
   const participantCountRef = useRef(0);
   const websocketRef = useRef<WebSocket | null>(null);
   const isInitiatorRef = useRef(false);
+  
+  // Participant tracking
+  const [participantCount, setParticipantCount] = useState(1); // Start at 1 for self
+  const [participantName, setParticipantName] = useState<string>('');
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -172,7 +177,8 @@ const VideoSession: React.FC = () => {
     websocketRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[VIDEO] WebSocket connected');
+      console.log('[VIDEO] WebSocket connected to:', wsUrl);
+      console.log('[VIDEO] Sending participant_joined for user:', user?.id, user?.firstName, user?.lastName);
       showSuccess('Connected to session server');
       
       ws.send(JSON.stringify({
@@ -184,13 +190,15 @@ const VideoSession: React.FC = () => {
 
     ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
-      console.log('[VIDEO] WebSocket message:', data.type);
+      console.log('[VIDEO] WebSocket message:', data.type, 'Full data:', data);
 
       switch (data.type) {
         case 'participant_joined':
-          console.log('[VIDEO] Another participant joined');
-          showSuccess('Another participant joined');
+          console.log('[VIDEO] Another participant joined:', data.user_name);
+          showSuccess(`${data.user_name || 'A participant'} joined the session`);
           participantCountRef.current += 1;
+          setParticipantCount(participantCountRef.current + 1); // +1 for self
+          setParticipantName(data.user_name || 'Participant');
           isInitiatorRef.current = true;
           // Initiator creates offer
           setTimeout(() => {
@@ -216,7 +224,11 @@ const VideoSession: React.FC = () => {
           break;
 
         case 'participant_left':
+          console.log('[VIDEO] Participant left');
           showError('Other participant left the session');
+          participantCountRef.current = Math.max(0, participantCountRef.current - 1);
+          setParticipantCount(participantCountRef.current + 1); // +1 for self
+          setParticipantName('');
           // Reset logic handled by useWebRTC closePeerConnection partially, 
           // but we might want to re-init PC for next participant?
           closePeerConnection();
@@ -457,7 +469,14 @@ const VideoSession: React.FC = () => {
             )}
           </Box>
           <Chip label={formatDuration(sessionDuration)} color="error" size="small" icon={<FiberManualRecord />} />
+          <Chip 
+            label={`${participantCount} Participant${participantCount !== 1 ? 's' : ''}`} 
+            color={participantCount > 1 ? "success" : "default"} 
+            size="small" 
+            icon={<PeopleIcon />} 
+          />
           {isRemoteVideoReady && <Chip label="Connected" color="success" size="small" />}
+          {participantName && <Chip label={participantName} size="small" variant="outlined" sx={{ color: 'white', borderColor: 'white' }} />}
         </Box>
       </Paper>
 
@@ -472,7 +491,16 @@ const VideoSession: React.FC = () => {
           />
           {!isRemoteVideoReady && (
             <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'white' }}>
-              <Typography variant="h6">Waiting for other participant...</Typography>
+              <Typography variant="h6">
+                {participantCount > 1 
+                  ? `Establishing connection with ${participantName || 'participant'}...`
+                  : 'Waiting for other participant to join...'}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.7 }}>
+                {participantCount > 1 
+                  ? 'Setting up video and audio...'
+                  : 'Share the session link or wait for them to connect'}
+              </Typography>
             </Box>
           )}
           {isRemoteVideoReady && isRemotePlaybackBlocked && (

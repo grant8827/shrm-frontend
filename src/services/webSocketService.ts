@@ -4,16 +4,18 @@ export interface WebSocketMessage {
   type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update' | 'transcription';
   sessionId: string;
   participantId?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   timestamp: Date;
 }
+
+type EventCallback = (data: Record<string, unknown>) => void;
 
 class WebSocketService {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, EventCallback[]> = new Map();
   private isConnected = false;
   private sessionId: string | null = null;
   private participantId: string | null = null;
@@ -52,7 +54,7 @@ class WebSocketService {
 
         this.ws.onmessage = (event) => {
           try {
-            const message: WebSocketMessage = JSON.parse(event.data);
+            const message = JSON.parse(event.data as string) as WebSocketMessage;
             this.handleMessage(message);
           } catch (error) {
             console.error('Failed to parse WebSocket message:', error);
@@ -117,7 +119,7 @@ class WebSocketService {
   /**
    * Add event listener
    */
-  on(event: string, callback: Function): void {
+  on(event: string, callback: EventCallback): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -127,7 +129,7 @@ class WebSocketService {
   /**
    * Remove event listener
    */
-  off(event: string, callback: Function): void {
+  off(event: string, callback: EventCallback): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       const index = callbacks.indexOf(callback);
@@ -234,39 +236,39 @@ class WebSocketService {
 
     switch (message.type) {
       case 'offer':
-        this.emit('offer', message.data);
+        this.emit('offer', message.data ?? {});
         break;
 
       case 'answer':
-        this.emit('answer', message.data);
+        this.emit('answer', message.data ?? {});
         break;
 
       case 'ice-candidate':
-        this.emit('ice-candidate', message.data);
+        this.emit('ice-candidate', message.data ?? {});
         break;
 
       case 'join':
-        this.emit('participant-joined', message.data);
+        this.emit('participant-joined', message.data ?? {});
         break;
 
       case 'leave':
-        this.emit('participant-left', message.data);
+        this.emit('participant-left', message.data ?? {});
         break;
 
       case 'chat':
-        this.emit('chat-message', message.data);
+        this.emit('chat-message', message.data ?? {});
         break;
 
       case 'recording-start':
-        this.emit('recording-started', message.data);
+        this.emit('recording-started', message.data ?? {});
         break;
 
       case 'recording-stop':
-        this.emit('recording-stopped', message.data);
+        this.emit('recording-stopped', message.data ?? {});
         break;
 
       case 'participant-update':
-        this.emit('participant-updated', message.data);
+        this.emit('participant-updated', message.data ?? {});
         break;
 
       default:
@@ -277,7 +279,7 @@ class WebSocketService {
   /**
    * Emit event to listeners
    */
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: Record<string, unknown>): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.forEach(callback => {

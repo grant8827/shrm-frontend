@@ -242,7 +242,7 @@ class TelehealthService {
   /**
    * Initialize WebRTC connection
    */
-  async initializeWebRTC(iceServers: RTCIceServer[]): Promise<RTCPeerConnection> {
+  initializeWebRTC(iceServers: RTCIceServer[]): RTCPeerConnection {
     const configuration: RTCConfiguration = {
       iceServers,
       iceCandidatePoolSize: 10,
@@ -423,7 +423,7 @@ class TelehealthService {
     };
 
     // Calculate overall status based on network test results
-    let overallStatus = 'good';
+    let overallStatus: 'good' | 'fair' | 'poor' | 'failed' = 'good';
     const recommendations: string[] = [];
 
     if (diagnostics.networkTest.latency > 200) {
@@ -444,7 +444,7 @@ class TelehealthService {
       id: `check-${Date.now()}`,
       userId: 'current-user',
       timestamp: new Date(),
-      overallStatus: overallStatus as any,
+      overallStatus,
       recommendations,
       ...diagnostics,
     };
