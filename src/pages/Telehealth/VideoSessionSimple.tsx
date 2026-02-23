@@ -218,7 +218,7 @@ const VideoSession: React.FC = () => {
 
         case 'offer':
           // Pass localStream to handleOffer because it needs to verify/init PC
-          if (localStream) {
+          if (localStream && data.offer) {
              await handleOffer(data.offer, localStream);
           } else {
              console.warn('[VIDEO] Received offer but local stream is not ready');
@@ -226,11 +226,15 @@ const VideoSession: React.FC = () => {
           break;
 
         case 'answer':
-          await handleAnswer(data.answer);
+          if (data.answer) {
+            await handleAnswer(data.answer);
+          }
           break;
 
         case 'ice_candidate':
-          await addIceCandidate(data.candidate);
+          if (data.candidate) {
+            await addIceCandidate(data.candidate);
+          }
           break;
 
         case 'participant_left':

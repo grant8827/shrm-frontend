@@ -293,6 +293,14 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     }
   };
 
+  // Fetch transcription periodically if needed
+  useEffect(() => {
+    if (isTranscribing && transcriptionSettings.realTimeTranscription) {
+      const interval = setInterval(fetchRealtimeTranscription, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isTranscribing, transcriptionSettings.realTimeTranscription]);
+
   const exportTranscript = async (format: 'pdf' | 'docx' | 'txt' | 'json') => {
     try {
       const result = await telehealthService.exportTranscript(sessionId, format);

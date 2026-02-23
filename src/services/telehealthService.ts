@@ -761,18 +761,21 @@ class TelehealthService {
       console.log('Recording stopped:', data);
     });
 
-    webSocketService.on('transcription', (message: WebSocketMessage) => {
-      if (message.data) {
+    webSocketService.on('transcription', (message: Record<string, unknown>) => {
+      const wsMessage = message as { type: string; sessionId: string; participantId?: string; data?: Record<string, unknown>; timestamp: Date };
+      if (wsMessage.data) {
         const entry: TranscriptEntry = {
           id: `entry-${Date.now()}-${Math.random()}`,
-          sessionId: message.sessionId,
-          speakerId: message.participantId || 'unknown',
-          speakerName: `Speaker ${message.participantId?.substring(0, 4) || 'N/A'}`,
-          text: message.data.text as string,
-          startTime: message.timestamp,
+          sessionId: wsMessage.sessionId,
+          speakerId: wsMessage.participantId || 'unknown',
+          speakerName: `Speaker ${wsMessage.participantId?.substring(0, 4) || 'N/A'}`,
+          text: wsMessage.data.text as string,
+          startTime: wsMessage.timestamp,
           endTime: new Date(),
-          confidence: message.data.confidence as number,
-          isInterim: !message.data.isFinal,
+          duration: 0,
+          confidence: wsMessage.data.confidence as number,
+          isInterim: !wsMessage.data.isFinal,
+          keywords: [],
         };
         this.emit('transcription-update', entry);
       }
@@ -1579,6 +1582,7 @@ class TelehealthService {
             confidence,
             isFinal,
           },
+          timestamp: new Date(),
         });
       }
     } catch (error) {
