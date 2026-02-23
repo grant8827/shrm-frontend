@@ -39,6 +39,28 @@ class TelehealthService {
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
   private dataChannel: RTCDataChannel | null = null;
+  private listeners: Map<string, ((data: any) => void)[]> = new Map();
+
+  public on(event: string, callback: (data: any) => void) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)!.push(callback);
+  }
+
+  public off(event: string, callback: (data: any) => void) {
+    if (this.listeners.has(event)) {
+      const filteredCallbacks = this.listeners.get(event)!.filter(cb => cb !== callback);
+      this.listeners.set(event, filteredCallbacks);
+    }
+  }
+
+  private emit(event: string, data: any) {
+    if (this.listeners.has(event)) {
+      this.listeners.get(event)!.forEach(callback => callback(data));
+    }
+  }
+
 
   /**
    * Get telehealth session by ID
@@ -737,6 +759,23 @@ class TelehealthService {
 
     webSocketService.on('recording-stopped', (data: Record<string, unknown>) => {
       console.log('Recording stopped:', data);
+    });
+
+    webSocketService.on('transcription', (message: WebSocketMessage) => {
+      if (message.data) {
+        const entry: TranscriptEntry = {
+          id: `entry-${Date.now()}-${Math.random()}`,
+          sessionId: message.sessionId,
+          speakerId: message.participantId || 'unknown',
+          speakerName: `Speaker ${message.participantId?.substring(0, 4) || 'N/A'}`,
+          text: message.data.text as string,
+          startTime: message.timestamp,
+          endTime: new Date(),
+          confidence: message.data.confidence as number,
+          isInterim: !message.data.isFinal,
+        };
+        this.emit('transcription-update', entry);
+      }
     });
   }
 
@@ -1539,9 +1578,7 @@ class TelehealthService {
             text: transcript,
             confidence,
             isFinal,
-            timestamp: new Date(),
           },
-          timestamp: new Date(),
         });
       }
     } catch (error) {

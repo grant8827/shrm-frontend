@@ -119,20 +119,26 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     };
   }, [isRecording, isPaused]);
 
-  // Poll for transcription updates
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isTranscribing) {
-      interval = setInterval(() => {
-        fetchRealtimeTranscription();
-      }, 2000);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
+    const handleTranscriptionUpdate = (entry: TranscriptEntry) => {
+      setRealtimeEntries(prevEntries => {
+        const lastEntry = prevEntries[prevEntries.length - 1];
+        if (entry.isInterim && lastEntry && lastEntry.isInterim) {
+          // Replace last interim result with the new one
+          return [...prevEntries.slice(0, -1), entry];
+        } else {
+          // Add new entry (either final or the first interim)
+          return [...prevEntries, entry];
+        }
+      });
     };
-  }, [isTranscribing]);
+
+    telehealthService.on('transcription-update', handleTranscriptionUpdate);
+
+    return () => {
+      telehealthService.off('transcription-update', handleTranscriptionUpdate);
+    };
+  }, []); // Remove dependencies to avoid re-subscribing on every render
 
   const loadRecordingControls = async () => {
     try {

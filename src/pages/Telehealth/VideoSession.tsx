@@ -45,6 +45,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { apiClient } from '../../services/apiClient';
+import { SessionDetails } from '../../types';
 
 interface Participant {
   id: string;
@@ -94,7 +95,7 @@ const VideoSession: React.FC = () => {
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
   const [mediaInitFailed, setMediaInitFailed] = useState(false);
   const [isRetryingMedia, setIsRetryingMedia] = useState(false);
-  const [, setSessionData] = useState<any>(null);
+  const [, setSessionData] = useState<SessionDetails | null>(null);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);

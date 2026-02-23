@@ -346,6 +346,25 @@ export interface AppointmentForm {
 }
 
 // Telehealth Types
+export interface SessionDetails {
+  id: number;
+  title: string;
+  room_id: string;
+  session_url: string;
+  patient_details: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  therapist_details: {
+    id: number;
+    first_name: string;
+    last_name: string;
+  };
+  status: string;
+  duration: number;
+}
+
 export interface TelehealthSession {
   id: string;
   appointmentId: string;

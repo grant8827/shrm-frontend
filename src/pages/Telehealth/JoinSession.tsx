@@ -12,25 +12,7 @@ import {
 import { VideoCall, Error as ErrorIcon } from '@mui/icons-material';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-
-interface SessionDetails {
-  id: number;
-  title: string;
-  room_id: string;
-  session_url: string;
-  patient_details: {
-    id: number;
-    first_name: string;
-    last_name: string;
-  };
-  therapist_details: {
-    id: number;
-    first_name: string;
-    last_name: string;
-  };
-  status: string;
-  duration: number;
-}
+import { SessionDetails } from '../../types';
 
 const JoinSession: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();

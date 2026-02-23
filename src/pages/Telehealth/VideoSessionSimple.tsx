@@ -34,6 +34,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/apiClient';
 import { useTelehealthMedia } from '../../hooks/telehealth/useTelehealthMedia';
 import { useWebRTC } from '../../hooks/telehealth/useWebRTC';
+import { SessionDetails } from '../../types';
+
+interface WebSocketMessage {
+  type: string;
+  user_id?: string;
+  user_name?: string;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+}
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -46,7 +56,7 @@ const VideoSession: React.FC = () => {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [sessionData, setSessionData] = useState<any>(null);
+  const [sessionData, setSessionData] = useState<SessionDetails | null>(null);
 
   // Recording and Transcription
   const [isRecording, setIsRecording] = useState(false);
@@ -85,7 +95,7 @@ const VideoSession: React.FC = () => {
     retryMediaAccess,
   } = useTelehealthMedia(showError);
 
-  const sendMessage = useCallback((msg: any) => {
+  const sendMessage = useCallback((msg: WebSocketMessage) => {
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
       websocketRef.current.send(JSON.stringify(msg));
     }
@@ -112,7 +122,7 @@ const VideoSession: React.FC = () => {
     const fetchSession = async () => {
       try {
         const response = await apiClient.get(`/telehealth/sessions/${sessionId}/`);
-        const session = response.data;
+        const session = response.data as SessionDetails;
         setRoomId(session.room_id);
         setSessionData(session);
         console.log('[VIDEO] Session loaded:', session);
@@ -123,7 +133,7 @@ const VideoSession: React.FC = () => {
     };
 
     if (sessionId) {
-      fetchSession();
+      fetchSession().catch(console.error);
     }
   }, [sessionId, showError]);
 
@@ -189,7 +199,7 @@ const VideoSession: React.FC = () => {
     };
 
     ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
+      const data = JSON.parse(event.data) as WebSocketMessage;
       console.log('[VIDEO] WebSocket message:', data.type, 'Full data:', data);
 
       switch (data.type) {
@@ -198,7 +208,7 @@ const VideoSession: React.FC = () => {
           showSuccess(`${data.user_name || 'A participant'} joined the session`);
           participantCountRef.current += 1;
           setParticipantCount(participantCountRef.current + 1); // +1 for self
-          setParticipantName(data.user_name || 'Participant');
+          setParticipantName(data.user_name ?? 'Participant');
           isInitiatorRef.current = true;
           // Initiator creates offer
           setTimeout(() => {
@@ -265,7 +275,7 @@ const VideoSession: React.FC = () => {
       }
     };
 
-    initSession();
+    initSession().catch(console.error);
 
     return () => {
       stopLocalMedia();
@@ -434,10 +444,15 @@ const VideoSession: React.FC = () => {
         }
         
         if (transcriptText.length > 0) {
-            await apiClient.post(`/telehealth/sessions/${sessionId}/save_transcript/`, {
-              transcript: transcriptText.join('\n')
-            });
-            showSuccess('Transcript saved');
+            try {
+                await apiClient.post(`/telehealth/sessions/${sessionId}/save_transcript/`, {
+                  transcript: transcriptText.join('\n')
+                });
+                showSuccess('Transcript saved');
+            } catch (error) {
+                console.error('Failed to save transcript:', error);
+                showError('Failed to save transcript');
+            }
         }
         setIsTranscribing(false);
         showSuccess('Transcription stopped');

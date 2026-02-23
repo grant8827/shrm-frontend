@@ -271,6 +271,10 @@ class WebSocketService {
         this.emit('participant-updated', message.data ?? {});
         break;
 
+      case 'transcription':
+        this.emit('transcription', message as any); // Pass the whole message
+        break;
+
       default:
         console.warn('Unknown message type:', message.type);
     }
