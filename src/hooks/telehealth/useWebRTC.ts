@@ -213,10 +213,15 @@ export const useWebRTC = ({
   }, [closePeerConnection, sendMessage, onConnectionStateChange, onError]);
 
   const createOffer = useCallback(async (isRestart = false) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.error('[useWebRTC] Cannot create offer: PeerConnection is null');
+      return;
+    }
     try {
+      console.log('[useWebRTC] Creating offer...');
       const offer = await peerConnectionRef.current.createOffer({ iceRestart: isRestart });
       await peerConnectionRef.current.setLocalDescription(offer);
+      console.log('[useWebRTC] Offer created, sending to peer');
       sendMessage({
         type: 'offer',
         offer,
@@ -228,17 +233,24 @@ export const useWebRTC = ({
   }, [sendMessage, onError]);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit, localStream: MediaStream) => {
+    console.log('[useWebRTC] Handling offer from peer');
     // If we haven't initialized yet, do so (as responder)
     if (!peerConnectionRef.current) {
+      console.log('[useWebRTC] No peer connection, initializing as responder');
       await initializePeerConnection(localStream, false);
     }
     
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.error('[useWebRTC] Failed to initialize peer connection');
+      return;
+    }
 
     try {
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log('[useWebRTC] Remote description set, creating answer');
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
+      console.log('[useWebRTC] Answer created, sending to peer');
       sendMessage({
         type: 'answer',
         answer,
@@ -246,6 +258,7 @@ export const useWebRTC = ({
       
       // Process pending candidates now that we have remote description
       if (pendingIceCandidatesRef.current.length > 0) {
+         console.log(`[useWebRTC] Processing ${pendingIceCandidatesRef.current.length} pending candidates`);
          for (const candidate of pendingIceCandidatesRef.current) {
              await peerConnectionRef.current.addIceCandidate(candidate);
          }
@@ -259,9 +272,14 @@ export const useWebRTC = ({
   }, [initializePeerConnection, sendMessage, onError]);
 
   const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
-    if (!peerConnectionRef.current) return;
+    if (!peerConnectionRef.current) {
+      console.error('[useWebRTC] Cannot handle answer: PeerConnection is null');
+      return;
+    }
     try {
+      console.log('[useWebRTC] Handling answer from peer');
       await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('[useWebRTC] Remote description (answer) set successfully');
     } catch (err: any) {
         console.error('[useWebRTC] Error handling answer:', err);
         onError('Failed to establish connection (answer error).');
@@ -275,6 +293,7 @@ export const useWebRTC = ({
       return;
     }
     try {
+      console.log('[useWebRTC] Adding ICE candidate');
       await peerConnectionRef.current.addIceCandidate(candidate);
     } catch (err: any) {
        console.error('[useWebRTC] Error adding ICE candidate:', err);
