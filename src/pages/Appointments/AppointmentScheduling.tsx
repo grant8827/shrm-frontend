@@ -139,27 +139,28 @@ const AppointmentScheduling: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
-  // Load all patients from API (Users with role='client')
+  // Load all patients from API
   React.useEffect(() => {
     const loadPatients = async () => {
       try {
         setIsLoadingPatients(true);
-        const response = await apiClient.get('/auth/');
-        console.log('Users API Response:', response.data);
+        const response = await apiClient.get('/patients/');
+        console.log('Patients API Response:', response.data);
         
-        const allUsers = Array.isArray(response.data.results) 
+        const allPatients = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
         
-        // Filter to get only active clients
-        const clientUsers = allUsers.filter((user: any) => 
-          user.role === 'client' && user.is_active === true
-        );
+        // Map patients to include full_name field (already snake_case from backend)
+        const patientsList = allPatients.map((patient: any) => ({
+          ...patient,
+          full_name: `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || patient.email
+        }));
         
-        console.log('Filtered clients:', clientUsers);
-        setPatients(clientUsers);
+        console.log('Loaded patients:', patientsList);
+        setPatients(patientsList);
       } catch (error) {
         console.error('Failed to load patients:', error);
         setPatients([]);
@@ -176,8 +177,8 @@ const AppointmentScheduling: React.FC = () => {
     const loadTherapists = async () => {
       try {
         setIsLoadingTherapists(true);
-        const response = await apiClient.get('/auth/');
-        console.log('Users API Response:', response.data);
+        const response = await apiClient.get('/users/therapists/');
+        console.log('Therapists API Response:', response.data);
         
         const allUsers = Array.isArray(response.data.results) 
           ? response.data.results 
@@ -185,10 +186,11 @@ const AppointmentScheduling: React.FC = () => {
           ? response.data 
           : [];
         
-        // Filter to get only active therapists and admins
-        const therapistUsers = allUsers.filter((user: any) => 
-          (user.role === 'therapist' || user.role === 'admin') && user.is_active === true
-        );
+        // Map users to include full_name field
+        const therapistUsers = allUsers.map((user: any) => ({
+          ...user,
+          full_name: `${user.first_name || user.firstName || ''} ${user.last_name || user.lastName || ''}`.trim() || user.username
+        }));
         
         console.log('Filtered therapists:', therapistUsers);
         setTherapists(therapistUsers);
@@ -359,15 +361,16 @@ const AppointmentScheduling: React.FC = () => {
       endDateTime.setMinutes(endDateTime.getMinutes() + formData.duration);
 
       const appointmentPayload = {
-        patient: formData.patientId,
-        therapist: formData.therapistId,
-        appointment_type: appointmentTypeId,
-        start_datetime: startDateTime.toISOString(),
-        end_datetime: endDateTime.toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        patientId: formData.patientId,
+        therapistId: formData.therapistId,
+        appointmentType: appointmentTypeId,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        duration: formData.duration,
         status: 'scheduled',
-        priority: 'normal',
-        is_telehealth: formData.format === 'telehealth',
+        notes: formData.notes || '',
+        telehealthLink: formData.format === 'telehealth' ? formData.meetingLink : null,
+        location: formData.format === 'in-person' ? formData.location : null,
       };
 
       console.log('Appointment payload:', appointmentPayload);
