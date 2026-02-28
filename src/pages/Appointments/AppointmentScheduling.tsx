@@ -369,7 +369,7 @@ const AppointmentScheduling: React.FC = () => {
         duration: formData.duration,
         status: 'scheduled',
         notes: formData.notes || '',
-        telehealthLink: formData.format === 'telehealth' ? formData.meetingLink : null,
+        telehealthLink: formData.format === 'telehealth' ? 'auto-generate' : null,
         location: formData.format === 'in-person' ? formData.location : null,
       };
 
