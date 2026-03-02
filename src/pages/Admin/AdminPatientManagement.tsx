@@ -398,30 +398,47 @@ const AdminPatientManagement: React.FC = () => {
   // Handle add patient
   const handleAddPatient = async (formData: PatientFormData) => {
     try {
-      const genderMap: Record<string, string> = {
-        male: 'M',
-        female: 'F',
-        other: 'O',
-        prefer_not_to_say: 'P',
+      // Generate username from email (prefix before @) or first.last
+      const generateUsername = (email: string, firstName: string, lastName: string): string => {
+        if (email && email.includes('@')) {
+          return email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        }
+        return `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z0-9_.]/g, '_');
       };
 
-      // Transform form data to backend format
+      const username = generateUsername(formData.email, formData.firstName, formData.lastName);
+
+      // Transform form data to match backend API
       const patientData = {
-        first_name_write: formData.firstName,
-        last_name_write: formData.lastName,
-        date_of_birth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
-        gender: genderMap[formData.gender] || 'P',
-        phone_write: formData.phone,
-        email_write: formData.email,
-        street_address_write: formData.address.street,
-        city_write: formData.address.city,
-        zip_code_write: formData.address.zipCode,
-        emergency_contact_name_write: formData.emergencyContact.name,
-        emergency_contact_phone_write: formData.emergencyContact.phone,
-        emergency_contact_relationship_write: formData.emergencyContact.relationship,
-        admission_date: new Date().toISOString().split('T')[0],
-        status: 'active',
-        create_portal_access: true,
+        // User data (required)
+        username,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phone,
+        
+        // Patient data
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : undefined,
+        street: formData.address.street || undefined,
+        city: formData.address.city || undefined,
+        state: formData.address.state || undefined,
+        zipCode: formData.address.zipCode || undefined,
+        
+        // Emergency contact
+        emergencyContactName: formData.emergencyContact.name || undefined,
+        emergencyContactPhone: formData.emergencyContact.phone || undefined,
+        emergencyContactRelationship: formData.emergencyContact.relationship || undefined,
+        emergencyContactEmail: formData.emergencyContact.email || undefined,
+        
+        // Insurance
+        insuranceProvider: formData.insurance.provider || undefined,
+        insurancePolicyNumber: formData.insurance.policyNumber || undefined,
+        insuranceGroupNumber: formData.insurance.groupNumber || undefined,
+        
+        // Medical
+        medicalHistory: formData.medical.medicalHistory || undefined,
+        allergies: formData.medical.allergies.join(', ') || undefined,
+        assignedTherapistId: formData.medical.primaryTherapist || undefined,
       };
 
       console.log('📤 Sending patient data to API:', patientData);
@@ -430,7 +447,7 @@ const AdminPatientManagement: React.FC = () => {
       
       console.log('✅ Patient created successfully:', response.data);
 
-      setSuccessMessage('Patient created successfully! Registration email has been sent.');
+      setSuccessMessage('Patient created successfully! Welcome email sent with login credentials.');
       setShowSuccess(true);
       setAddPatientOpen(false);
       
