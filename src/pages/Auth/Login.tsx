@@ -12,16 +12,13 @@ import {
   FormControlLabel,
   Checkbox,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import ChangePasswordDialog from '../../components/ChangePasswordDialog';
 
 const validationSchema = yup.object({
   username: yup
@@ -38,12 +35,21 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false);
+  const [loggedInUsername, setLoggedInUsername] = useState('');
   const { login } = useAuth();
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
 
   const hasMustChangePassword = (value: unknown): value is { must_change_password?: boolean } => {
     return !!value && typeof value === 'object';
+  };
+
+  const handlePasswordChanged = () => {
+    setShowPasswordChangeDialog(false);
+    showSuccess('Password changed successfully! Redirecting to dashboard...');
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 1000);
   };
 
   const formik = useFormik({
@@ -63,7 +69,8 @@ const Login: React.FC = () => {
           if (userStr) {
             const parsedUser: unknown = JSON.parse(userStr);
             if (hasMustChangePassword(parsedUser) && parsedUser.must_change_password === true) {
-              // Show popup dialog instead of redirecting immediately
+              // Show password change dialog
+              setLoggedInUsername(values.username);
               setShowPasswordChangeDialog(true);
               return;
             }
@@ -209,56 +216,11 @@ const Login: React.FC = () => {
       </Box>
 
       {/* Password Change Required Dialog */}
-      <Dialog
+      <ChangePasswordDialog
         open={showPasswordChangeDialog}
-        onClose={() => {}} // Prevent closing by clicking outside
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Typography variant="h5" component="span" color="warning.main">
-            ⚠️ Password Change Required
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            <strong>Security Notice:</strong> You are using a temporary password.
-          </Alert>
-          <Typography variant="body1" paragraph>
-            For your security, you must change your temporary password before accessing the system.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            Your new password must:
-          </Typography>
-          <Box component="ul" sx={{ pl: 3, mb: 2 }}>
-            <Typography component="li" variant="body2" color="text.secondary">
-              Be at least 12 characters long
-            </Typography>
-            <Typography component="li" variant="body2" color="text.secondary">
-              Contain uppercase and lowercase letters
-            </Typography>
-            <Typography component="li" variant="body2" color="text.secondary">
-              Include at least one number
-            </Typography>
-            <Typography component="li" variant="body2" color="text.secondary">
-              Be different from your temporary password
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button
-            fullWidth
-            variant="contained"
-            size="large"
-            onClick={() => {
-              setShowPasswordChangeDialog(false);
-              navigate('/change-password');
-            }}
-          >
-            Change Password Now
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onPasswordChanged={handlePasswordChanged}
+        username={loggedInUsername}
+      />
     </Container>
   );
 };
