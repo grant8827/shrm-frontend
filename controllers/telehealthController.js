@@ -85,6 +85,14 @@ const getSessions = asyncHandler(async (req, res) => {
         },
         recordings: true,
         transcripts: true,
+        therapistUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -94,7 +102,7 @@ const getSessions = asyncHandler(async (req, res) => {
   // Transform sessions to match frontend expectations
   const transformedSessions = sessions.map(session => {
     const patientUser = session.patient?.user;
-    const therapist = session.appointment?.therapist;
+    const therapist = session.appointment?.therapist || session.therapistUser;
     
     return {
       id: session.id,
@@ -121,8 +129,8 @@ const getSessions = asyncHandler(async (req, res) => {
         email: therapist.email,
       } : null,
       appointment_id: session.appointmentId,
-      title: session.appointment ? 'Telehealth Appointment' : 'Telehealth Session',
-      is_emergency: false,
+      title: session.appointmentId ? 'Telehealth Appointment' : 'Emergency Session',
+      is_emergency: !session.appointmentId,
       has_recording: session.recordings && session.recordings.length > 0,
       has_transcript: session.transcripts && session.transcripts.length > 0,
       recording_enabled: session.recordingEnabled,
