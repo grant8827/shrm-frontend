@@ -53,6 +53,30 @@ const getSessions = asyncHandler(async (req, res) => {
       skip,
       take,
       include: {
+        patient: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        appointment: {
+          include: {
+            therapist: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
         participants: {
           include: {
             user: {
@@ -66,14 +90,56 @@ const getSessions = asyncHandler(async (req, res) => {
           },
         },
         recordings: true,
+        transcripts: true,
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     }),
     prisma.telehealthSession.count({ where }),
   ]);
 
+  // Transform sessions to match frontend expectations
+  const transformedSessions = sessions.map(session => {
+    const patientUser = session.patient?.user;
+    const therapist = session.appointment?.therapist;
+    
+    return {
+      id: session.id,
+      room_id: session.roomId,
+      session_url: session.sessionUrl,
+      status: session.status,
+      scheduled_at: session.appointment?.startTime || session.createdAt,
+      duration: session.scheduledDuration,
+      started_at: session.startedAt,
+      ended_at: session.endedAt,
+      platform: session.platform,
+      patient: session.patientId,
+      patient_details: patientUser ? {
+        id: patientUser.id,
+        first_name: patientUser.firstName,
+        last_name: patientUser.lastName,
+        email: patientUser.email,
+      } : null,
+      therapist: therapist?.id,
+      therapist_details: therapist ? {
+        id: therapist.id,
+        first_name: therapist.firstName,
+        last_name: therapist.lastName,
+        email: therapist.email,
+      } : null,
+      appointment_id: session.appointmentId,
+      title: session.appointment ? 'Telehealth Appointment' : 'Telehealth Session',
+      is_emergency: false,
+      has_recording: session.recordings && session.recordings.length > 0,
+      has_transcript: session.transcripts && session.transcripts.length > 0,
+      recording_enabled: session.recordingEnabled,
+      chat_enabled: session.chatEnabled,
+      screen_share_enabled: session.screenShareEnabled,
+      participants: session.participants,
+    };
+  });
+
   return res.json({
-    results: sessions,
+    results: transformedSessions,
     count: total,
     next: skip + take < total ? parseInt(page) + 1 : null,
     previous: page > 1 ? parseInt(page) - 1 : null,
@@ -89,6 +155,30 @@ const getSession = asyncHandler(async (req, res) => {
   const session = await prisma.telehealthSession.findUnique({
     where: { id },
     include: {
+      patient: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      },
+      appointment: {
+        include: {
+          therapist: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      },
       participants: {
         include: {
           user: {
@@ -119,7 +209,48 @@ const getSession = asyncHandler(async (req, res) => {
     }
   }
 
-  return res.json(session);
+  // Transform session to match frontend expectations
+  const patientUser = session.patient?.user;
+  const therapist = session.appointment?.therapist;
+  
+  const transformedSession = {
+    id: session.id,
+    room_id: session.roomId,
+    session_url: session.sessionUrl,
+    status: session.status,
+    scheduled_at: session.appointment?.startTime || session.createdAt,
+    duration: session.scheduledDuration,
+    started_at: session.startedAt,
+    ended_at: session.endedAt,
+    platform: session.platform,
+    patient: session.patientId,
+    patient_details: patientUser ? {
+      id: patientUser.id,
+      first_name: patientUser.firstName,
+      last_name: patientUser.lastName,
+      email: patientUser.email,
+    } : null,
+    therapist: therapist?.id,
+    therapist_details: therapist ? {
+      id: therapist.id,
+      first_name: therapist.firstName,
+      last_name: therapist.lastName,
+      email: therapist.email,
+    } : null,
+    appointment_id: session.appointmentId,
+    title: session.appointment ? 'Telehealth Appointment' : 'Telehealth Session',
+    is_emergency: false,
+    has_recording: session.recordings && session.recordings.length > 0,
+    has_transcript: session.transcripts && session.transcripts.length > 0,
+    recording_enabled: session.recordingEnabled,
+    chat_enabled: session.chatEnabled,
+    screen_share_enabled: session.screenShareEnabled,
+    participants: session.participants,
+    recordings: session.recordings,
+    transcripts: session.transcripts,
+  };
+
+  return res.json(transformedSession);
 });
 
 // Create telehealth session
