@@ -437,8 +437,17 @@ const AdminPatientManagement: React.FC = () => {
       console.log('📤 Sending patient data to API:', patientData);
 
       const response = await apiService.post('/patients/', patientData);
-      
-      console.log('✅ Patient created successfully:', response.data);
+
+      // apiService.post swallows HTTP errors instead of throwing — detect them here
+      if (response.success === false) {
+        const errMsg =
+          response.message ||
+          (Array.isArray(response.errors) && response.errors[0]) ||
+          'Failed to create patient';
+        throw new Error(errMsg);
+      }
+
+      console.log('✅ Patient created successfully:', response);
 
       setSuccessMessage('Patient created successfully! Welcome email sent with login credentials.');
       setShowSuccess(true);
