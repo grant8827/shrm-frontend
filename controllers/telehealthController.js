@@ -659,26 +659,11 @@ const createEmergencySession = asyncHandler(async (req, res) => {
     },
   });
 
-  // Send email to patient with join link
-  try {
-    const emailService = require('../utils/emailService');
-    await emailService.sendEmergencySessionEmail({
-      email: patient.user.email,
-      firstName: patient.user.firstName,
-      lastName: patient.user.lastName,
-      sessionUrl,
-      roomId,
-    });
-  } catch (emailError) {
-    console.error('Error sending emergency session email:', emailError);
-    // Don't fail the request if email fails
-  }
-
   return res.status(201).json({
     session,
     session_url: sessionUrl,
     room_id: roomId,
-    message: 'Emergency session created and email sent to patient',
+    message: 'Emergency session created successfully',
   });
 });
 
