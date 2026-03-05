@@ -1,6 +1,7 @@
 const prisma = require('../utils/prisma');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { toSnakeAppointment } = require('../utils/transformers');
+const crypto = require('crypto');
 
 // Get all appointments (with filters)
 const getAppointments = asyncHandler(async (req, res) => {
@@ -101,6 +102,7 @@ const getAppointment = asyncHandler(async (req, res) => {
       },
       soapNote: true,
       relatedInvoices: true,
+      session: true, // Include telehealth session if exists
     },
   });
 
@@ -144,44 +146,79 @@ const createAppointment = asyncHandler(async (req, res) => {
     calculatedEndTime = new Date(start.getTime() + 60 * 60000);
   }
 
-  const appointment = await prisma.appointment.create({
-    data: {
-      patientId,
-      therapistId,
-      createdById: req.user.id,
-      startTime: new Date(startTime),
-      endTime: new Date(calculatedEndTime),
-      type: type || appointmentType || 'therapy_session',
-      status: status || 'scheduled',
-      notes,
-      telehealthLink,
-      location,
-    },
-    include: {
-      patient: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
+  // Determine appointment type
+  const finalAppointmentType = type || appointmentType || 'therapy_session';
+  const isTelehealth = finalAppointmentType === 'telehealth';
+
+  // Calculate duration in minutes
+  const durationMinutes = duration || Math.round((new Date(calculatedEndTime) - new Date(startTime)) / 60000);
+
+  // Create appointment and telehealth session in a transaction if needed
+  const result = await prisma.$transaction(async (tx) => {
+    // Create the appointment
+    const appointment = await tx.appointment.create({
+      data: {
+        patientId,
+        therapistId,
+        createdById: req.user.id,
+        startTime: new Date(startTime),
+        endTime: new Date(calculatedEndTime),
+        type: finalAppointmentType,
+        status: status || 'scheduled',
+        notes,
+        telehealthLink,
+        location,
+      },
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
         },
-      },
-      therapist: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
+        therapist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
         },
       },
-    },
+    });
+
+    // If it's a telehealth appointment, create a session
+    if (isTelehealth) {
+      const roomId = crypto.randomBytes(16).toString('hex');
+      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const sessionUrl = `${baseUrl}/telehealth/session/${roomId}`;
+
+      await tx.telehealthSession.create({
+        data: {
+          appointmentId: appointment.id,
+          patientId,
+          roomId,
+          sessionUrl,
+          status: 'scheduled',
+          scheduledDuration: durationMinutes,
+          platform: 'webrtc',
+          recordingEnabled: true,
+          chatEnabled: true,
+          screenShareEnabled: true,
+        },
+      });
+    }
+
+    return appointment;
   });
 
-  return res.status(201).json(toSnakeAppointment(appointment));
+  return res.status(201).json(toSnakeAppointment(result));
 });
 
 // Update appointment
@@ -220,34 +257,67 @@ const updateAppointment = asyncHandler(async (req, res) => {
   if (noShowReason !== undefined) updateData.noShowReason = noShowReason;
   if (cancelledBy !== undefined) updateData.cancelledBy = cancelledBy;
 
-  const appointment = await prisma.appointment.update({
-    where: { id },
-    data: updateData,
-    include: {
-      patient: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
+  // Check if the appointment is being changed to telehealth
+  const finalType = type || appointmentType;
+  const isChangingToTelehealth = finalType === 'telehealth';
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Update the appointment
+    const appointment = await tx.appointment.update({
+      where: { id },
+      data: updateData,
+      include: {
+        patient: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
         },
-      },
-      therapist: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
+        therapist: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
         },
+        session: true, // Include session to check if it exists
       },
-    },
+    });
+
+    // If the appointment is now telehealth and doesn't have a session, create one
+    if (isChangingToTelehealth && !appointment.session) {
+      const durationMinutes = duration || Math.round((appointment.endTime - appointment.startTime) / 60000);
+      const roomId = crypto.randomBytes(16).toString('hex');
+      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const sessionUrl = `${baseUrl}/telehealth/session/${roomId}`;
+
+      await tx.telehealthSession.create({
+        data: {
+          appointmentId: appointment.id,
+          patientId: appointment.patientId,
+          roomId,
+          sessionUrl,
+          status: 'scheduled',
+          scheduledDuration: durationMinutes,
+          platform: 'webrtc',
+          recordingEnabled: true,
+          chatEnabled: true,
+          screenShareEnabled: true,
+        },
+      });
+    }
+
+    return appointment;
   });
 
-  return res.json(toSnakeAppointment(appointment));
+  return res.json(toSnakeAppointment(result));
 });
 
 // Delete appointment
