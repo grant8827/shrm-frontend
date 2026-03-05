@@ -144,12 +144,12 @@ const createSignalingServer = (httpServer, allowedOrigins = []) => {
     // offer – WebRTC offer from initiator → sent to peers in room
     // ----------------------------------------------------------------
     socket.on('offer', ({ roomId: room, offer, targetUserId }) => {
-      console.log(`[Signaling] offer from ${displayName} in room ${room}`);
+      const dest = room || socket.roomId;
+      console.log(`[Signaling] offer from ${displayName} in room ${dest}`);
       if (targetUserId) {
-        // Direct to specific peer
         socket.to(targetUserId).emit('offer', { offer, fromUserId: userId, fromDisplayName: displayName });
-      } else {
-        socket.to(room).emit('offer', { offer, fromUserId: userId, fromDisplayName: displayName });
+      } else if (dest) {
+        socket.to(dest).emit('offer', { offer, fromUserId: userId, fromDisplayName: displayName });
       }
     });
 
@@ -157,11 +157,12 @@ const createSignalingServer = (httpServer, allowedOrigins = []) => {
     // answer – WebRTC answer from responder → back to initiator
     // ----------------------------------------------------------------
     socket.on('answer', ({ roomId: room, answer, targetUserId }) => {
-      console.log(`[Signaling] answer from ${displayName} in room ${room}`);
+      const dest = room || socket.roomId;
+      console.log(`[Signaling] answer from ${displayName} in room ${dest}`);
       if (targetUserId) {
         socket.to(targetUserId).emit('answer', { answer, fromUserId: userId });
-      } else {
-        socket.to(room).emit('answer', { answer, fromUserId: userId });
+      } else if (dest) {
+        socket.to(dest).emit('answer', { answer, fromUserId: userId });
       }
     });
 
@@ -169,15 +170,16 @@ const createSignalingServer = (httpServer, allowedOrigins = []) => {
     // ice-candidate – trickle ICE forwarding
     // ----------------------------------------------------------------
     socket.on('ice-candidate', async ({ roomId: room, candidate, targetUserId }) => {
-      // Buffer in Redis for the 10-second reconnection window (bonus requirement)
-      if (room && candidate) {
-        await telehealthSessionHelpers.bufferIceCandidate(room, userId, candidate);
+      const dest = room || socket.roomId;
+      // Buffer in Redis for the 10-second reconnection window
+      if (dest && candidate) {
+        await telehealthSessionHelpers.bufferIceCandidate(dest, userId, candidate);
       }
 
       if (targetUserId) {
         socket.to(targetUserId).emit('ice-candidate', { candidate, fromUserId: userId });
-      } else if (room) {
-        socket.to(room).emit('ice-candidate', { candidate, fromUserId: userId });
+      } else if (dest) {
+        socket.to(dest).emit('ice-candidate', { candidate, fromUserId: userId });
       }
     });
 
