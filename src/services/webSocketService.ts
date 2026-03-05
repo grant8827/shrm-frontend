@@ -1,4 +1,4 @@
-// WebSocket types are defined inline to avoid unused imports
+import { io, Socket } from 'socket.io-client';
 
 export interface WebSocketMessage {
   type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update' | 'transcription';
@@ -11,69 +11,81 @@ export interface WebSocketMessage {
 type EventCallback = (data: Record<string, unknown>) => void;
 
 class WebSocketService {
-  private ws: WebSocket | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private socket: Socket | null = null;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private listeners: Map<string, EventCallback[]> = new Map();
   private isConnected = false;
   private sessionId: string | null = null;
   private participantId: string | null = null;
 
   /**
-   * Connect to WebSocket server
+   * Connect to Socket.io signaling server
    */
-  connect(sessionId: string, participantId: string): Promise<void> {
+  connect(
+    sessionId: string,
+    participantId: string,
+    auth?: { token: string; displayName?: string; role?: string }
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.sessionId = sessionId;
         this.participantId = participantId;
 
-        const wsUrl = process.env.NODE_ENV === 'production'
-          ? `wss://${window.location.host}/ws/telehealth/${sessionId}/`
-          : `ws://localhost:8000/ws/telehealth/${sessionId}/`;
+        const apiBase = (import.meta as { env: Record<string, string> }).env.VITE_API_URL ?? '';
+        const backendUrl =
+          apiBase
+            ? apiBase.replace(/\/api\/?$/, '')
+            : window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : window.location.origin;
 
-        this.ws = new WebSocket(wsUrl);
+        this.socket = io(backendUrl, {
+          auth: {
+            userId: participantId,
+            token: auth?.token ?? '',
+            displayName: auth?.displayName ?? 'Participant',
+            role: auth?.role ?? 'client',
+          },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+        });
 
-        this.ws.onopen = () => {
-          console.log('WebSocket connected');
+        this.socket.on('connect', () => {
+          console.log('[Socket.io] Connected:', this.socket?.id);
           this.isConnected = true;
-          this.reconnectAttempts = 0;
-          
-          // Send join message
-          this.sendMessage({
-            type: 'join',
-            sessionId,
-            participantId,
-            data: { participantId },
-            timestamp: new Date(),
-          });
-
+          this._startHeartbeat();
           resolve();
-        };
+        });
 
-        this.ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data as string) as WebSocketMessage;
-            this.handleMessage(message);
-          } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
-          }
-        };
+        this.socket.on('connect_error', (err: Error) => {
+          console.error('[Socket.io] Connection error:', err);
+          reject(err);
+        });
 
-        this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason);
+        this.socket.on('disconnect', (reason: string) => {
+          console.log('[Socket.io] Disconnected:', reason);
           this.isConnected = false;
-          
-          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnect();
-          }
-        };
+          this._stopHeartbeat();
+          this._emit('disconnect', { reason });
+        });
 
-        this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          reject(error);
-        };
+        // Forward all signaling events to local listeners
+        const signalingEvents = [
+          'room-joined',
+          'participant-joined',
+          'participant-left',
+          'offer',
+          'answer',
+          'ice-candidate',
+          'buffered-candidates',
+        ];
+        signalingEvents.forEach((event) => {
+          this.socket!.on(event, (data: Record<string, unknown>) => {
+            this._emit(event, data);
+          });
+        });
 
       } catch (error) {
         reject(error);
@@ -82,43 +94,67 @@ class WebSocketService {
   }
 
   /**
-   * Disconnect from WebSocket
+   * Join a signaling room
+   */
+  joinRoom(roomId: string, sessionId?: string): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('join-room', {
+        roomId,
+        sessionId: sessionId ?? this.sessionId,
+      });
+    } else {
+      console.warn('[Socket.io] Cannot join room — not connected');
+    }
+  }
+
+  /**
+   * Disconnect from Socket.io
    */
   disconnect(): void {
-    if (this.ws && this.isConnected) {
-      // Send leave message before closing
-      if (this.sessionId && this.participantId) {
-        this.sendMessage({
-          type: 'leave',
-          sessionId: this.sessionId,
-          participantId: this.participantId,
-          timestamp: new Date(),
-        });
+    this._stopHeartbeat();
+    if (this.socket) {
+      if (this.sessionId) {
+        this.socket.emit('leave-room', { roomId: this.sessionId });
       }
-      
-      this.ws.close(1000, 'Client disconnect');
+      this.socket.disconnect();
+      this.socket = null;
     }
-    
     this.isConnected = false;
-    this.ws = null;
     this.sessionId = null;
     this.participantId = null;
   }
 
   /**
-   * Send message through WebSocket
+   * Route a WebSocketMessage to the appropriate Socket.io emit.
+   * Keeps backward-compat with consumers (e.g. useWebRTC hook) that call sendMessage().
    */
   sendMessage(message: WebSocketMessage): void {
-    if (this.ws && this.isConnected) {
-      this.ws.send(JSON.stringify(message));
-    } else {
-      console.error('WebSocket not connected');
+    if (!this.socket || !this.isConnected) {
+      console.warn('[Socket.io] Not connected, dropping message:', message.type);
+      return;
+    }
+    switch (message.type) {
+      case 'offer':
+        this.socket.emit('offer', message.data ?? {});
+        break;
+      case 'answer':
+        this.socket.emit('answer', message.data ?? {});
+        break;
+      case 'ice-candidate':
+        this.socket.emit('ice-candidate', message.data ?? {});
+        break;
+      case 'join':
+        this.joinRoom(message.sessionId);
+        break;
+      case 'leave':
+        this.socket.emit('leave-room', { roomId: message.sessionId });
+        break;
+      default:
+        console.log('[Socket.io] Unhandled message type:', message.type);
     }
   }
 
-  /**
-   * Add event listener
-   */
+  /** Add event listener */
   on(event: string, callback: EventCallback): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
@@ -126,9 +162,7 @@ class WebSocketService {
     this.listeners.get(event)!.push(callback);
   }
 
-  /**
-   * Remove event listener
-   */
+  /** Remove event listener */
   off(event: string, callback: EventCallback): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
@@ -139,205 +173,81 @@ class WebSocketService {
     }
   }
 
-  /**
-   * Send WebRTC offer
-   */
+  /** Send WebRTC offer via Socket.io */
   sendOffer(offer: RTCSessionDescriptionInit, targetParticipantId: string): void {
-    this.sendMessage({
-      type: 'offer',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      data: {
-        offer,
-        targetParticipantId,
-      },
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Send WebRTC answer
-   */
-  sendAnswer(answer: RTCSessionDescriptionInit, targetParticipantId: string): void {
-    this.sendMessage({
-      type: 'answer',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      data: {
-        answer,
-        targetParticipantId,
-      },
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Send ICE candidate
-   */
-  sendIceCandidate(candidate: RTCIceCandidateInit, targetParticipantId: string): void {
-    this.sendMessage({
-      type: 'ice-candidate',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      data: {
-        candidate,
-        targetParticipantId,
-      },
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Send chat message
-   */
-  sendChatMessage(content: string, isPrivate = false, recipientId?: string): void {
-    this.sendMessage({
-      type: 'chat',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      data: {
-        content,
-        isPrivate,
-        recipientId,
-      },
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Send recording start notification
-   */
-  sendRecordingStart(): void {
-    this.sendMessage({
-      type: 'recording-start',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Send recording stop notification
-   */
-  sendRecordingStop(): void {
-    this.sendMessage({
-      type: 'recording-stop',
-      sessionId: this.sessionId!,
-      participantId: this.participantId!,
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Handle incoming WebSocket messages
-   */
-  private handleMessage(message: WebSocketMessage): void {
-    console.log('Received WebSocket message:', message);
-
-    switch (message.type) {
-      case 'offer':
-        this.emit('offer', message.data ?? {});
-        break;
-
-      case 'answer':
-        this.emit('answer', message.data ?? {});
-        break;
-
-      case 'ice-candidate':
-        this.emit('ice-candidate', message.data ?? {});
-        break;
-
-      case 'join':
-        this.emit('participant-joined', message.data ?? {});
-        break;
-
-      case 'leave':
-        this.emit('participant-left', message.data ?? {});
-        break;
-
-      case 'chat':
-        this.emit('chat-message', message.data ?? {});
-        break;
-
-      case 'recording-start':
-        this.emit('recording-started', message.data ?? {});
-        break;
-
-      case 'recording-stop':
-        this.emit('recording-stopped', message.data ?? {});
-        break;
-
-      case 'participant-update':
-        this.emit('participant-updated', message.data ?? {});
-        break;
-
-      case 'transcription':
-        this.emit('transcription', message as any); // Pass the whole message
-        break;
-
-      default:
-        console.warn('Unknown message type:', message.type);
+    if (this.socket && this.isConnected) {
+      this.socket.emit('offer', { offer, to: targetParticipantId, from: this.participantId });
     }
   }
 
-  /**
-   * Emit event to listeners
-   */
-  private emit(event: string, data: Record<string, unknown>): void {
+  /** Send WebRTC answer via Socket.io */
+  sendAnswer(answer: RTCSessionDescriptionInit, targetParticipantId: string): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('answer', { answer, to: targetParticipantId, from: this.participantId });
+    }
+  }
+
+  /** Send ICE candidate via Socket.io */
+  sendIceCandidate(candidate: RTCIceCandidateInit, targetParticipantId: string): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('ice-candidate', { candidate, to: targetParticipantId, from: this.participantId });
+    }
+  }
+
+  /** Send chat message */
+  sendChatMessage(content: string, isPrivate = false, recipientId?: string): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('chat', { content, isPrivate, recipientId, from: this.participantId });
+    }
+  }
+
+  sendRecordingStart(): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('recording-start', { sessionId: this.sessionId });
+    }
+  }
+
+  sendRecordingStop(): void {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('recording-stop', { sessionId: this.sessionId });
+    }
+  }
+
+  private _startHeartbeat(): void {
+    this._stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socket && this.isConnected) {
+        this.socket.emit('heartbeat', { userId: this.participantId });
+      }
+    }, 60_000);
+  }
+
+  private _stopHeartbeat(): void {
+    if (this.heartbeatInterval !== null) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /** Internal: dispatch to local listeners */
+  private _emit(event: string, data: Record<string, unknown>): void {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
-      callbacks.forEach(callback => {
+      callbacks.forEach((cb) => {
         try {
-          callback(data);
-        } catch (error) {
-          console.error('Error in event callback:', error);
+          cb(data);
+        } catch (err) {
+          console.error('[Socket.io] Error in event callback:', err);
         }
       });
     }
   }
 
-  /**
-   * Reconnect to WebSocket
-   */
-  private reconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-
-    setTimeout(() => {
-      if (this.sessionId && this.participantId) {
-        this.connect(this.sessionId, this.participantId).catch((error) => {
-          console.error('Reconnection failed:', error);
-        });
-      }
-    }, delay);
-  }
-
-  /**
-   * Get connection status
-   */
   getConnectionStatus(): 'connected' | 'connecting' | 'disconnected' {
-    if (!this.ws) return 'disconnected';
-    
-    switch (this.ws.readyState) {
-      case WebSocket.CONNECTING:
-        return 'connecting';
-      case WebSocket.OPEN:
-        return 'connected';
-      default:
-        return 'disconnected';
-    }
+    if (!this.socket) return 'disconnected';
+    return this.socket.connected ? 'connected' : 'connecting';
   }
 
-  /**
-   * Check if connected
-   */
   isWebSocketConnected(): boolean {
     return this.isConnected;
   }

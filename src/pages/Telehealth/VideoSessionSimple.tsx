@@ -34,17 +34,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/apiClient';
 import { useTelehealthMedia } from '../../hooks/telehealth/useTelehealthMedia';
 import { useWebRTC } from '../../hooks/telehealth/useWebRTC';
-import { webSocketService } from '../../services/webSocketService';
+import { webSocketService, WebSocketMessage } from '../../services/webSocketService';
 import { SessionDetails } from '../../types';
-
-interface WebSocketMessage {
-  type: string;
-  user_id?: string;
-  user_name?: string;
-  offer?: RTCSessionDescriptionInit;
-  answer?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit;
-}
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -97,7 +88,7 @@ const VideoSession: React.FC = () => {
   } = useTelehealthMedia(showError);
 
   const sendMessage = useCallback((msg: WebSocketMessage) => {
-    webSocketService.sendMessage(msg as unknown as { type: string; [key: string]: unknown });
+    webSocketService.sendMessage(msg);
   }, []);
 
   const {
