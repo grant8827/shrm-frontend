@@ -423,6 +423,7 @@ model TelehealthSession {
   
   roomId            String            @unique
   sessionUrl        String
+  sessionToken      String?           @unique  // JWT/hex token for access control
   status            TelehealthStatus  @default(scheduled)
   
   startedAt         DateTime?

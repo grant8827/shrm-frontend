@@ -10,6 +10,8 @@ router.use(authenticate);
 router.get('/sessions', telehealthController.getSessions);
 router.post('/sessions', requireRole('admin', 'therapist', 'staff'), telehealthController.createSession);
 router.post('/sessions/create_emergency', requireRole('admin', 'therapist', 'staff'), telehealthController.createEmergencySession);
+// Lookup by appointmentId FK — must be BEFORE /:id wildcard
+router.get('/sessions/by-appointment/:appointmentId', telehealthController.getSessionByAppointmentId);
 router.get('/sessions/:id', telehealthController.getSession);
 router.patch('/sessions/:id', requireRole('admin', 'therapist', 'staff'), telehealthController.updateSession);
 router.put('/sessions/:id', requireRole('admin', 'therapist', 'staff'), telehealthController.updateSession);

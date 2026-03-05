@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { toSnakeAppointment } = require('../utils/transformers');
 const crypto = require('crypto');
+const { redisClient } = require('../utils/redis');
 
 // Get all appointments (with filters)
 const getAppointments = asyncHandler(async (req, res) => {
@@ -194,17 +195,20 @@ const createAppointment = asyncHandler(async (req, res) => {
     });
 
     // If it's a telehealth appointment, create a session
+    let createdSession = null;
     if (isTelehealth) {
       const roomId = crypto.randomBytes(16).toString('hex');
+      const sessionToken = crypto.randomBytes(32).toString('hex');
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const sessionUrl = `${baseUrl}/telehealth/session/${roomId}`;
 
-      await tx.telehealthSession.create({
+      createdSession = await tx.telehealthSession.create({
         data: {
           appointmentId: appointment.id,
           patientId,
           roomId,
           sessionUrl,
+          sessionToken,
           status: 'scheduled',
           scheduledDuration: durationMinutes,
           platform: 'webrtc',
@@ -215,10 +219,23 @@ const createAppointment = asyncHandler(async (req, res) => {
       });
     }
 
-    return appointment;
+    return { appointment, createdSession };
   });
 
-  return res.status(201).json(toSnakeAppointment(result));
+  // Cache sessionId in Redis keyed by appointmentId, TTL = appointment duration
+  if (result.createdSession) {
+    const ttlSeconds = durationMinutes * 60;
+    if (redisClient) {
+      await redisClient.set(
+        `telehealth:appt:${result.appointment.id}`,
+        result.createdSession.id,
+        'EX',
+        ttlSeconds
+      ).catch((err) => console.error('[Redis] Failed to cache session:', err));
+    }
+  }
+
+  return res.status(201).json(toSnakeAppointment(result.appointment));
 });
 
 // Update appointment
@@ -292,18 +309,21 @@ const updateAppointment = asyncHandler(async (req, res) => {
     });
 
     // If the appointment is now telehealth and doesn't have a session, create one
+    let newSession = null;
     if (isChangingToTelehealth && !appointment.session) {
       const durationMinutes = duration || Math.round((appointment.endTime - appointment.startTime) / 60000);
       const roomId = crypto.randomBytes(16).toString('hex');
+      const sessionToken = crypto.randomBytes(32).toString('hex');
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const sessionUrl = `${baseUrl}/telehealth/session/${roomId}`;
 
-      await tx.telehealthSession.create({
+      newSession = await tx.telehealthSession.create({
         data: {
           appointmentId: appointment.id,
           patientId: appointment.patientId,
           roomId,
           sessionUrl,
+          sessionToken,
           status: 'scheduled',
           scheduledDuration: durationMinutes,
           platform: 'webrtc',
@@ -314,10 +334,25 @@ const updateAppointment = asyncHandler(async (req, res) => {
       });
     }
 
-    return appointment;
+    return { appointment, newSession };
   });
 
-  return res.json(toSnakeAppointment(result));
+  // Cache newly created session in Redis
+  if (result.newSession) {
+    const appt = result.appointment;
+    const durationMinutes = Math.round((appt.endTime - appt.startTime) / 60000);
+    const ttlSeconds = durationMinutes * 60;
+    if (redisClient) {
+      await redisClient.set(
+        `telehealth:appt:${appt.id}`,
+        result.newSession.id,
+        'EX',
+        ttlSeconds
+      ).catch((err) => console.error('[Redis] Failed to cache session:', err));
+    }
+  }
+
+  return res.json(toSnakeAppointment(result.appointment));
 });
 
 // Delete appointment

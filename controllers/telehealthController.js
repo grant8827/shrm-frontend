@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { v4: uuidv4 } = require('uuid');
-const { presenceHelpers, telehealthSessionHelpers } = require('../utils/redis');
+const { presenceHelpers, telehealthSessionHelpers, redisClient } = require('../utils/redis');
 
 // Get telehealth sessions
 const getSessions = asyncHandler(async (req, res) => {
@@ -333,6 +333,25 @@ const startSession = asyncHandler(async (req, res) => {
     },
   });
 
+  // Sync active status to Redis with TTL matching scheduled duration
+  if (redisClient && session) {
+    const ttlSeconds = (session.scheduledDuration || 60) * 60;
+    await redisClient.set(
+      `telehealth:session:${id}:status`,
+      'active',
+      'EX',
+      ttlSeconds
+    ).catch((err) => console.error('[Redis] Failed to sync session status:', err));
+
+    // Also extend the appointment lookup TTL so it stays warm
+    if (session.appointmentId) {
+      await redisClient.expire(
+        `telehealth:appt:${session.appointmentId}`,
+        ttlSeconds
+      ).catch(() => {});
+    }
+  }
+
   return res.json(session);
 });
 
@@ -652,6 +671,86 @@ const createEmergencySession = asyncHandler(async (req, res) => {
   });
 });
 
+// GET /telehealth/sessions/by-appointment/:appointmentId
+// Look up a TelehealthSession by its appointmentId FK.
+// Tries Redis fast-path first, falls back to DB.
+const getSessionByAppointmentId = asyncHandler(async (req, res) => {
+  const { appointmentId } = req.params;
+  const userId = req.user.id;
+  const userRole = req.user.role;
+
+  // Redis fast-path
+  let sessionId = null;
+  if (redisClient) {
+    sessionId = await redisClient.get(`telehealth:appt:${appointmentId}`).catch(() => null);
+  }
+
+  let session;
+  if (sessionId) {
+    session = await prisma.telehealthSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        patient: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        appointment: { include: { therapist: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        participants: { include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } } },
+      },
+    });
+  } else {
+    session = await prisma.telehealthSession.findUnique({
+      where: { appointmentId },
+      include: {
+        patient: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        appointment: { include: { therapist: { select: { id: true, firstName: true, lastName: true, email: true } } } },
+        participants: { include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } } },
+      },
+    });
+  }
+
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found for this appointment' });
+  }
+
+  // Ownership check for clients
+  if (userRole === 'client') {
+    const patientUserId = session.patient?.user?.id;
+    if (patientUserId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+  }
+
+  const patientUser = session.patient?.user;
+  const therapist = session.appointment?.therapist;
+
+  return res.json({
+    id: session.id,
+    room_id: session.roomId,
+    session_url: session.sessionUrl,
+    session_token: session.sessionToken,
+    status: session.status,
+    scheduled_at: session.appointment?.startTime || session.createdAt,
+    duration: session.scheduledDuration,
+    started_at: session.startedAt,
+    ended_at: session.endedAt,
+    platform: session.platform,
+    patient: session.patientId,
+    patient_details: patientUser ? {
+      id: patientUser.id,
+      first_name: patientUser.firstName,
+      last_name: patientUser.lastName,
+      email: patientUser.email,
+    } : null,
+    therapist: therapist?.id,
+    therapist_details: therapist ? {
+      id: therapist.id,
+      first_name: therapist.firstName,
+      last_name: therapist.lastName,
+      email: therapist.email,
+    } : null,
+    appointment_id: session.appointmentId,
+    participants: session.participants,
+  });
+});
+
 // GET /telehealth/presence/:userId
 // Returns whether a given user is currently online (for Waiting Room UI)
 const getUserPresence = asyncHandler(async (req, res) => {
@@ -691,6 +790,7 @@ const getRoomMeta = asyncHandler(async (req, res) => {
 module.exports = {
   getSessions,
   getSession,
+  getSessionByAppointmentId,
   createSession,
   createEmergencySession,
   startSession,
