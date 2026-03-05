@@ -13,6 +13,7 @@ import {
   InputAdornment,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   onPasswordChanged,
   username,
 }) => {
+  const { updateUser } = useAuth();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -90,14 +92,15 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
       console.log('✅ Password changed successfully:', response.data);
       
       // Update user in localStorage to reflect mustChangePassword: false
-      if (response.data.user) {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-          const currentUser = JSON.parse(userStr) as Record<string, unknown>;
-          const updatedUser = { ...currentUser, must_change_password: false };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const currentUser = JSON.parse(userStr) as Record<string, unknown>;
+        const updatedUser = { ...currentUser, must_change_password: false };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
       }
+
+      // Update AuthContext in-memory state so must_change_password gate is cleared
+      updateUser({ must_change_password: false });
       
       // Clear form
       setCurrentPassword('');

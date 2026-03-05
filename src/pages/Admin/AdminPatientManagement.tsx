@@ -76,10 +76,6 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
-interface ResendEmailData {
-  email?: string;
-}
-
 type PatientUpdatePayload = {
   first_name: string;
   last_name: string;
@@ -273,12 +269,9 @@ const AdminPatientManagement: React.FC = () => {
   // Resend welcome email to patient
   const handleResendEmail = async (patientId: string) => {
     try {
-      const response = await apiService.post<ResendEmailData>(`/patients/${patientId}/resend_welcome_email/`);
-      
-      if (response.data?.email) {
-        setSuccessMessage(`Registration email sent successfully to ${response.data.email}`);
-        setShowSuccess(true);
-      }
+      const response = await apiService.post<{ message: string }>(`/patients/${patientId}/resend-welcome-email`);
+      setSuccessMessage(response.data?.message || 'Welcome email resent successfully.');
+      setShowSuccess(true);
     } catch (error: unknown) {
       console.error('❌ Error resending email:', error);
       setErrorMessage(getErrorMessage(error, 'Failed to send registration email. Please try again.'));
