@@ -118,10 +118,12 @@ const TelehealthDashboard: React.FC = () => {
     notes: '',
   });
 
-  // Mock data - replace with actual API calls
+  // Load on mount and poll every 30s so all parties see new sessions
   useEffect(() => {
     loadSessions();
     loadPatients();
+    const interval = setInterval(() => loadSessions(), 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadPatients = async () => {
