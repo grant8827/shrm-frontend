@@ -243,7 +243,7 @@ const BillingManagement: React.FC = () => {
       fetchBills();
       fetchSummary();
     } catch (error: any) {
-      showError(error.response?.data?.detail || 'Failed to save bill');
+      showError(error.response?.data?.error || error.response?.data?.detail || 'Failed to save bill');
       console.error('Error saving bill:', error);
     }
   };
@@ -257,7 +257,7 @@ const BillingManagement: React.FC = () => {
       fetchBills();
       fetchSummary();
     } catch (error: any) {
-      showError(error.response?.data?.detail || 'Failed to delete bill');
+      showError(error.response?.data?.error || error.response?.data?.detail || 'Failed to delete bill');
       console.error('Error deleting bill:', error);
     }
   };
@@ -290,7 +290,7 @@ const BillingManagement: React.FC = () => {
       fetchBills();
       fetchSummary();
     } catch (error: any) {
-      showError(error.response?.data?.detail || 'Failed to record payment');
+      showError(error.response?.data?.error || error.response?.data?.detail || 'Failed to record payment');
       console.error('Error recording payment:', error);
     }
   };
