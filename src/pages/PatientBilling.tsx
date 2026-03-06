@@ -74,7 +74,7 @@ const PatientBilling: React.FC = () => {
 
   const fetchBills = async () => {
     try {
-      const response = await apiClient.get('/api/billing/invoices');
+      const response = await apiClient.get('/billing/invoices');
       const list: any[] = response.data.results || response.data;
       setBills(list.map((inv: any) => {
         const isPaid = inv.status === 'paid';
@@ -109,7 +109,7 @@ const PatientBilling: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const response = await apiClient.get('/api/billing/summary');
+      const response = await apiClient.get('/billing/summary');
       const s = response.data;
       setSummary({
         total_billed: s.totalBilled ?? 0,
@@ -145,7 +145,7 @@ const PatientBilling: React.FC = () => {
       });
     }
     try {
-      await apiClient.post(`/api/billing/invoices/${bill.id}/payment`, {
+      await apiClient.post(`/billing/invoices/${bill.id}/payment`, {
         amount: parseFloat(bill.balance_remaining),
       });
       showSuccess('Payment recorded successfully');
