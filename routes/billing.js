@@ -6,14 +6,17 @@ const billingController = require('../controllers/billingController');
 // All routes require authentication
 router.use(authenticate);
 
+// Summary (before /:id routes to avoid capture)
+router.get('/summary', requireRole('admin', 'therapist', 'staff', 'client'), billingController.getBillingSummary);
+
 // Invoices
-router.get('/invoices', requireRole('admin', 'therapist', 'staff'), billingController.getInvoices);
+router.get('/invoices', requireRole('admin', 'therapist', 'staff', 'client'), billingController.getInvoices);
 router.post('/invoices', requireRole('admin', 'staff'), billingController.createInvoice);
 router.get('/invoices/:id', requireRole('admin', 'therapist', 'staff', 'client'), billingController.getInvoice);
 router.patch('/invoices/:id', requireRole('admin', 'staff'), billingController.updateInvoice);
 router.put('/invoices/:id', requireRole('admin', 'staff'), billingController.updateInvoice);
 router.delete('/invoices/:id', requireRole('admin'), billingController.deleteInvoice);
-router.post('/invoices/:id/payment', requireRole('admin', 'staff'), billingController.addPayment);
+router.post('/invoices/:id/payment', requireRole('admin', 'staff', 'client'), billingController.addPayment);
 
 // Claims
 router.get('/claims', requireRole('admin', 'staff'), billingController.getClaims);
