@@ -136,6 +136,8 @@ interface MessageFormData {
 interface ApiUser {
   id: string;
   full_name?: string;
+  first_name?: string;
+  last_name?: string;
   username?: string;
   role?: string;
   is_online?: boolean;
@@ -221,7 +223,11 @@ const toPriority = (value: unknown): Message['priority'] => {
 
 const mapApiUser = (user: ApiUser): { id: string; name: string; role: string; isOnline: boolean } => ({
   id: user.id,
-  name: user.full_name || user.username || 'Unknown User',
+  name:
+    user.full_name ||
+    [user.first_name, user.last_name].filter(Boolean).join(' ') ||
+    user.username ||
+    'Unknown User',
   role: user.role || 'client',
   isOnline: user.is_online || false,
 });
