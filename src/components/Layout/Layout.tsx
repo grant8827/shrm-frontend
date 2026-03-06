@@ -36,6 +36,7 @@ import {
   VideoCall,
   AttachMoney,
   Circle,
+  CalendarMonth,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -142,6 +143,7 @@ export const Layout: React.FC = () => {
         { text: 'Dashboard', icon: <Dashboard />, path: '/therapist' },
         { text: 'My Patients', icon: <People />, path: '/therapist/patients' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
+        { text: 'My Availability', icon: <CalendarMonth />, path: '/therapist/schedule' },
         { text: 'SOAP Notes', icon: <Settings />, path: '/therapist/soap-notes' },
         { text: 'Messages', icon: <Message />, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },
@@ -152,6 +154,7 @@ export const Layout: React.FC = () => {
         { text: 'Admin Dashboard', icon: <Dashboard />, path: '/admin' },
         { text: 'Patient Management', icon: <People />, path: '/admin/patients' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
+        { text: 'Schedule', icon: <CalendarMonth />, path: '/admin/schedule' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },
         { text: 'Messages', icon: <Message />, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },

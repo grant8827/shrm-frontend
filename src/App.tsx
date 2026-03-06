@@ -38,6 +38,8 @@ import VideoSession from './pages/Telehealth/VideoSessionSimple';
 import JoinSession from './pages/Telehealth/JoinSession';
 import WaitingRoom from './pages/Telehealth/WaitingRoom';
 import Reports from './pages/Reports/Reports';
+import AdminSchedulePage from './pages/Admin/AdminSchedulePage';
+import TherapistSchedulePage from './pages/Therapist/TherapistSchedulePage';
 
 // Components
 import { DashboardRedirect } from './components/DashboardRedirect';
@@ -58,6 +60,7 @@ function AdminRoutes() {
       <Route path="appointments" element={<AppointmentScheduling />} />
       <Route path="soap-notes" element={<SOAPNotes />} />
       <Route path="messages" element={<Messages />} />
+      <Route path="schedule" element={<AdminSchedulePage />} />
       <Route path="staff" element={<div>Staff Management</div>} />
       <Route path="reports" element={<Reports />} />
       <Route path="settings" element={<AdminSettings />} />
@@ -110,6 +113,7 @@ function App() {
                           <Route index element={<TherapistDashboard />} />
                           <Route path="patients" element={<PatientManagement />} />
                           <Route path="appointments" element={<AppointmentScheduling />} />
+                          <Route path="schedule" element={<TherapistSchedulePage />} />
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />
                           <Route path="telehealth" element={<Telehealth />} />
@@ -122,7 +126,7 @@ function App() {
                     }
                   />
 
-                  {/* Staff Routes (aliased to therapist routes) */}
+                  {/* Staff Routes (aliased to therapist routes) */
                   <Route
                     path="/staff/*"
                     element={
@@ -131,6 +135,7 @@ function App() {
                           <Route index element={<TherapistDashboard />} />
                           <Route path="patients" element={<PatientManagement />} />
                           <Route path="appointments" element={<AppointmentScheduling />} />
+                          <Route path="schedule" element={<TherapistSchedulePage />} />
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />
                           <Route path="telehealth" element={<Telehealth />} />
@@ -143,7 +148,7 @@ function App() {
                     }
                   />
 
-                  {/* Client Routes */}
+                  {/* Client Routes */
                   <Route
                     path="/client/*"
                     element={
