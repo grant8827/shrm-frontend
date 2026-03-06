@@ -57,6 +57,17 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../services/apiClient';
+import ScheduleGrid, { GridPatient } from '../../components/ScheduleGrid/ScheduleGrid';
+
+/** Return the Monday of the week that contains d */
+const getMondayOf = (d: Date): Date => {
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  mon.setHours(0, 0, 0, 0);
+  return mon;
+};
 
 const AdminDashboard: React.FC = () => {
   const { state } = useAuth();
@@ -109,6 +120,44 @@ const AdminDashboard: React.FC = () => {
     { id: 3, severity: 'error', message: '2 failed payment transactions require attention', action: 'View Payments' },
     { id: 4, severity: 'warning', message: 'System backup due in 2 days', action: 'Configure Backup' },
   ];
+
+  // ── Schedule state ────────────────────────────────────────────────────────
+  const [therapistList, setTherapistList] = useState<{ id: string; full_name: string }[]>([]);
+  const [selectedTherapistId, setSelectedTherapistId] = useState<string>('');
+  const [schedulePatients, setSchedulePatients] = useState<GridPatient[]>([]);
+  const [scheduleWeekStart] = useState<Date>(() => getMondayOf(new Date()));
+  const [loadingScheduleData, setLoadingScheduleData] = useState(false);
+  const [scheduleSnackbar, setScheduleSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+
+  useEffect(() => {
+    const loadScheduleData = async () => {
+      setLoadingScheduleData(true);
+      try {
+        const [therapistsRes, patientsRes] = await Promise.all([
+          apiClient.get('/schedule/therapists'),
+          apiClient.get('/patients/'),
+        ]);
+        const therapists = therapistsRes.data as { id: string; full_name: string }[];
+        setTherapistList(therapists);
+        if (therapists.length > 0 && !selectedTherapistId) {
+          setSelectedTherapistId(therapists[0].id);
+        }
+        const patients = (patientsRes.data?.results ?? patientsRes.data ?? []) as any[];
+        setSchedulePatients(
+          patients.map((p: any) => ({
+            id: p.id,
+            name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.username || 'Unknown',
+          }))
+        );
+      } catch (err) {
+        console.error('Failed to load schedule data:', err);
+      } finally {
+        setLoadingScheduleData(false);
+      }
+    };
+    loadScheduleData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load real users from API
   const [recentUsers, setRecentUsers] = useState<any[]>([]);
@@ -658,6 +707,76 @@ const AdminDashboard: React.FC = () => {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* ── Therapist Availability Scheduler ── */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+            <Typography variant="h6" component="h2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Schedule color="primary" />
+              Schedule Appointment
+            </Typography>
+
+            {/* Therapist selector */}
+            {loadingScheduleData ? (
+              <CircularProgress size={20} />
+            ) : therapistList.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No therapists found</Typography>
+            ) : (
+              <FormControl size="small" sx={{ minWidth: 220 }}>
+                <InputLabel id="sched-therapist-label">Select Therapist</InputLabel>
+                <Select
+                  labelId="sched-therapist-label"
+                  value={selectedTherapistId}
+                  label="Select Therapist"
+                  onChange={(e) => setSelectedTherapistId(e.target.value)}
+                >
+                  {therapistList.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>{t.full_name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Box>
+
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Blue slots are available for booking. Click a blue slot to open the booking form.
+            Green slots are already booked.
+          </Typography>
+
+          {selectedTherapistId ? (
+            <ScheduleGrid
+              therapistId={selectedTherapistId}
+              therapistName={therapistList.find((t) => t.id === selectedTherapistId)?.full_name}
+              weekStart={scheduleWeekStart}
+              mode="admin"
+              patients={schedulePatients}
+              onSlotBooked={(appt) => {
+                setScheduleSnackbar({
+                  open: true,
+                  message: `Appointment booked for ${(appt as any).patient_name} on ${new Date((appt as any).start_time).toLocaleString()}`,
+                  severity: 'success',
+                });
+              }}
+            />
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              {loadingScheduleData ? 'Loading therapists…' : 'Select a therapist above to view their availability.'}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+
+      <Snackbar
+        open={scheduleSnackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setScheduleSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={scheduleSnackbar.severity} onClose={() => setScheduleSnackbar((p) => ({ ...p, open: false }))}>
+          {scheduleSnackbar.message}
+        </Alert>
+      </Snackbar>
 
       {/* Add User Dialog */}
       <Dialog open={openDialog} onClose={() => !isLoading && setOpenDialog(false)} maxWidth="md" fullWidth>

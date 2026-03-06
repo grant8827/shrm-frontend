@@ -33,12 +33,24 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-// import { apiClient } from '../../services/apiClient';
+import ScheduleGrid from '../../components/ScheduleGrid/ScheduleGrid';
+
+/** Return the Monday of the week that contains the given date */
+const getMondayOf = (d: Date): Date => {
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diff);
+  mon.setHours(0, 0, 0, 0);
+  return mon;
+};
 
 const TherapistDashboard: React.FC = () => {
   const { state } = useAuth();
   const navigate = useNavigate();
-  
+
+  const [weekStart] = useState<Date>(() => getMondayOf(new Date()));
+
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
   const [recentMessages, setRecentMessages] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -330,6 +342,34 @@ const TherapistDashboard: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+
+      <Divider sx={{ my: 4 }} />
+
+      {/* ── My Weekly Availability ── */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Schedule color="primary" />
+          My Weekly Availability
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Click a white slot to mark yourself <strong>available</strong> (blue). Click a blue slot to mark it <strong>unavailable</strong> again.
+          Office staff will then be able to book patient appointments into your available slots.
+        </Typography>
+
+        {state.user?.id ? (
+          <ScheduleGrid
+            therapistId={state.user.id}
+            therapistName={(() => {
+              const u = state.user as Record<string, string | undefined>;
+              return [u?.firstName || u?.first_name || '', u?.lastName || u?.last_name || ''].join(' ').trim();
+            })()}
+            weekStart={weekStart}
+            mode="therapist"
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">Loading…</Typography>
+        )}
+      </Box>
 
       <Divider sx={{ my: 4 }} />
 
