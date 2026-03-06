@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const { testEmailConnection } = require('./utils/emailService');
 const { redisClient } = require('./utils/redis');
 const { createSignalingServer } = require('./utils/signalingServer');
+const { createChatNamespace } = require('./utils/chatServer');
 
 dotenv.config();
 
@@ -110,6 +111,9 @@ const allowedOriginsForSignaling = [
 ].filter(Boolean);
 
 const io = createSignalingServer(httpServer, allowedOriginsForSignaling);
+
+// Attach chat namespace (/chat) sharing the same io + Redis adapter
+createChatNamespace(io);
 
 // Make io accessible to controllers if needed
 app.set('io', io);

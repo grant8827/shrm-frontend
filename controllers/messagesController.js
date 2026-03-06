@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { chatHelpers } = require('../utils/redis');
 
 // Get message threads for a user
 const getThreads = asyncHandler(async (req, res) => {
@@ -114,19 +115,36 @@ const getThread = asyncHandler(async (req, res) => {
 
 // Create message thread
 const createThread = asyncHandler(async (req, res) => {
-  const {  participantIds, subject } = req.body;
+  const { participantIds, subject } = req.body;
   const userId = req.user.id;
 
-  // Note: Participants are currently derived from messages (sender/reader)
-  // To fully implement participant management, add MessageThreadParticipant table
+  if (!subject?.trim()) {
+    return res.status(400).json({ error: 'subject is required' });
+  }
 
-  const thread = await prisma.messageThread.create({
-    data: {
-      subject,
-    },
-    include: {
-      messages: true,
-    },
+  // Deduplicate: always include creator
+  const allIds = Array.from(new Set([userId, ...(Array.isArray(participantIds) ? participantIds : [])]));
+
+  const thread = await prisma.$transaction(async (tx) => {
+    const t = await tx.messageThread.create({
+      data: { subject: subject.trim() },
+    });
+
+    await tx.messageThreadParticipant.createMany({
+      data: allIds.map((uid) => ({ threadId: t.id, userId: uid })),
+      skipDuplicates: true,
+    });
+
+    return tx.messageThread.findUnique({
+      where: { id: t.id },
+      include: {
+        participants: {
+          include: {
+            user: { select: { id: true, firstName: true, lastName: true, role: true } },
+          },
+        },
+      },
+    });
   });
 
   return res.status(201).json(thread);
@@ -231,11 +249,48 @@ const sendMessage = asyncHandler(async (req, res) => {
     },
   });
 
-  // Update thread's updatedAt
+  // Update thread's lastActivity
   await prisma.messageThread.update({
     where: { id: threadId },
-    data: { updatedAt: new Date() },
+    data: { lastActivity: new Date() },
   });
+
+  // Push to Redis history buffer
+  const senderName = `${req.user.firstName} ${req.user.lastName}`.trim();
+  const payload = {
+    id: message.id,
+    threadId,
+    senderId: userId,
+    senderName,
+    senderRole: req.user.role,
+    content: message.content,
+    priority: message.priority,
+    timestamp: message.createdAt.toISOString(),
+    isRead: false,
+    isEncrypted: message.isEncrypted,
+    deliveryStatus: 'sent',
+    attachments: [],
+  };
+  await chatHelpers.pushMessage(threadId, payload);
+
+  // Increment unread for other participants
+  const threadData = await prisma.messageThread.findUnique({
+    where: { id: threadId },
+    include: { participants: { select: { userId: true } } },
+  });
+  if (threadData) {
+    await Promise.all(
+      threadData.participants
+        .filter((p) => p.userId !== userId)
+        .map((p) => chatHelpers.incrUnread(p.userId, userId)),
+    );
+  }
+
+  // Emit via chat namespace if Socket.io is available (real-time push)
+  const io = req.app?.get('io');
+  if (io) {
+    io.of('/chat').to(`thread:${threadId}`).emit('message:receive', payload);
+  }
 
   return res.status(201).json(message);
 });

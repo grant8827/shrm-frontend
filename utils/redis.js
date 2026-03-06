@@ -404,6 +404,78 @@ const telehealthSessionHelpers = {
   },
 };
 
+// ─── Chat helpers ───────────────────────────────────────────────────────────
+// Redis data schema:
+//   history:room:{threadId}          LIST  – last 50 messages (LPUSH/LTRIM)
+//   unread:user:{uid}:from:{sender}  STRING – unread counter (INCR)
+const chatHelpers = {
+  /**
+   * Push a message to the Redis history buffer for a thread.
+   * Keeps only the last 50 messages and sets a 24-hour TTL.
+   */
+  pushMessage: async (threadId, msgObj) => {
+    try {
+      const key = `history:room:${threadId}`;
+      await redisClient.lpush(key, JSON.stringify(msgObj));
+      await redisClient.ltrim(key, 0, 49);
+      await redisClient.expire(key, 86400);
+    } catch (err) {
+      console.error('chatHelpers.pushMessage error:', err.message);
+    }
+  },
+
+  /**
+   * Retrieve message history for a thread (oldest first).
+   */
+  getHistory: async (threadId) => {
+    try {
+      const key = `history:room:${threadId}`;
+      const items = await redisClient.lrange(key, 0, 49);
+      // LPUSH prepends newest, so reverse to return oldest-first
+      return items.map((item) => JSON.parse(item)).reverse();
+    } catch (err) {
+      console.error('chatHelpers.getHistory error:', err.message);
+      return [];
+    }
+  },
+
+  /**
+   * Increment the unread counter for a recipient from a specific sender.
+   */
+  incrUnread: async (toUserId, fromUserId) => {
+    try {
+      const key = `unread:user:${toUserId}:from:${fromUserId}`;
+      await redisClient.incr(key);
+      await redisClient.expire(key, 7 * 86400);
+    } catch (err) {
+      console.error('chatHelpers.incrUnread error:', err.message);
+    }
+  },
+
+  /**
+   * Clear unread counter for a user from a specific sender.
+   */
+  clearUnread: async (userId, fromUserId) => {
+    try {
+      await redisClient.del(`unread:user:${userId}:from:${fromUserId}`);
+    } catch (err) {
+      console.error('chatHelpers.clearUnread error:', err.message);
+    }
+  },
+
+  /**
+   * Get unread count for a user from a specific sender.
+   */
+  getUnreadCount: async (userId, fromUserId) => {
+    try {
+      const val = await redisClient.get(`unread:user:${userId}:from:${fromUserId}`);
+      return val ? parseInt(val, 10) : 0;
+    } catch (err) {
+      return 0;
+    }
+  },
+};
+
 module.exports = {
   redisClient,
   sessionHelpers,
@@ -412,4 +484,5 @@ module.exports = {
   rateLimitHelpers,
   presenceHelpers,
   telehealthSessionHelpers,
+  chatHelpers,
 };
