@@ -28,8 +28,8 @@ import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface Bill {
-  id: number;
-  patient: number;
+  id: string;
+  patient: string;
   patient_name: string;
   title: string;
   description: string;
@@ -38,7 +38,7 @@ interface Bill {
   balance_remaining: string;
   status: string;
   issue_date: string;
-  due_date: string;
+  due_date: string | null;
   paid_date: string | null;
   payment_method: string;
   transaction_id: string;
@@ -154,7 +154,7 @@ const PatientBilling: React.FC = () => {
     } catch (error: any) {
       setBills(prevBills);
       setSummary(prevSummary);
-      showError(error.response?.data?.detail || 'Failed to record payment');
+      showError(error.response?.data?.error || error.response?.data?.detail || 'Failed to record payment');
     }
   };
 
@@ -177,8 +177,10 @@ const PatientBilling: React.FC = () => {
     return `$${parseFloat(amount.toString()).toFixed(2)}`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
   };
 
   return (

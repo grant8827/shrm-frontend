@@ -38,8 +38,8 @@ import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface Bill {
-  id: number;
-  patient: number;
+  id: string;
+  patient: string;
   patient_name: string;
   title: string;
   description: string;
@@ -48,7 +48,7 @@ interface Bill {
   balance_remaining: string;
   status: string;
   issue_date: string;
-  due_date: string;
+  due_date: string | null;
   paid_date: string | null;
   payment_method: string;
   transaction_id: string;
@@ -70,7 +70,6 @@ interface Patient {
 
 interface BillingFormData {
   patient: string;
-  title: string;
   description: string;
   amount: string;
   issue_date: string;
@@ -98,7 +97,6 @@ const BillingManagement: React.FC = () => {
   
   const [formData, setFormData] = useState<BillingFormData>({
     patient: '',
-    title: '',
     description: '',
     amount: '',
     issue_date: new Date().toISOString().split('T')[0],
@@ -193,18 +191,16 @@ const BillingManagement: React.FC = () => {
       setSelectedBill(bill);
       setFormData({
         patient: bill.patient.toString(),
-        title: bill.title,
         description: bill.description,
         amount: bill.amount,
         issue_date: bill.issue_date,
-        due_date: bill.due_date,
+        due_date: bill.due_date || '',
       });
     } else {
       setEditMode(false);
       setSelectedBill(null);
       setFormData({
         patient: '',
-        title: '',
         description: '',
         amount: '',
         issue_date: new Date().toISOString().split('T')[0],
@@ -248,7 +244,7 @@ const BillingManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (billId: number) => {
+  const handleDelete = async (billId: string) => {
     if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
     try {
@@ -314,8 +310,10 @@ const BillingManagement: React.FC = () => {
     return `$${parseFloat(amount.toString()).toFixed(2)}`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
+    const d = new Date(dateString);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
   };
 
   return (
@@ -510,17 +508,7 @@ const BillingManagement: React.FC = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                />
-              </Grid>
-
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
+                  label="Description / Notes"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   multiline
@@ -573,7 +561,7 @@ const BillingManagement: React.FC = () => {
           <Button
             onClick={handleSubmit}
             variant="contained"
-            disabled={!formData.patient || !formData.title || !formData.amount || !formData.due_date}
+            disabled={!formData.patient || !formData.amount || !formData.due_date}
           >
             {editMode ? 'Update' : 'Create'}
           </Button>
