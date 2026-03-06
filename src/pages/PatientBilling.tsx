@@ -60,7 +60,7 @@ interface BillingSummary {
 }
 
 const PatientBilling: React.FC = () => {
-  const { showError } = useNotification();
+  const { showError, showSuccess } = useNotification();
   
   const [bills, setBills] = useState<Bill[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
@@ -74,8 +74,33 @@ const PatientBilling: React.FC = () => {
 
   const fetchBills = async () => {
     try {
-      const response = await apiClient.get('/billing/bills/');
-      setBills(response.data.results || response.data);
+      const response = await apiClient.get('/billing/invoices');
+      const list: any[] = response.data.results || response.data;
+      setBills(list.map((inv: any) => {
+        const isPaid = inv.status === 'paid';
+        const isOverdue = !isPaid && inv.dueDate && new Date(inv.dueDate) < new Date();
+        return {
+          id: inv.id,
+          patient: inv.patientId,
+          patient_name: inv.patient?.user
+            ? `${inv.patient.user.firstName || ''} ${inv.patient.user.lastName || ''}`.trim()
+            : 'Unknown Patient',
+          title: inv.invoiceNumber || `INV-${String(inv.id).slice(0, 8)}`,
+          description: inv.notes || '',
+          amount: String(inv.total ?? 0),
+          amount_paid: isPaid ? String(inv.total ?? 0) : '0',
+          balance_remaining: isPaid ? '0' : String(inv.total ?? 0),
+          status: isOverdue ? 'overdue' : (inv.status === 'draft' ? 'pending' : inv.status),
+          issue_date: inv.date,
+          due_date: inv.dueDate,
+          paid_date: inv.paymentDate || null,
+          payment_method: inv.paymentMethod || '',
+          transaction_id: '',
+          is_paid: isPaid,
+          is_overdue: Boolean(isOverdue),
+          created_at: inv.createdAt,
+        };
+      }));
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
@@ -84,10 +109,52 @@ const PatientBilling: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const response = await apiClient.get('/billing/bills/summary/');
-      setSummary(response.data);
+      const response = await apiClient.get('/billing/summary');
+      const s = response.data;
+      setSummary({
+        total_billed: s.totalBilled ?? 0,
+        total_paid: s.totalPaid ?? 0,
+        total_outstanding: s.totalOutstanding ?? 0,
+        total_pending: s.totalOutstanding ?? 0,
+        total_overdue: s.totalOverdue ?? 0,
+        bill_count: s.invoiceCount ?? 0,
+        paid_count: s.paidCount ?? 0,
+        pending_count: s.pendingCount ?? 0,
+        overdue_count: s.overdueCount ?? 0,
+      });
     } catch (error) {
       console.error('Error fetching summary:', error);
+    }
+  };
+
+  const handlePayNow = async (bill: Bill) => {
+    const prevBills = bills;
+    const prevSummary = summary;
+    // Optimistic update
+    setBills(prev => prev.map(b => b.id === bill.id
+      ? { ...b, status: 'paid', is_paid: true, amount_paid: b.amount, balance_remaining: '0', paid_date: new Date().toISOString() }
+      : b
+    ));
+    if (summary) {
+      setSummary({
+        ...summary,
+        total_paid: summary.total_paid + parseFloat(bill.balance_remaining),
+        total_outstanding: Math.max(0, summary.total_outstanding - parseFloat(bill.balance_remaining)),
+        paid_count: summary.paid_count + 1,
+        pending_count: Math.max(0, summary.pending_count - 1),
+      });
+    }
+    try {
+      await apiClient.post(`/billing/invoices/${bill.id}/payment`, {
+        amount: parseFloat(bill.balance_remaining),
+      });
+      showSuccess('Payment recorded successfully');
+      fetchBills();
+      fetchSummary();
+    } catch (error: any) {
+      setBills(prevBills);
+      setSummary(prevSummary);
+      showError(error.response?.data?.detail || 'Failed to record payment');
     }
   };
 
@@ -260,9 +327,20 @@ const PatientBilling: React.FC = () => {
                             setSelectedBill(bill);
                             setShowDetails(true);
                           }}
+                          title="View Details"
                         >
                           <ReceiptIcon />
                         </IconButton>
+                        {!bill.is_paid && bill.status !== 'cancelled' && (
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handlePayNow(bill)}
+                            title="Pay Now"
+                          >
+                            <PaymentIcon />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

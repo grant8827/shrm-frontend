@@ -94,6 +94,7 @@ const BillingManagement: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
+  const [summary, setSummary] = useState<{ totalRevenue: number; totalOutstanding: number; totalOverdue: number; invoiceCount: number } | null>(null);
   
   const [formData, setFormData] = useState<BillingFormData>({
     patient: '',
@@ -113,12 +114,38 @@ const BillingManagement: React.FC = () => {
   useEffect(() => {
     fetchBills();
     fetchPatients();
+    fetchSummary();
   }, []);
 
   const fetchBills = async () => {
     try {
-      const response = await apiClient.get('/billing/bills/');
-      setBills(response.data.results || response.data);
+      const response = await apiClient.get('/billing/invoices');
+      const list: any[] = response.data.results || response.data;
+      setBills(list.map((inv: any) => {
+        const isPaid = inv.status === 'paid';
+        const isOverdue = !isPaid && inv.dueDate && new Date(inv.dueDate) < new Date();
+        return {
+          id: inv.id,
+          patient: inv.patientId,
+          patient_name: inv.patient?.user
+            ? `${inv.patient.user.firstName || ''} ${inv.patient.user.lastName || ''}`.trim()
+            : 'Unknown Patient',
+          title: inv.invoiceNumber || `INV-${String(inv.id).slice(0, 8)}`,
+          description: inv.notes || '',
+          amount: String(inv.total ?? 0),
+          amount_paid: isPaid ? String(inv.total ?? 0) : '0',
+          balance_remaining: isPaid ? '0' : String(inv.total ?? 0),
+          status: isOverdue ? 'overdue' : (inv.status === 'draft' ? 'pending' : inv.status),
+          issue_date: inv.date,
+          due_date: inv.dueDate,
+          paid_date: inv.paymentDate || null,
+          payment_method: inv.paymentMethod || '',
+          transaction_id: '',
+          is_paid: isPaid,
+          is_overdue: Boolean(isOverdue),
+          created_at: inv.createdAt,
+        };
+      }));
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
@@ -127,30 +154,36 @@ const BillingManagement: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      console.log('Fetching users from /auth/ endpoint...');
-      const response = await apiClient.get('/auth/');
-      console.log('Users API response:', response);
-      console.log('Response data:', response.data);
-      
-      const userList = response.data.results || response.data;
-      console.log('User list (before filtering):', userList);
-      console.log('Is array?', Array.isArray(userList));
-      
-      // Filter only active client users
-      const activeClients = Array.isArray(userList) 
-        ? userList.filter((u: Patient) => {
-            console.log(`Checking user ${u.username}: role=${u.role}, is_active=${u.is_active}`);
-            return u.role === 'client' && u.is_active === true;
-          })
-        : [];
-      
-      console.log('Active client users (after filtering):', activeClients);
-      console.log('Number of active clients:', activeClients.length);
-      setPatients(activeClients);
+      const response = await apiClient.get('/patients/');
+      const list: any[] = response.data.results || response.data;
+      setPatients(list.map((p: any) => ({
+        id: p.id,
+        username: p.id,
+        email: p.email || '',
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        full_name: `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        role: 'client',
+        is_active: true,
+      })));
     } catch (error: any) {
-      console.error('Error fetching client users:', error);
-      console.error('Error details:', error.response?.data);
       showError('Failed to load patients: ' + (error.response?.data?.detail || error.message));
+      console.error('Error fetching patients:', error);
+    }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const response = await apiClient.get('/billing/summary');
+      const s = response.data;
+      setSummary({
+        totalRevenue: s.totalPaid ?? 0,
+        totalOutstanding: s.totalOutstanding ?? 0,
+        totalOverdue: s.totalOverdue ?? 0,
+        invoiceCount: s.invoiceCount ?? 0,
+      });
+    } catch (error) {
+      console.error('Error fetching billing summary:', error);
     }
   };
 
@@ -189,15 +222,26 @@ const BillingManagement: React.FC = () => {
 
   const handleSubmit = async () => {
     try {
+      const payload = {
+        patientId: formData.patient,
+        total: parseFloat(formData.amount) || 0,
+        subtotal: parseFloat(formData.amount) || 0,
+        tax: 0,
+        date: formData.issue_date,
+        dueDate: formData.due_date,
+        notes: formData.description || undefined,
+        status: 'pending',
+      };
       if (editMode && selectedBill) {
-        await apiClient.patch(`/billing/bills/${selectedBill.id}/`, formData);
+        await apiClient.patch(`/billing/invoices/${selectedBill.id}`, payload);
         showSuccess('Bill updated successfully');
       } else {
-        await apiClient.post('/billing/bills/', formData);
+        await apiClient.post('/billing/invoices', payload);
         showSuccess('Bill created successfully');
       }
       handleCloseDialog();
       fetchBills();
+      fetchSummary();
     } catch (error: any) {
       showError(error.response?.data?.detail || 'Failed to save bill');
       console.error('Error saving bill:', error);
@@ -208,9 +252,10 @@ const BillingManagement: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
     try {
-      await apiClient.delete(`/billing/bills/${billId}/`);
+      await apiClient.delete(`/billing/invoices/${billId}`);
       showSuccess('Bill deleted successfully');
       fetchBills();
+      fetchSummary();
     } catch (error: any) {
       showError(error.response?.data?.detail || 'Failed to delete bill');
       console.error('Error deleting bill:', error);
@@ -236,10 +281,14 @@ const BillingManagement: React.FC = () => {
     if (!selectedBill) return;
 
     try {
-      await apiClient.post(`/billing/bills/${selectedBill.id}/add_payment/`, paymentData);
+      await apiClient.post(`/billing/invoices/${selectedBill.id}/payment`, {
+        amount: parseFloat(paymentData.amount) || 0,
+        paymentMethod: paymentData.payment_method || undefined,
+      });
       showSuccess('Payment recorded successfully');
       handleClosePaymentDialog();
       fetchBills();
+      fetchSummary();
     } catch (error: any) {
       showError(error.response?.data?.detail || 'Failed to record payment');
       console.error('Error recording payment:', error);
@@ -282,6 +331,15 @@ const BillingManagement: React.FC = () => {
           Create Bill
         </Button>
       </Box>
+
+      {summary && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+          <Card><CardContent><Typography variant="subtitle2" color="text.secondary">Total Revenue</Typography><Typography variant="h6">${summary.totalRevenue.toFixed(2)}</Typography></CardContent></Card>
+          <Card><CardContent><Typography variant="subtitle2" color="text.secondary">Outstanding</Typography><Typography variant="h6" color="warning.main">${summary.totalOutstanding.toFixed(2)}</Typography></CardContent></Card>
+          <Card><CardContent><Typography variant="subtitle2" color="text.secondary">Overdue</Typography><Typography variant="h6" color="error.main">${summary.totalOverdue.toFixed(2)}</Typography></CardContent></Card>
+          <Card><CardContent><Typography variant="subtitle2" color="text.secondary">Total Invoices</Typography><Typography variant="h6">{summary.invoiceCount}</Typography></CardContent></Card>
+        </Box>
+      )}
 
       {isMobile ? (
         <Box sx={{ display: 'grid', gap: 1.5 }}>
