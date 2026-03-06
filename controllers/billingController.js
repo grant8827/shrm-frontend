@@ -186,6 +186,9 @@ const createInvoice = asyncHandler(async (req, res) => {
     });
   }
 
+  const VALID_STATUSES = ['draft', 'pending', 'sent', 'paid', 'partial', 'overdue', 'cancelled'];
+  const safeStatus = status && VALID_STATUSES.includes(status) ? status : 'pending';
+
   const invoice = await prisma.invoice.create({
     data: {
       patientId,
@@ -197,7 +200,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       subtotal: subtotal ? parseFloat(subtotal) : 0,
       tax: tax ? parseFloat(tax) : 0,
       total: parseFloat(total),
-      status: status || 'draft',
+      status: safeStatus,
       notes,
       items: items ? {
         create: items.map((item) => ({

@@ -35,8 +35,10 @@ enum AppointmentStatus {
 
 enum InvoiceStatus {
   draft
+  pending
   sent
   paid
+  partial
   overdue
   cancelled
 }
