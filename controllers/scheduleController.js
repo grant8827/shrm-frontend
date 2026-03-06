@@ -244,18 +244,21 @@ const getTherapists = asyncHandler(async (req, res) => {
   const therapists = await prisma.user.findMany({
     where: {
       role: 'therapist',
-      isActive: { not: false },  // includes true AND null
+      isActive: { not: false },
     },
-    select: { id: true, firstName: true, lastName: true, email: true },
+    select: { id: true, firstName: true, lastName: true, username: true, email: true },
     orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
   });
 
   return res.json(
-    therapists.map((t) => ({
-      id: t.id,
-      full_name: `${t.firstName} ${t.lastName}`.trim() || t.email,
-      email: t.email,
-    }))
+    therapists.map((t) => {
+      const name = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim();
+      return {
+        id: t.id,
+        full_name: name || t.username || t.email,
+        email: t.email,
+      };
+    })
   );
 });
 
