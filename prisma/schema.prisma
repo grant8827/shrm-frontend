@@ -246,12 +246,12 @@ model Invoice {
   patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   appointmentId   String?       @unique
   appointment     Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
-  createdById     String
-  createdBy       User          @relation("creator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById     String?
+  createdBy       User?         @relation("creator", fields: [createdById], references: [id], onDelete: SetNull)
   
   invoiceNumber   String        @unique
   date            DateTime
-  dueDate         DateTime
+  dueDate         DateTime?
   subtotal        Float
   tax             Float
   total           Float

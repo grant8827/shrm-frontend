@@ -193,7 +193,7 @@ const createInvoice = asyncHandler(async (req, res) => {
       createdById: req.user.id,
       invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
       date: date ? new Date(date) : (invoiceDate ? new Date(invoiceDate) : new Date()),
-      dueDate: dueDate ? new Date(dueDate) : null,
+      dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       subtotal: subtotal ? parseFloat(subtotal) : 0,
       tax: tax ? parseFloat(tax) : 0,
       total: parseFloat(total),
