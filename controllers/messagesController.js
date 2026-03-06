@@ -88,19 +88,21 @@ const getThread = asyncHandler(async (req, res) => {
     where: {
       id,
       participants: {
-        some: {
-          id: userId,
-        },
+        some: { userId },
       },
     },
     include: {
       participants: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          email: true,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              email: true,
+            },
+          },
         },
       },
     },
@@ -163,11 +165,7 @@ const getMessages = asyncHandler(async (req, res) => {
   const thread = await prisma.messageThread.findFirst({
     where: {
       id: threadId,
-      participants: {
-        some: {
-          id: userId,
-        },
-      },
+      participants: { some: { userId } },
     },
   });
 
@@ -206,22 +204,64 @@ const getMessages = asyncHandler(async (req, res) => {
 
 // Send message
 const sendMessage = asyncHandler(async (req, res) => {
-  const { threadId, content, priority, isEncrypted } = req.body;
+  const { threadId, content, priority, isEncrypted, recipient_ids, subject } = req.body;
   const userId = req.user.id;
 
-  if (!threadId || !content) {
-    return res.status(400).json({ error: 'threadId and content are required' });
+  if (!content) {
+    return res.status(400).json({ error: 'content is required' });
   }
 
-  // Verify user is participant
+  let resolvedThreadId = threadId;
+
+  // ── Find-or-create thread when caller supplies recipient_ids instead of threadId ──
+  if (!resolvedThreadId) {
+    if (!recipient_ids || !Array.isArray(recipient_ids) || recipient_ids.length === 0) {
+      return res.status(400).json({ error: 'threadId or recipient_ids is required' });
+    }
+
+    const allParticipantIds = Array.from(new Set([userId, ...recipient_ids]));
+
+    // For 1-to-1 conversations, look for an existing thread between exactly these two users
+    if (allParticipantIds.length === 2) {
+      const existing = await prisma.messageThread.findFirst({
+        where: {
+          AND: allParticipantIds.map((uid) => ({
+            participants: { some: { userId: uid } },
+          })),
+        },
+        include: {
+          participants: { select: { userId: true } },
+        },
+        orderBy: { lastActivity: 'desc' },
+      });
+
+      // Only reuse if the thread has exactly these two participants
+      if (existing && existing.participants.length === 2) {
+        resolvedThreadId = existing.id;
+      }
+    }
+
+    // Create a new thread if none found
+    if (!resolvedThreadId) {
+      const newThread = await prisma.$transaction(async (tx) => {
+        const t = await tx.messageThread.create({
+          data: { subject: subject || 'New Message' },
+        });
+        await tx.messageThreadParticipant.createMany({
+          data: allParticipantIds.map((uid) => ({ threadId: t.id, userId: uid })),
+          skipDuplicates: true,
+        });
+        return t;
+      });
+      resolvedThreadId = newThread.id;
+    }
+  }
+
+  // ── Verify requesting user is a participant ──
   const thread = await prisma.messageThread.findFirst({
     where: {
-      id: threadId,
-      participants: {
-        some: {
-          id: userId,
-        },
-      },
+      id: resolvedThreadId,
+      participants: { some: { userId } },
     },
   });
 
@@ -231,7 +271,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   const message = await prisma.message.create({
     data: {
-      threadId,
+      threadId: resolvedThreadId,
       senderId: userId,
       content,
       priority: priority || 'normal',
@@ -251,7 +291,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Update thread's lastActivity
   await prisma.messageThread.update({
-    where: { id: threadId },
+    where: { id: resolvedThreadId },
     data: { lastActivity: new Date() },
   });
 
@@ -259,7 +299,7 @@ const sendMessage = asyncHandler(async (req, res) => {
   const senderName = `${req.user.firstName} ${req.user.lastName}`.trim();
   const payload = {
     id: message.id,
-    threadId,
+    threadId: resolvedThreadId,
     senderId: userId,
     senderName,
     senderRole: req.user.role,
@@ -271,11 +311,11 @@ const sendMessage = asyncHandler(async (req, res) => {
     deliveryStatus: 'sent',
     attachments: [],
   };
-  await chatHelpers.pushMessage(threadId, payload);
+  await chatHelpers.pushMessage(resolvedThreadId, payload);
 
   // Increment unread for other participants
   const threadData = await prisma.messageThread.findUnique({
-    where: { id: threadId },
+    where: { id: resolvedThreadId },
     include: { participants: { select: { userId: true } } },
   });
   if (threadData) {
@@ -289,10 +329,11 @@ const sendMessage = asyncHandler(async (req, res) => {
   // Emit via chat namespace if Socket.io is available (real-time push)
   const io = req.app?.get('io');
   if (io) {
-    io.of('/chat').to(`thread:${threadId}`).emit('message:receive', payload);
+    io.of('/chat').to(`thread:${resolvedThreadId}`).emit('message:receive', payload);
   }
 
-  return res.status(201).json(message);
+  // Include thread.id in response so frontend can navigate to the conversation
+  return res.status(201).json({ ...message, thread: { id: resolvedThreadId } });
 });
 
 // Mark message as read
@@ -313,11 +354,7 @@ const markAsRead = asyncHandler(async (req, res) => {
   const isParticipant = await prisma.messageThread.findFirst({
     where: {
       id: message.threadId,
-      participants: {
-        some: {
-          id: userId,
-        },
-      },
+      participants: { some: { userId } },
     },
   });
 
@@ -350,11 +387,7 @@ const toggleStar = asyncHandler(async (req, res) => {
   const isParticipant = await prisma.messageThread.findFirst({
     where: {
       id: message.threadId,
-      participants: {
-        some: {
-          id: userId,
-        },
-      },
+      participants: { some: { userId } },
     },
   });
 
