@@ -291,12 +291,16 @@ const createSession = asyncHandler(async (req, res) => {
       scheduledDuration: scheduledDuration || 60,
       status: 'scheduled',
       participants: {
-        create: participantIds && participantIds.length > 0
-          ? participantIds.map((userId) => ({
-              userId,
-              role: 'participant',
-            }))
-          : [],
+        create: [
+          // Always add the therapist (session creator) as host
+          { userId: req.user.id, role: 'host' },
+          // Add any extra participant IDs supplied by the caller
+          ...(participantIds && participantIds.length > 0
+            ? participantIds
+                .filter((uid) => uid !== req.user.id) // avoid duplicate
+                .map((userId) => ({ userId, role: 'participant' }))
+            : []),
+        ],
       },
     },
     include: {
@@ -459,35 +463,58 @@ const joinSession = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
 
-  const participant = await prisma.telehealthParticipant.findFirst({
-    where: {
-      sessionId: id,
-      userId,
-    },
+  // Look up the session so we can return roomId
+  const session = await prisma.telehealthSession.findUnique({
+    where: { id },
+  });
+
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  // Auto-upsert participant so patients/therapists not pre-listed can still join
+  let participant = await prisma.telehealthParticipant.findFirst({
+    where: { sessionId: id, userId },
   });
 
   if (!participant) {
-    return res.status(404).json({ error: 'Participant not found' });
+    const userRecord = await prisma.user.findUnique({ where: { id: userId } });
+    const role = userRecord?.role === 'therapist' ? 'host' : 'participant';
+    participant = await prisma.telehealthParticipant.create({
+      data: { sessionId: id, userId, role },
+    });
   }
 
   const updatedParticipant = await prisma.telehealthParticipant.update({
     where: { id: participant.id },
-    data: {
-      joinedAt: new Date(),
-    },
+    data: { joinedAt: new Date() },
     include: {
       session: true,
       user: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-        },
+        select: { id: true, firstName: true, lastName: true },
       },
     },
   });
 
-  return res.json(updatedParticipant);
+  // Build ICE server list from env vars or fall back to public STUN
+  const iceServers = [];
+  if (process.env.TURN_URL) {
+    iceServers.push({
+      urls: process.env.TURN_URL,
+      username: process.env.TURN_USERNAME || '',
+      credential: process.env.TURN_CREDENTIAL || '',
+    });
+  } else {
+    iceServers.push({ urls: 'stun:stun.l.google.com:19302' });
+    iceServers.push({ urls: 'stun:stun1.l.google.com:19302' });
+  }
+
+  return res.json({
+    participantId: updatedParticipant.id,
+    userId: updatedParticipant.userId,
+    roomId: session.roomId,
+    iceServers,
+  });
 });
 
 // Leave session (update participant status)
