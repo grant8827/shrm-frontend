@@ -203,7 +203,9 @@ const VideoSession: React.FC = () => {
       setParticipantCount(participantCountRef.current + 1);
       setParticipantName(name);
       isInitiatorRef.current = true;
-      setTimeout(() => { void createOffer(); }, 500);
+      // Call immediately — PC is guaranteed initialized before joinRoom now,
+      // so there is no need for an artificial delay.
+      void createOffer();
     });
 
     // offer: we are the responder. Use localStreamRef so the closure always
@@ -226,6 +228,18 @@ const VideoSession: React.FC = () => {
     webSocketService.on('ice-candidate', async (data) => {
       const candidate = data.candidate as RTCIceCandidateInit | undefined;
       if (candidate) await addIceCandidate(candidate);
+    });
+
+    // buffered-candidates: server replays ICE candidates that were queued in Redis
+    // during the 10-second reconnection window. Without this handler they are lost.
+    webSocketService.on('buffered-candidates', async (data) => {
+      const candidates = (data.candidates as RTCIceCandidateInit[]) ?? [];
+      if (candidates.length > 0) {
+        console.log('[VIDEO] Processing', candidates.length, 'buffered ICE candidates from server');
+        for (const candidate of candidates) {
+          await addIceCandidate(candidate);
+        }
+      }
     });
 
     webSocketService.on('participant-left', () => {

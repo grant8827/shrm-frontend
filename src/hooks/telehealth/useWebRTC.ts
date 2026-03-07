@@ -43,6 +43,24 @@ export const useWebRTC = ({
     };
   }, []);
 
+  // Re-attach remoteStream to the video element whenever the stream state updates.
+  // This is the safety net for the race where ontrack fires before the <video> ref
+  // is committed to the DOM — without this the screen stays blank intermittently.
+  useEffect(() => {
+    if (!remoteStream || !remoteVideoRef.current) return;
+    if (remoteVideoRef.current.srcObject !== remoteStream) {
+      console.log('[useWebRTC] Re-attaching remote stream to video element');
+      remoteVideoRef.current.srcObject = remoteStream;
+      const playPromise = remoteVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[useWebRTC] Remote autoplay blocked (re-attach):', err);
+          setIsRemotePlaybackBlocked(true);
+        });
+      }
+    }
+  }, [remoteStream]);
+
   const buildIceConfiguration = (): RTCConfiguration => {
     const configuredStunUrls = (import.meta.env.VITE_STUN_URLS as string | undefined)
       ?.split(',')
