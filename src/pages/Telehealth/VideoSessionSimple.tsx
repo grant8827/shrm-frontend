@@ -65,6 +65,8 @@ const VideoSession: React.FC = () => {
   const participantCountRef = useRef(0);
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
+  // Ref keeps the stream alive in closures registered BEFORE re-renders propagate
+  const localStreamRef = useRef<MediaStream | null>(null);
   
   // Participant tracking
   const [participantCount, setParticipantCount] = useState(1); // Start at 1 for self
@@ -155,12 +157,15 @@ const VideoSession: React.FC = () => {
   const connectWebSocket = useCallback(async () => {
     if (!roomId || !user) return;
 
+    // Clear any stale listeners from a previous connection to prevent duplicate handlers
+    webSocketService.clearListeners();
+
     const token = localStorage.getItem('access_token') || localStorage.getItem('token') || '';
 
     try {
       await webSocketService.connect(sessionId ?? roomId, user.id, {
         token,
-        displayName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Participant',
+        displayName: `${(user.firstName ?? '')} ${(user.lastName ?? '')}`.trim() || 'Participant',
         role: (user.role as string) ?? 'client',
       });
     } catch (err) {
@@ -169,11 +174,27 @@ const VideoSession: React.FC = () => {
       return;
     }
 
-    // Join the signaling room using the roomId from the session record
-    webSocketService.joinRoom(roomId, sessionId ?? undefined);
+    // Join the signaling room AFTER registering listeners so no events are missed
+    // ── Inbound signaling handlers ───────────────────────────────────────────
 
-    // ── Inbound signaling handlers ──────────────────────────────────────────
+    // room-joined: sent to US when we enter a room that already has participants.
+    // The server includes the list of who is already present.
+    // We don't create an offer here — the existing participant will send one to us
+    // because the server fires participant-joined on their side.
+    webSocketService.on('room-joined', (data) => {
+      const others = (data.participants as Array<{ userId: string; displayName: string }>) ?? [];
+      if (others.length > 0) {
+        const first = others[0];
+        const name = first.displayName || 'A participant';
+        console.log('[VIDEO] Room already has participants:', others);
+        participantCountRef.current = others.length;
+        setParticipantCount(others.length + 1); // +1 for ourselves
+        setParticipantName(name);
+      }
+    });
 
+    // participant-joined: sent to EXISTING participants when someone new arrives.
+    // We are the initiator — create an offer for the new arrival.
     webSocketService.on('participant-joined', (data) => {
       const name = (data.displayName as string) || 'A participant';
       console.log('[VIDEO] Participant joined:', name);
@@ -185,12 +206,15 @@ const VideoSession: React.FC = () => {
       setTimeout(() => { void createOffer(); }, 500);
     });
 
+    // offer: we are the responder. Use localStreamRef so the closure always
+    // reads the current stream regardless of when it was captured.
     webSocketService.on('offer', async (data) => {
       const offer = data.offer as RTCSessionDescriptionInit | undefined;
-      if (localStream && offer) {
-        await handleOffer(offer, localStream);
+      const stream = localStreamRef.current;
+      if (stream && offer) {
+        await handleOffer(offer, stream);
       } else {
-        console.warn('[VIDEO] Received offer but local stream is not ready');
+        console.warn('[VIDEO] Received offer but local stream is not ready. stream:', !!stream, 'offer:', !!offer);
       }
     });
 
@@ -217,8 +241,13 @@ const VideoSession: React.FC = () => {
       showError('Connection to session server lost');
     });
 
+    // Join the room AFTER handlers are registered
+    webSocketService.joinRoom(roomId, sessionId ?? undefined);
+
     showSuccess('Connected to session server');
-  }, [roomId, sessionId, user, showSuccess, showError, createOffer, handleOffer, handleAnswer, addIceCandidate, closePeerConnection, localStream]);
+  // localStream intentionally omitted — we use localStreamRef instead to avoid stale closures
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, sessionId, user, showSuccess, showError, createOffer, handleOffer, handleAnswer, addIceCandidate, closePeerConnection]);
 
   // Start Session Effect
   useEffect(() => {
@@ -226,10 +255,17 @@ const VideoSession: React.FC = () => {
       if (roomId && !localStream) {
         const stream = await startLocalMedia();
         if (stream) {
-          // Once media is ready, connect signaling
+          // Store in ref so signaling-event closures always read the live stream
+          localStreamRef.current = stream;
+
+          // CRITICAL ORDER:
+          // 1. Initialize peer connection FIRST so it is ready to handle an
+          //    incoming offer before we announce our presence to the room.
+          await initializePeerConnection(stream, false);
+
+          // 2. Connect signaling and join the room AFTER the PC is prepared.
           await connectWebSocket();
-          // Initialize PC (as non-initiator by default, until participant joins)
-          await initializePeerConnection(stream, false); 
+
           setSessionStartTime(new Date());
         }
       }
