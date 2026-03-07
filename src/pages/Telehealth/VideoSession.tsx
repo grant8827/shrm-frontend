@@ -622,9 +622,8 @@ const VideoSession: React.FC = () => {
       .connect(sessionId ?? '', user.id, {
         token,
         displayName:
-          `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() ||
-          user.email ??
-          '',
+          (`${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() ||
+          (user.email ?? '')),
         role: (user as any).role ?? 'client',
       })
       .then(() => {
