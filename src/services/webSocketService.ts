@@ -186,21 +186,36 @@ class WebSocketService {
   /** Send WebRTC offer via Socket.io */
   sendOffer(offer: RTCSessionDescriptionInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('offer', { offer, targetUserId: targetParticipantId, from: this.participantId });
+      this.socket.emit('offer', {
+        offer,
+        targetUserId: targetParticipantId || undefined,
+        roomId: this.currentRoomId,
+        from: this.participantId,
+      });
     }
   }
 
   /** Send WebRTC answer via Socket.io */
   sendAnswer(answer: RTCSessionDescriptionInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('answer', { answer, targetUserId: targetParticipantId, from: this.participantId });
+      this.socket.emit('answer', {
+        answer,
+        targetUserId: targetParticipantId || undefined,
+        roomId: this.currentRoomId,
+        from: this.participantId,
+      });
     }
   }
 
   /** Send ICE candidate via Socket.io */
   sendIceCandidate(candidate: RTCIceCandidateInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('ice-candidate', { candidate, targetUserId: targetParticipantId, from: this.participantId });
+      this.socket.emit('ice-candidate', {
+        candidate,
+        targetUserId: targetParticipantId || undefined,
+        roomId: this.currentRoomId,
+        from: this.participantId,
+      });
     }
   }
 

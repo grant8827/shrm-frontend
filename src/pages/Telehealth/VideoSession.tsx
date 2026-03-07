@@ -653,7 +653,8 @@ const VideoSession: React.FC = () => {
 
     // Incoming offer — we are the responder
     webSocketService.on('offer', async (data: Record<string, unknown>) => {
-      const fromId = data.from as string | undefined;
+      // Server emits fromUserId (not 'from')
+      const fromId = (data.fromUserId ?? data.from) as string | undefined;
       if (fromId) peerUserIdRef.current = fromId;
       console.log('[VIDEO] Received offer from:', fromId);
       const offerData = data.offer as RTCSessionDescriptionInit | undefined;
@@ -662,6 +663,8 @@ const VideoSession: React.FC = () => {
 
     // Incoming answer
     webSocketService.on('answer', async (data: Record<string, unknown>) => {
+      const fromId = (data.fromUserId ?? data.from) as string | undefined;
+      if (fromId) peerUserIdRef.current = fromId;
       console.log('[VIDEO] Received answer');
       const answerData = data.answer as RTCSessionDescriptionInit | undefined;
       if (answerData) await handleAnswer(answerData);
