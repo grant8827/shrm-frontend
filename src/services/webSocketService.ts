@@ -115,8 +115,8 @@ class WebSocketService {
   disconnect(): void {
     this._stopHeartbeat();
     if (this.socket) {
-      if (this.sessionId) {
-        this.socket.emit('leave-room', { roomId: this.sessionId });
+      if (this.currentRoomId) {
+        this.socket.emit('leave-room', { roomId: this.currentRoomId });
       }
       this.socket.disconnect();
       this.socket = null;
@@ -124,6 +124,7 @@ class WebSocketService {
     this.isConnected = false;
     this.sessionId = null;
     this.participantId = null;
+    this.currentRoomId = null;
   }
 
   /**
@@ -158,6 +159,11 @@ class WebSocketService {
     }
   }
 
+  /** Clear all local event listeners (call before reconnecting to avoid stale duplicate handlers) */
+  clearListeners(): void {
+    this.listeners.clear();
+  }
+
   /** Add event listener */
   on(event: string, callback: EventCallback): void {
     if (!this.listeners.has(event)) {
@@ -180,21 +186,21 @@ class WebSocketService {
   /** Send WebRTC offer via Socket.io */
   sendOffer(offer: RTCSessionDescriptionInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('offer', { offer, to: targetParticipantId, from: this.participantId });
+      this.socket.emit('offer', { offer, targetUserId: targetParticipantId, from: this.participantId });
     }
   }
 
   /** Send WebRTC answer via Socket.io */
   sendAnswer(answer: RTCSessionDescriptionInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('answer', { answer, to: targetParticipantId, from: this.participantId });
+      this.socket.emit('answer', { answer, targetUserId: targetParticipantId, from: this.participantId });
     }
   }
 
   /** Send ICE candidate via Socket.io */
   sendIceCandidate(candidate: RTCIceCandidateInit, targetParticipantId: string): void {
     if (this.socket && this.isConnected) {
-      this.socket.emit('ice-candidate', { candidate, to: targetParticipantId, from: this.participantId });
+      this.socket.emit('ice-candidate', { candidate, targetUserId: targetParticipantId, from: this.participantId });
     }
   }
 

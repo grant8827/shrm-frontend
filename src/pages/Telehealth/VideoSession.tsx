@@ -45,6 +45,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { apiClient } from '../../services/apiClient';
+import { webSocketService } from '../../services/webSocketService';
 import { SessionDetails } from '../../types';
 
 interface Participant {
@@ -85,7 +86,6 @@ const VideoSession: React.FC = () => {
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const websocketRef = useRef<WebSocket | null>(null);
 
   // Session state
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -110,23 +110,8 @@ const VideoSession: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [autoTranscribe, setAutoTranscribe] = useState(true);
 
-  // Data
-  const [participants] = useState<Participant[]>([
-    {
-      id: '1',
-      name: 'Dr. Sarah Smith',
-      role: 'therapist',
-      isMuted: false,
-      isVideoOff: false,
-    },
-    {
-      id: '2',
-      name: 'John Doe',
-      role: 'patient',
-      isMuted: false,
-      isVideoOff: false,
-    },
-  ]);
+  // Data — populated from session API response
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -141,6 +126,8 @@ const VideoSession: React.FC = () => {
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const lastIceRestartAtRef = useRef(0);
   const iceRestartAttemptsRef = useRef(0);
+  // Peer's Socket.io userId — set when we learn who joined or who sent an offer
+  const peerUserIdRef = useRef<string | null>(null);
 
   const buildIceConfiguration = (): RTCConfiguration => {
     const configuredStunUrls = (import.meta.env.VITE_STUN_URLS as string | undefined)
@@ -213,6 +200,21 @@ const VideoSession: React.FC = () => {
         const session = response.data;
         setRoomId(session.room_id);
         setSessionData(session);
+        // Populate real participant list from session data
+        if (Array.isArray(session.participants) && session.participants.length > 0) {
+          setParticipants(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            session.participants.map((p: any) => ({
+              id: p.userId ?? p.id,
+              name: p.user
+                ? `${p.user.firstName ?? ''} ${p.user.lastName ?? ''}`.trim()
+                : 'Participant',
+              role: (p.role === 'therapist' ? 'therapist' : 'patient') as 'therapist' | 'patient',
+              isMuted: false,
+              isVideoOff: false,
+            }))
+          );
+        }
         console.log('[VIDEO] Session loaded:', session);
       } catch (error) {
         console.error('[VIDEO] Error fetching session:', error);
@@ -530,12 +532,9 @@ const VideoSession: React.FC = () => {
     
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
-      if (event.candidate && websocketRef.current) {
-        console.log('[VIDEO] Sending ICE candidate');
-        websocketRef.current.send(JSON.stringify({
-          type: 'ice_candidate',
-          candidate: event.candidate,
-        }));
+      if (event.candidate) {
+        console.log('[VIDEO] Sending ICE candidate to peer:', peerUserIdRef.current);
+        webSocketService.sendIceCandidate(event.candidate, peerUserIdRef.current ?? '');
       }
     };
     
@@ -608,133 +607,107 @@ const VideoSession: React.FC = () => {
   };
 
   const connectWebSocket = () => {
-    if (!roomId) {
-      console.error('[VIDEO] No room_id available');
+    if (!roomId || !user) {
+      console.error('[VIDEO] No room_id or user available');
       return;
     }
-    
-    // Resolve WebSocket URL with explicit base URL first, then API URL, then host fallback
-    const configuredWsBaseUrl = import.meta.env.VITE_WS_BASE_URL as string | undefined;
-    const configuredWsHost = import.meta.env.VITE_WS_HOST as string | undefined;
-    const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
-    let wsProtocol: 'ws' | 'wss' = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    let wsHost = window.location.host;
+    // Clear any stale listeners from a previous session to prevent double-firing
+    webSocketService.clearListeners();
 
-    if (configuredWsBaseUrl) {
-      try {
-        const wsBase = new URL(configuredWsBaseUrl);
-        wsProtocol = wsBase.protocol === 'wss:' ? 'wss' : 'ws';
-        wsHost = wsBase.host;
-      } catch (urlError) {
-        console.warn('[VIDEO] Invalid VITE_WS_BASE_URL:', urlError);
-      }
-    } else if (configuredApiBaseUrl) {
-      try {
-        const apiUrl = new URL(configuredApiBaseUrl);
-        wsProtocol = apiUrl.protocol === 'https:' ? 'wss' : 'ws';
-        wsHost = apiUrl.host;
-      } catch (urlError) {
-        console.warn('[VIDEO] Invalid VITE_API_BASE_URL for WS fallback:', urlError);
-      }
-    } else if (configuredWsHost) {
-      wsHost = configuredWsHost;
-    }
+    const token =
+      (localStorage.getItem('token') ?? localStorage.getItem('auth_token') ?? '');
 
-    const wsUrl = `${wsProtocol}://${wsHost}/ws/video/${roomId}/`;
-    
-    console.log('[VIDEO] Connecting to WebSocket:', wsUrl);
-    
-    const ws = new WebSocket(wsUrl);
-    websocketRef.current = ws;
-    
-    ws.onopen = () => {
-      console.log('[VIDEO] WebSocket connected');
+    webSocketService
+      .connect(sessionId ?? '', user.id, {
+        token,
+        displayName:
+          `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() ||
+          user.email ??
+          '',
+        role: (user as any).role ?? 'client',
+      })
+      .then(() => {
+        console.log('[VIDEO] Socket.io connected, joining room:', roomId);
+        webSocketService.joinRoom(roomId, sessionId ?? undefined);
+      })
+      .catch((err: unknown) => {
+        console.error('[VIDEO] Socket.io connection failed:', err);
+        showError('Failed to connect to session server');
+      });
+
+    // Room joined confirmation from server
+    webSocketService.on('room-joined', (data: Record<string, unknown>) => {
+      console.log('[VIDEO] Room joined:', data);
       showSuccess('Connected to session server');
-      
-      // Notify server that we joined
-      ws.send(JSON.stringify({
-        type: 'participant_joined',
-        user_id: user?.id,
-        user_name: user?.firstName + ' ' + user?.lastName
-      }));
-    };
-    
-    ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-      console.log('[VIDEO] WebSocket message:', data.type, data);
-      
-      switch (data.type) {
-        case 'participant_joined':
-          console.log('[VIDEO] Another participant joined');
-          showSuccess('Another participant joined');
-          participantCountRef.current += 1;
-          
-          // Always create offer when another participant joins
-          // This ensures connection is established regardless of join order
-          console.log('[VIDEO] Creating offer for new participant');
-          isInitiatorRef.current = true;
-          setTimeout(() => {
-            void createOffer();
-          }, 500);
-          break;
-          
-        case 'offer':
-          console.log('[VIDEO] Received offer - I am the responder');
-          await handleOffer(data.offer);
-          break;
-          
-        case 'answer':
-          console.log('[VIDEO] Received answer');
-          await handleAnswer(data.answer);
-          break;
-          
-        case 'ice_candidate':
-          console.log('[VIDEO] Received ICE candidate');
-          await handleIceCandidate(data.candidate);
-          break;
-          
-        case 'participant_left':
-          console.log('[VIDEO] Participant left');
-          resetPeerConnectionForNextParticipant();
-          showError('Other participant left the session');
-          break;
+    });
+
+    // Another participant arrived — we become the offer initiator
+    webSocketService.on('participant-joined', (data: Record<string, unknown>) => {
+      const peerId = ((data.userId ?? data.guestId ?? data.participantId) as string | undefined) ?? null;
+      if (peerId) peerUserIdRef.current = peerId;
+      console.log('[VIDEO] Participant joined, creating offer for:', peerId);
+      participantCountRef.current += 1;
+      isInitiatorRef.current = true;
+      setTimeout(() => void createOffer(), 500);
+    });
+
+    // Incoming offer — we are the responder
+    webSocketService.on('offer', async (data: Record<string, unknown>) => {
+      const fromId = data.from as string | undefined;
+      if (fromId) peerUserIdRef.current = fromId;
+      console.log('[VIDEO] Received offer from:', fromId);
+      const offerData = data.offer as RTCSessionDescriptionInit | undefined;
+      if (offerData) await handleOffer(offerData);
+    });
+
+    // Incoming answer
+    webSocketService.on('answer', async (data: Record<string, unknown>) => {
+      console.log('[VIDEO] Received answer');
+      const answerData = data.answer as RTCSessionDescriptionInit | undefined;
+      if (answerData) await handleAnswer(answerData);
+    });
+
+    // Incoming ICE candidate
+    webSocketService.on('ice-candidate', async (data: Record<string, unknown>) => {
+      const candidateData = data.candidate as RTCIceCandidateInit | undefined;
+      if (candidateData) await handleIceCandidate(candidateData);
+    });
+
+    // Buffered candidates delivered by server after room-join (late joiner case)
+    webSocketService.on('buffered-candidates', async (data: Record<string, unknown>) => {
+      const candidates = data.candidates as RTCIceCandidateInit[] | undefined;
+      if (Array.isArray(candidates)) {
+        for (const c of candidates) await handleIceCandidate(c);
       }
-    };
-    
-    ws.onerror = (error) => {
-      console.error('[VIDEO] WebSocket error:', error);
-      showError('Failed to connect to session server');
-    };
-    
-    ws.onclose = (event) => {
-      console.log('[VIDEO] WebSocket closed:', event.code, event.reason);
-      if (event.code !== 1000) { // Not a normal closure
-        showError('Connection to session server lost');
-      }
-    };
+    });
+
+    // Peer left the room
+    webSocketService.on('participant-left', (data: Record<string, unknown>) => {
+      console.log('[VIDEO] Participant left:', data);
+      peerUserIdRef.current = null;
+      resetPeerConnectionForNextParticipant();
+      showError('Other participant left the session');
+    });
   };
 
   const createOffer = async (iceRestart = false) => {
-    if (!peerConnectionRef.current || !websocketRef.current) return;
+    if (!peerConnectionRef.current) return;
     
     try {
       const offer = await peerConnectionRef.current.createOffer({ iceRestart });
       await peerConnectionRef.current.setLocalDescription(offer);
       
-      console.log('[VIDEO] Sending offer');
-      websocketRef.current.send(JSON.stringify({
-        type: 'offer',
-        offer: offer,
-      }));
+      console.log('[VIDEO] Sending offer to peer:', peerUserIdRef.current);
+      webSocketService.sendOffer(offer, peerUserIdRef.current ?? '');
     } catch (error) {
       console.error('[VIDEO] Error creating offer:', error);
     }
   };
 
   const handleOffer = async (offer: RTCSessionDescriptionInit) => {
-    if (!peerConnectionRef.current || !websocketRef.current) {
-      console.error('[VIDEO] Cannot handle offer - missing peer connection or websocket');
+    if (!peerConnectionRef.current) {
+      console.error('[VIDEO] Cannot handle offer - missing peer connection');
       return;
     }
     
@@ -747,11 +720,8 @@ const VideoSession: React.FC = () => {
       const answer = await peerConnectionRef.current.createAnswer();
       await peerConnectionRef.current.setLocalDescription(answer);
       
-      console.log('[VIDEO] Sending answer');
-      websocketRef.current.send(JSON.stringify({
-        type: 'answer',
-        answer: answer,
-      }));
+      console.log('[VIDEO] Sending answer to peer:', peerUserIdRef.current);
+      webSocketService.sendAnswer(answer, peerUserIdRef.current ?? '');
     } catch (error) {
       console.error('[VIDEO] Error handling offer:', error);
       showError('Failed to establish connection');
@@ -824,14 +794,15 @@ const VideoSession: React.FC = () => {
       peerConnectionRef.current.close();
     }
     
-    if (websocketRef.current) {
-      websocketRef.current.close();
-    }
+    // Disconnect Socket.io signaling and clear all listeners
+    webSocketService.clearListeners();
+    webSocketService.disconnect();
     
     pendingIceCandidatesRef.current = [];
     participantCountRef.current = 0;
     isInitiatorRef.current = false;
     iceRestartAttemptsRef.current = 0;
+    peerUserIdRef.current = null;
     setIsRemotePlaybackBlocked(false);
   };
 

@@ -40,6 +40,8 @@ class TelehealthService {
   private remoteStream: MediaStream | null = null;
   private dataChannel: RTCDataChannel | null = null;
   private listeners: Map<string, ((data: any) => void)[]> = new Map();
+  /** userId of the remote peer — set on participant-joined or from an incoming offer */
+  private peerUserId: string | null = null;
 
   public on(event: string, callback: (data: any) => void) {
     if (!this.listeners.has(event)) {
@@ -116,8 +118,11 @@ class TelehealthService {
       });
       
       if (response.success && response.data) {
-        // Connect to WebSocket for real-time communication
+        // Connect to Socket.io signaling server
         await webSocketService.connect(sessionId, response.data.participantId);
+        // Join the signaling room so server can route messages to us
+        const roomId = (response.data as any).session?.roomId ?? sessionId;
+        webSocketService.joinRoom(roomId, sessionId);
         this.setupWebSocketListeners();
       }
       
@@ -668,8 +673,8 @@ class TelehealthService {
    * Send signaling message through WebSocket
    */
   private sendSignalingMessage(type: string, data: unknown): void {
-    if (type === 'ice-candidate' && data) {
-      webSocketService.sendIceCandidate(data as RTCIceCandidate, 'all'); // Send to all participants
+    if (type === 'ice-candidate' && data && this.peerUserId) {
+      webSocketService.sendIceCandidate(data as RTCIceCandidateInit, this.peerUserId);
     }
   }
 
@@ -717,11 +722,14 @@ class TelehealthService {
    */
   private setupWebSocketListeners(): void {
     webSocketService.on('offer', async (data: Record<string, unknown>) => {
-      const offerData = data as { offer: RTCSessionDescriptionInit; targetParticipantId: string };
+      const offerData = data as { offer: RTCSessionDescriptionInit; from?: string };
+      // Capture peer id from server-forwarded 'from' field
+      const fromId = data.from as string | undefined;
+      if (fromId) this.peerUserId = fromId;
       if (this.webRtcPeerConnection && offerData.offer) {
         const answer = await this.createAnswer(offerData.offer);
-        if (answer) {
-          webSocketService.sendAnswer(answer, offerData.targetParticipantId);
+        if (answer && this.peerUserId) {
+          webSocketService.sendAnswer(answer, this.peerUserId);
         }
       }
     });
@@ -745,8 +753,17 @@ class TelehealthService {
       console.log('Chat message received:', data);
     });
 
-    webSocketService.on('participant-joined', (data: Record<string, unknown>) => {
-      console.log('Participant joined:', data);
+    webSocketService.on('participant-joined', async (data: Record<string, unknown>) => {
+      const peerId = (data.userId ?? data.guestId ?? data.participantId) as string | undefined;
+      if (peerId) this.peerUserId = peerId;
+      console.log('Participant joined, creating offer for peer:', peerId);
+      // Become the initiator and send an offer to the newly-arrived peer
+      if (this.webRtcPeerConnection && this.peerUserId) {
+        const offer = await this.createOffer();
+        if (offer) {
+          webSocketService.sendOffer(offer, this.peerUserId);
+        }
+      }
     });
 
     webSocketService.on('participant-left', (data: Record<string, unknown>) => {
