@@ -48,7 +48,8 @@ import {
   CheckCircleOutline,
   Person,
   Phone,
-  MedicalServices
+  MedicalServices,
+  PersonAdd,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
@@ -63,6 +64,8 @@ interface PatientItem {
   status: string;
   diagnosis: string;
   nextAppointment?: string;
+  assignedTherapist?: string;
+  assignedTherapistId?: string;
 }
 
 const PatientManagement: React.FC = () => {
@@ -114,6 +117,8 @@ const PatientManagement: React.FC = () => {
         status: patient.is_active ? 'active' : 'inactive',
         diagnosis: patient.medical_history || '',
         nextAppointment: '',
+        assignedTherapist: patient.assigned_therapist_name || '',
+        assignedTherapistId: patient.assigned_therapist_id || '',
       }));
       
       setPatients(transformedPatients);
@@ -149,6 +154,8 @@ const PatientManagement: React.FC = () => {
   const [removePatientOpen, setRemovePatientOpen] = useState(false);
   const [completePatientOpen, setCompletePatientOpen] = useState(false);
   const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([]);
+  const [assignTherapistOpen, setAssignTherapistOpen] = useState(false);
+  const [selectedTherapistId, setSelectedTherapistId] = useState<string>('');
   const [editPatientData, setEditPatientData] = useState({
     name: '',
     email: '',
@@ -290,6 +297,43 @@ const PatientManagement: React.FC = () => {
       setSnackbar({ open: true, message: 'Failed to mark patient complete', severity: 'error' });
     } finally {
       setCompletePatientOpen(false);
+      setActionPatient(null);
+    }
+  };
+
+  const handleOpenAssignTherapist = () => {
+    setSelectedTherapistId(actionPatient?.assignedTherapistId || '');
+    setAssignTherapistOpen(true);
+    handleCloseActions();
+  };
+
+  const handleAssignTherapist = async () => {
+    if (!actionPatient) return;
+    try {
+      await apiClient.patch(`/api/patients/${actionPatient.id}/`, {
+        assignedTherapistId: selectedTherapistId || null,
+      });
+      const therapistName = selectedTherapistId
+        ? (therapists.find((t) => t.id === selectedTherapistId)?.name || '')
+        : '';
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === actionPatient.id
+            ? { ...p, assignedTherapist: therapistName, assignedTherapistId: selectedTherapistId }
+            : p
+        )
+      );
+      setSnackbar({
+        open: true,
+        message: selectedTherapistId
+          ? `Therapist assigned to ${actionPatient.name} successfully`
+          : `Therapist removed from ${actionPatient.name}`,
+        severity: 'success',
+      });
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to assign therapist', severity: 'error' });
+    } finally {
+      setAssignTherapistOpen(false);
       setActionPatient(null);
     }
   };
@@ -526,6 +570,7 @@ const PatientManagement: React.FC = () => {
                     sx={{ mb: 1.25 }}
                   />
 
+                  <Typography variant="body2"><strong>Therapist:</strong> {patient.assignedTherapist || 'Unassigned'}</Typography>
                   <Typography variant="body2"><strong>Diagnosis:</strong> {patient.diagnosis || 'Not specified'}</Typography>
                   <Typography variant="body2"><strong>Phone:</strong> {patient.phone || 'N/A'}</Typography>
                   <Typography variant="body2"><strong>Email:</strong> {patient.email || 'N/A'}</Typography>
@@ -546,6 +591,7 @@ const PatientManagement: React.FC = () => {
                   <TableCell>Contact</TableCell>
                   <TableCell>Last Visit</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Therapist</TableCell>
                   <TableCell>Primary Diagnosis</TableCell>
                   <TableCell>Next Appointment</TableCell>
                   <TableCell align="center">Actions</TableCell>
@@ -579,6 +625,19 @@ const PatientManagement: React.FC = () => {
                         size="small"
                         variant="outlined"
                       />
+                    </TableCell>
+                    <TableCell>
+                      {patient.assignedTherapist ? (
+                        <Chip
+                          icon={<PersonAdd fontSize="small" />}
+                          label={patient.assignedTherapist}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">Unassigned</Typography>
+                      )}
                     </TableCell>
                     <TableCell>{patient.diagnosis}</TableCell>
                     <TableCell>{patient.nextAppointment || 'Not scheduled'}</TableCell>
@@ -614,6 +673,12 @@ const PatientManagement: React.FC = () => {
             <Edit fontSize="small" />
           </ListItemIcon>
           <ListItemText>Edit Patient</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleOpenAssignTherapist}>
+          <ListItemIcon>
+            <PersonAdd fontSize="small" color="primary" />
+          </ListItemIcon>
+          <ListItemText>Add Therapist</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleOpenCompletePatient}>
           <ListItemIcon>
@@ -780,6 +845,54 @@ const PatientManagement: React.FC = () => {
           <Button onClick={() => setCompletePatientOpen(false)}>Cancel</Button>
           <Button color="success" variant="contained" onClick={() => void handleCompletePatient()}>
             Complete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Assign Therapist Dialog */}
+      <Dialog
+        open={assignTherapistOpen}
+        onClose={() => setAssignTherapistOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          Assign Therapist
+          {actionPatient && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Patient: {actionPatient.name}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Select Therapist</InputLabel>
+              <Select
+                value={selectedTherapistId}
+                label="Select Therapist"
+                onChange={(e) => setSelectedTherapistId(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None (Unassign)</em>
+                </MenuItem>
+                {therapists.map((therapist) => (
+                  <MenuItem key={therapist.id} value={therapist.id}>
+                    {therapist.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignTherapistOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={() => void handleAssignTherapist()}
+          >
+            Assign
           </Button>
         </DialogActions>
       </Dialog>
