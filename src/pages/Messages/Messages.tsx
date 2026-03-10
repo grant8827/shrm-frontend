@@ -65,7 +65,6 @@ import {
   Notifications,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
-import { useChat } from '../../hooks/useChat';
 import { messageService } from '../../services/messageService';
 import { apiClient } from '../../services/apiClient';
 import { UserRole } from '../../types';
@@ -136,10 +135,6 @@ interface MessageFormData {
 interface ApiUser {
   id: string;
   full_name?: string;
-  first_name?: string;
-  last_name?: string;
-  firstName?: string;
-  lastName?: string;
   username?: string;
   role?: string;
   is_online?: boolean;
@@ -225,11 +220,7 @@ const toPriority = (value: unknown): Message['priority'] => {
 
 const mapApiUser = (user: ApiUser): { id: string; name: string; role: string; isOnline: boolean } => ({
   id: user.id,
-  name:
-    user.full_name ||
-    [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(' ') ||
-    user.username ||
-    'Unknown User',
+  name: user.full_name || user.username || 'Unknown User',
   role: user.role || 'client',
   isOnline: user.is_online || false,
 });
@@ -255,28 +246,87 @@ const parseParticipant = (value: unknown): Participant | null => {
     return null;
   }
 
-  // Handle both flat format { id, full_name } and nested join-table format { userId, user: { id, firstName, lastName } }
-  const userObj = isRecord(value.user) ? value.user : value;
-  const id = stringFrom(userObj.id) || stringFrom(value.userId);
+  const id = stringFrom(value.id);
   if (!id) {
     return null;
   }
 
-  const fullName =
-    stringFrom(userObj.full_name) ||
-    stringFrom(value.full_name) ||
-    stringFrom(value.username) ||
-    (() => {
-      const first = stringFrom(userObj.firstName);
-      const last = stringFrom(userObj.lastName);
-      return first || last ? `${first} ${last}`.trim() : undefined;
-    })();
+  return {
+    id,
+    name: stringFrom(value.full_name) || stringFrom(value.username) || 'Unknown',
+    role: toParticipantRole(value.role),
+    isOnline: booleanFrom(value.is_online),
+  };
+};
+
+// Build a Conversation directly from the backend thread response (no per-thread message fetch)
+const buildConversationFromThread = (rawThread: unknown, currentUserId: string): Conversation | null => {
+  if (!isRecord(rawThread)) return null;
+  const id = stringFrom(rawThread.id);
+  const updatedAt = stringFrom(rawThread.updated_at);
+  if (!id || !updatedAt) return null;
+
+  const parsedParticipants = Array.isArray(rawThread.participants)
+    ? (rawThread.participants as unknown[]).map(parseParticipant).filter((p): p is Participant => p !== null)
+    : [];
+
+  const rawLastMsg = isRecord(rawThread.last_message) ? rawThread.last_message : null;
+  const subject = stringFrom(rawThread.subject) || 'No Subject';
+
+  const lastMessage: Message = rawLastMsg
+    ? {
+        id: stringFrom(rawLastMsg.id) || `${id}-last`,
+        threadId: id,
+        senderId: isRecord(rawLastMsg.sender) ? stringFrom(rawLastMsg.sender.id) : '',
+        senderName: isRecord(rawLastMsg.sender)
+          ? stringFrom(rawLastMsg.sender.full_name) || stringFrom(rawLastMsg.sender.username)
+          : '',
+        senderRole: isRecord(rawLastMsg.sender) ? toSenderRole(rawLastMsg.sender.role) : 'patient',
+        receiverId: parsedParticipants.find(p => p.id !== (isRecord(rawLastMsg.sender) ? rawLastMsg.sender.id : ''))?.id || '',
+        receiverName: parsedParticipants.find(p => p.id !== (isRecord(rawLastMsg.sender) ? rawLastMsg.sender.id : ''))?.name || '',
+        subject,
+        content: stringFrom(rawLastMsg.content),
+        timestamp: stringFrom(rawLastMsg.created_at) || updatedAt,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        priority: 'normal',
+        attachments: [],
+        isEncrypted: false,
+        deliveryStatus: 'sent',
+        tags: [],
+      }
+    : {
+        id: `${id}-placeholder`,
+        threadId: id,
+        senderId: currentUserId,
+        senderName: '',
+        senderRole: 'patient',
+        receiverId: '',
+        receiverName: '',
+        subject,
+        content: 'No messages yet',
+        timestamp: updatedAt,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        priority: 'normal',
+        attachments: [],
+        isEncrypted: false,
+        deliveryStatus: 'sent',
+        tags: [],
+      };
+
+  const unreadCount = typeof rawThread.unread_count === 'number' ? rawThread.unread_count : 0;
 
   return {
     id,
-    name: fullName || 'Unknown',
-    role: toParticipantRole(userObj.role ?? value.role),
-    isOnline: booleanFrom(value.is_online),
+    participants: parsedParticipants,
+    lastMessage,
+    unreadCount,
+    isGroup: parsedParticipants.length > 2,
+    title: stringFrom(rawThread.subject) || undefined,
+    updatedAt,
   };
 };
 
@@ -286,15 +336,10 @@ const parseThreadLike = (thread: unknown): ThreadLike | null => {
   }
 
   const id = stringFrom(thread.id);
-  if (!id) {
+  const updatedAt = stringFrom(thread.updated_at);
+  if (!id || !updatedAt) {
     return null;
   }
-
-  // Accept both snake_case (updated_at from backend transform) and camelCase (lastActivity from Prisma)
-  const updatedAt =
-    stringFrom(thread.updated_at) ||
-    stringFrom(thread.lastActivity) ||
-    new Date(0).toISOString();
 
   return {
     id,
@@ -311,26 +356,17 @@ const parseThreadMessageLike = (message: unknown): ThreadMessageLike | null => {
 
   const id = stringFrom(message.id);
   const content = stringFrom(message.content);
-  // Accept both snake_case (created_at) and camelCase (createdAt)
-  const createdAt = stringFrom(message.created_at) || stringFrom(message.createdAt);
+  const createdAt = stringFrom(message.created_at);
   if (!id || !createdAt) {
     return null;
   }
 
-  const senderObj = isRecord(message.sender) ? message.sender : null;
-  const sender = senderObj
+  const sender = isRecord(message.sender)
     ? {
-        id: stringFrom(senderObj.id),
-        full_name:
-          stringFrom(senderObj.full_name) ||
-          (() => {
-            const first = stringFrom(senderObj.firstName);
-            const last = stringFrom(senderObj.lastName);
-            return first || last ? `${first} ${last}`.trim() : undefined;
-          })() ||
-          stringFrom(senderObj.username),
-        username: stringFrom(senderObj.username),
-        role: stringFrom(senderObj.role),
+        id: stringFrom(message.sender.id),
+        full_name: stringFrom(message.sender.full_name),
+        username: stringFrom(message.sender.username),
+        role: stringFrom(message.sender.role),
       }
     : undefined;
 
@@ -339,8 +375,8 @@ const parseThreadMessageLike = (message: unknown): ThreadMessageLike | null => {
     sender,
     content,
     created_at: createdAt,
-    is_read: booleanFrom(message.is_read) || booleanFrom(message.isRead),
-    is_starred: booleanFrom(message.is_starred) || booleanFrom(message.isStarred),
+    is_read: booleanFrom(message.is_read),
+    is_starred: booleanFrom(message.is_starred),
     priority: toPriority(message.priority),
     attachments: Array.isArray(message.attachments) ? (message.attachments as Attachment[]) : [],
   };
@@ -350,20 +386,6 @@ const Messages: React.FC = () => {
   const { state } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  // ── Real-time chat (Socket.io /chat namespace) ──────────────────────────
-  const token = localStorage.getItem('access_token');
-  const {
-    messages: socketMessages,
-    typingUsers,
-    isConnected: isChatConnected,
-    joinThread,
-    sendMessage: socketSend,
-    startTyping,
-    stopTyping,
-  } = useChat(state.user?.id, token);
-  // ────────────────────────────────────────────────────────────────────────
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string, name: string, role: string, isOnline?: boolean}>>([]);
@@ -374,46 +396,6 @@ const Messages: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tabValue, setTabValue] = useState(0);
-
-  // Join the socket room whenever the active conversation changes
-  useEffect(() => {
-    if (selectedConversation) joinThread(selectedConversation);
-  }, [selectedConversation, joinThread]);
-
-  // Merge incoming socket messages into local state (no duplicates)
-  useEffect(() => {
-    if (socketMessages.length === 0) return;
-    setMessages((prev) => {
-      const byId = new Map(prev.map((m) => [m.id, m]));
-      socketMessages.forEach((sm) => {
-        if (!byId.has(sm.id)) {
-          const conv = conversations.find((c) => c.id === sm.threadId);
-          byId.set(sm.id, {
-            id: sm.id,
-            threadId: sm.threadId,
-            senderId: sm.senderId,
-            senderName: sm.senderName,
-            senderRole: sm.senderRole as Message['senderRole'],
-            receiverId: '',
-            receiverName: '',
-            subject: conv?.title ?? '',
-            content: sm.content,
-            timestamp: sm.timestamp,
-            isRead: sm.isRead,
-            isStarred: false,
-            isArchived: false,
-            priority: sm.priority,
-            attachments: [],
-            isEncrypted: sm.isEncrypted,
-            deliveryStatus: sm.deliveryStatus,
-            tags: [],
-          });
-        }
-      });
-      return Array.from(byId.values());
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketMessages]);
 
   // Load users from backend when component mounts
   useEffect(() => {
@@ -426,7 +408,7 @@ const Messages: React.FC = () => {
         if (state.user?.role === UserRole.ADMIN) {
           // Fetch all users with pagination handling
           let allUsers: ApiUser[] = [];
-          let nextUrl: string | null = '/auth/';
+          let nextUrl: string | null = '/api/auth/';
           
           // Keep fetching until no more pages
           while (nextUrl) {
@@ -452,8 +434,8 @@ const Messages: React.FC = () => {
           setAvailableUsers(users);
         } else {
           // For non-admin users, load users from first page only
-          console.log('Fetching users from /auth/');
-          const response: { data: unknown } = await apiClient.get('/auth/');
+          console.log('Fetching users from /api/auth/');
+          const response: { data: unknown } = await apiClient.get('/api/auth/');
           console.log('API Response:', response);
           const { users: pageUsers } = parseAuthUsersPayload(response.data);
           const users = pageUsers.map(mapApiUser);
@@ -507,120 +489,28 @@ const Messages: React.FC = () => {
     }
   }, [state.user?.id, state.user?.role]);
 
-  // Load messages and conversations from backend when component mounts
+  // Load conversations (thread list only — messages fetched lazily on click)
   useEffect(() => {
-    const loadMessagesAndConversations = async () => {
+    const loadConversations = async () => {
       try {
         setIsLoadingMessages(true);
-        const threads = await messageService.getThreads();
-        
-        // Convert threads to conversations
-        const loadedConversations: Conversation[] = [];
-        const allMessages: Message[] = [];
-        
-        for (const rawThread of threads) {
-          const thread = parseThreadLike(rawThread);
-          if (!thread) {
-            continue;
-          }
-
-          let parsedThreadMessages: ThreadMessageLike[] = [];
-          try {
-            const threadMessages = await messageService.getMessages(thread.id);
-            parsedThreadMessages = threadMessages
-              .map((rawMessage) => parseThreadMessageLike(rawMessage))
-              .filter((message): message is ThreadMessageLike => message !== null);
-          } catch {
-            // Thread exists but messages failed to load — still show conversation
-          }
-
-          const parsedParticipants = thread.participants
-            .map((participant) => parseParticipant(participant))
-            .filter((participant): participant is Participant => participant !== null);
-          
-          // Convert backend messages to frontend Message type
-          const convertedMessages = parsedThreadMessages.map((msg) => {
-            const senderId = stringFrom(msg.sender?.id);
-            const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
-
-            return {
-              id: msg.id,
-            threadId: thread.id,
-            senderId,
-            senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
-            senderRole: toSenderRole(msg.sender?.role),
-            receiverId: otherParticipant?.id || '',
-            receiverName: otherParticipant?.name || '',
-            subject: thread.subject || 'No Subject',
-            content: msg.content,
-            timestamp: msg.created_at,
-            isRead: msg.is_read,
-            isStarred: msg.is_starred,
-            isArchived: false,
-            priority: toPriority(msg.priority),
-            attachments: msg.attachments || [],
-            isEncrypted: true,
-            deliveryStatus: 'sent' as Message['deliveryStatus'],
-            tags: [],
-            };
-          });
-          
-          allMessages.push(...convertedMessages);
-          
-          // Always show the thread as a conversation, even with 0 messages
-          const lastMessage = convertedMessages[convertedMessages.length - 1] ?? {
-            id: `placeholder-${thread.id}`,
-            threadId: thread.id,
-            senderId: '',
-            senderName: '',
-            senderRole: 'patient' as Message['senderRole'],
-            receiverId: '',
-            receiverName: '',
-            subject: thread.subject || 'No Subject',
-            content: '',
-            timestamp: thread.updated_at,
-            isRead: true,
-            isStarred: false,
-            isArchived: false,
-            priority: 'normal' as Message['priority'],
-            attachments: [],
-            isEncrypted: false,
-            deliveryStatus: 'sent' as Message['deliveryStatus'],
-            tags: [],
-          };
-
-          const unreadCount = convertedMessages.filter(
-            (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
-          ).length;
-
-          loadedConversations.push({
-            id: thread.id,
-            participants: parsedParticipants,
-            lastMessage,
-            unreadCount,
-            isGroup: thread.participants.length > 2,
-            title: thread.subject,
-            updatedAt: thread.updated_at,
-          });
-        }
-        
-        // Sort conversations by last message time
-        loadedConversations.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-        
-        setConversations(loadedConversations);
-        setMessages(allMessages);
+        const rawThreads = await messageService.getThreads();
+        const loaded = (Array.isArray(rawThreads) ? rawThreads : [])
+          .map((t) => buildConversationFromThread(t, state.user?.id ?? ''))
+          .filter((c): c is Conversation => c !== null);
+        loaded.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        setConversations(loaded);
+        setMessages([]); // messages are loaded lazily per thread
       } catch (error) {
-        console.error('Failed to load messages:', error);
-        // Don't wipe existing state on error
+        console.error('Failed to load threads:', error);
+        setConversations([]);
       } finally {
         setIsLoadingMessages(false);
       }
     };
 
     if (state.user?.id) {
-      void loadMessagesAndConversations();
+      void loadConversations();
     }
   }, [state.user?.id]);
 
@@ -670,126 +560,94 @@ const Messages: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
 
-  // Handle conversation selection and mark messages as read
-  const handleConversationSelect = (conversationId: string) => {
+  // Handle conversation selection — lazy-load messages for the clicked thread
+  const handleConversationSelect = async (conversationId: string) => {
     setSelectedConversation(conversationId);
-    
-    // Mark all messages in this conversation as read
-    setMessages(prev => prev.map(msg => 
-      msg.threadId === conversationId && msg.senderId !== state.user?.id
-        ? { ...msg, isRead: true }
-        : msg
+    // Optimistically clear unread badge
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId ? { ...c, unreadCount: 0 } : c
     ));
-    
-    // Update the conversation's unread count to 0
-    setConversations(prev => prev.map(conv =>
-      conv.id === conversationId
-        ? { ...conv, unreadCount: 0 }
-        : conv
-    ));
-  };
-
-  // Reload conversations when needed (defined as async function)
-  const reloadConversations = async () => {
     try {
-      const threads = await messageService.getThreads();
-      const loadedConversations: Conversation[] = [];
-      const allMessages: Message[] = [];
-      
-      for (const rawThread of threads) {
-        const thread = parseThreadLike(rawThread);
-        if (!thread) {
-          continue;
-        }
-
-        let parsedThreadMessages: ThreadMessageLike[] = [];
-        try {
-          const threadMessages = await messageService.getMessages(thread.id);
-          parsedThreadMessages = threadMessages
-            .map((rawMessage) => parseThreadMessageLike(rawMessage))
-            .filter((message): message is ThreadMessageLike => message !== null);
-        } catch {
-          // Thread exists but messages failed to load — still show conversation
-        }
-
-        const parsedParticipants = thread.participants
-          .map((participant) => parseParticipant(participant))
-          .filter((participant): participant is Participant => participant !== null);
-        
-        const convertedMessages = parsedThreadMessages.map((msg) => {
+      const conv = conversations.find(c => c.id === conversationId);
+      const participants = conv?.participants ?? [];
+      const rawMsgs = await messageService.getMessages(conversationId);
+      const converted: Message[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+        .map(parseThreadMessageLike)
+        .filter((m): m is ThreadMessageLike => m !== null)
+        .map((msg) => {
           const senderId = stringFrom(msg.sender?.id);
-          const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
-
+          const other = participants.find(p => p.id !== senderId);
           return {
             id: msg.id,
-          threadId: thread.id,
-          senderId,
-          senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
-          senderRole: toSenderRole(msg.sender?.role),
-          receiverId: otherParticipant?.id || '',
-          receiverName: otherParticipant?.name || '',
-          subject: thread.subject || 'No Subject',
-          content: msg.content,
-          timestamp: msg.created_at,
-          isRead: msg.is_read,
-          isStarred: msg.is_starred,
-          isArchived: false,
-          priority: toPriority(msg.priority),
-          attachments: msg.attachments || [],
-          isEncrypted: true,
-          deliveryStatus: 'sent' as Message['deliveryStatus'],
-          tags: [],
+            threadId: conversationId,
+            senderId,
+            senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+            senderRole: toSenderRole(msg.sender?.role),
+            receiverId: other?.id || '',
+            receiverName: other?.name || '',
+            subject: conv?.title || 'No Subject',
+            content: msg.content,
+            timestamp: msg.created_at,
+            isRead: msg.is_read,
+            isStarred: msg.is_starred,
+            isArchived: false,
+            priority: toPriority(msg.priority),
+            attachments: msg.attachments || [],
+            isEncrypted: false,
+            deliveryStatus: 'sent' as Message['deliveryStatus'],
+            tags: [],
           };
         });
-        
-        allMessages.push(...convertedMessages);
-        
-        // Always show the thread, even with 0 messages
-        const lastMessage = convertedMessages[convertedMessages.length - 1] ?? {
-          id: `placeholder-${thread.id}`,
-          threadId: thread.id,
-          senderId: '',
-          senderName: '',
-          senderRole: 'patient' as Message['senderRole'],
-          receiverId: '',
-          receiverName: '',
-          subject: thread.subject || 'No Subject',
-          content: '',
-          timestamp: thread.updated_at,
-          isRead: true,
-          isStarred: false,
-          isArchived: false,
-          priority: 'normal' as Message['priority'],
-          attachments: [],
-          isEncrypted: false,
-          deliveryStatus: 'sent' as Message['deliveryStatus'],
-          tags: [],
-        };
+      setMessages(prev => [...prev.filter(m => m.threadId !== conversationId), ...converted]);
+    } catch (err) {
+      console.error('Failed to load thread messages:', err);
+    }
+  };
 
-        const unreadCount = convertedMessages.filter(
-          (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
-        ).length;
+  // Reload thread list, then refresh messages for whichever thread is open
+  const reloadConversations = async () => {
+    try {
+      const rawThreads = await messageService.getThreads();
+      const loaded = (Array.isArray(rawThreads) ? rawThreads : [])
+        .map((t) => buildConversationFromThread(t, state.user?.id ?? ''))
+        .filter((c): c is Conversation => c !== null);
+      loaded.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setConversations(loaded);
 
-        loadedConversations.push({
-          id: thread.id,
-          participants: parsedParticipants,
-          lastMessage,
-          unreadCount,
-          isGroup: thread.participants.length > 2,
-          title: thread.subject,
-          updatedAt: thread.updated_at,
-        });
+      // Refresh messages for the currently open thread
+      if (selectedConversation) {
+        const conv = loaded.find(c => c.id === selectedConversation);
+        const participants = conv?.participants ?? [];
+        const rawMsgs = await messageService.getMessages(selectedConversation);
+        const converted: Message[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+          .map(parseThreadMessageLike)
+          .filter((m): m is ThreadMessageLike => m !== null)
+          .map((msg) => {
+            const senderId = stringFrom(msg.sender?.id);
+            const other = participants.find(p => p.id !== senderId);
+            return {
+              id: msg.id,
+              threadId: selectedConversation,
+              senderId,
+              senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+              senderRole: toSenderRole(msg.sender?.role),
+              receiverId: other?.id || '',
+              receiverName: other?.name || '',
+              subject: conv?.title || 'No Subject',
+              content: msg.content,
+              timestamp: msg.created_at,
+              isRead: msg.is_read,
+              isStarred: msg.is_starred,
+              isArchived: false,
+              priority: toPriority(msg.priority),
+              attachments: msg.attachments || [],
+              isEncrypted: false,
+              deliveryStatus: 'sent' as Message['deliveryStatus'],
+              tags: [],
+            };
+          });
+        setMessages(prev => [...prev.filter(m => m.threadId !== selectedConversation), ...converted]);
       }
-      
-      loadedConversations.sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
-      
-      console.log('Reloaded conversations:', loadedConversations.length);
-      console.log('Reloaded messages:', allMessages.length);
-      
-      setConversations(loadedConversations);
-      setMessages(allMessages);
     } catch (error) {
       console.error('Failed to reload conversations:', error);
     }
@@ -851,27 +709,6 @@ const Messages: React.FC = () => {
   const handleQuickReply = async () => {
     if (!quickReply.trim() || !selectedConversation) return;
 
-    const trimmedContent = quickReply.trim();
-
-    // ── Real-time path via socket (no REST round-trip) ──────────────────
-    if (isChatConnected) {
-      const sent = socketSend(trimmedContent);
-      if (sent) {
-        setQuickReply('');
-        stopTyping();
-        // Optimistically update sidebar last message
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === selectedConversation
-              ? { ...c, lastMessage: { ...c.lastMessage, content: trimmedContent }, updatedAt: new Date().toISOString() }
-              : c,
-          ),
-        );
-        return;
-      }
-    }
-
-    // ── REST fallback when socket is not connected ──────────────────────
     setIsSendingQuickReply(true);
 
     try {
@@ -920,6 +757,7 @@ const Messages: React.FC = () => {
       // Call backend API to send message
       const response = await messageService.sendMessage({
         recipient_ids: [formData.receiverId],
+        subject: formData.subject,
         content: formData.content,
         priority: formData.priority,
       });
@@ -1421,26 +1259,13 @@ const Messages: React.FC = () => {
 
                 {/* Quick Reply */}
                 <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-                  {/* Typing indicator */}
-                  {typingUsers.length > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-                      <CircularProgress size={10} thickness={6} />
-                      <Typography variant="caption" color="text.secondary">
-                        {typingUsers.map((u) => u.displayName).join(', ')}{' '}
-                        {typingUsers.length === 1 ? 'is' : 'are'} typing…
-                      </Typography>
-                    </Box>
-                  )}
                   <TextField
-                    placeholder={isChatConnected ? 'Type a quick reply…' : 'Type a quick reply (offline – will send via REST)…'}
+                    placeholder="Type a quick reply..."
                     fullWidth
                     multiline
                     rows={2}
                     value={quickReply}
-                    onChange={(e) => {
-                      setQuickReply(e.target.value);
-                      if (e.target.value) startTyping(); else stopTyping();
-                    }}
+                    onChange={(e) => setQuickReply(e.target.value)}
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();

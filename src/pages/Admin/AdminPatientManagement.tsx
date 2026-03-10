@@ -29,6 +29,9 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
+  FormControl,
+  InputLabel,
+  Select,
   type ChipProps,
   useTheme,
   useMediaQuery,
@@ -76,15 +79,14 @@ interface PaginatedResponse<T> {
   results: T[];
 }
 
+interface ResendEmailData {
+  email?: string;
+}
+
 type PatientUpdatePayload = {
-  first_name: string;
-  last_name: string;
-  email: string;
   phone: string;
-  date_of_birth: string;
+  dateOfBirth: string;
   gender: string;
-  status: string;
-  admission_date: string;
 };
 
 // Form data interface
@@ -150,6 +152,10 @@ const AdminPatientManagement: React.FC = () => {
   const [actionPatient, setActionPatient] = useState<BackendPatient | null>(null);
   const [removePatientOpen, setRemovePatientOpen] = useState(false);
   const [completePatientOpen, setCompletePatientOpen] = useState(false);
+  const [assignTherapistOpen, setAssignTherapistOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({ phone: '', dateOfBirth: '', gender: '' });
+  const [selectedTherapistId, setSelectedTherapistId] = useState<string>('');
+  const [therapists, setTherapists] = useState<{ id: string; name: string }[]>([]);
 
   const getErrorMessage = (error: unknown, fallback: string): string => {
     if (axios.isAxiosError(error)) {
@@ -184,6 +190,28 @@ const AdminPatientManagement: React.FC = () => {
     }
 
     return fallback;
+  };
+
+  const loadTherapists = async () => {
+    try {
+      const response = await apiService.get('/users/therapists/');
+      console.log('🟢 therapists raw response:', response);
+      type TherapistItem = { id: string; first_name?: string; last_name?: string; firstName?: string; lastName?: string; username?: string };
+      const raw = response as unknown as { results?: TherapistItem[] } | TherapistItem[];
+      const list: TherapistItem[] = Array.isArray(raw) ? raw : (raw.results ?? []);
+      console.log('🟢 therapists list:', list);
+      setTherapists(
+        list.map((u) => ({
+          id: u.id,
+          name:
+            `${u.firstName || u.first_name || ''} ${u.lastName || u.last_name || ''}`.trim() ||
+            u.username ||
+            'Unknown',
+        }))
+      );
+    } catch (error) {
+      console.error('Error loading therapists:', error);
+    }
   };
 
   // Load patients from API
@@ -235,30 +263,26 @@ const AdminPatientManagement: React.FC = () => {
     }
   };
 
-  // Open edit patient dialog
-  const handleEditPatient = async (patientId: string) => {
-    try {
-      const response = await apiService.get(`/patients/${patientId}/`);
-      setSelectedPatient(response.data as BackendPatient);
-      setEditPatientOpen(true);
-    } catch (error: unknown) {
-      console.error('❌ Error loading patient details:', error);
-      setErrorMessage('Failed to load patient details');
-      setShowError(true);
-    }
-  };
-
   // Handle patient update
   const handleUpdatePatient = async (formData: PatientUpdatePayload) => {
     try {
       if (!selectedPatient) return;
-      
-      await apiService.put(`/patients/${selectedPatient.id}/`, formData);
+      // Only send fields that updatePatient actually accepts (camelCase)
+      const payload: Record<string, string> = {};
+      if (formData.gender) payload.gender = formData.gender;
+      if (formData.phone) payload.phone = formData.phone;
+      if (formData.dateOfBirth) payload.dateOfBirth = formData.dateOfBirth;
+      await apiService.patch(`/patients/${selectedPatient.id}/`, payload);
+      // Update local state immediately so the table refreshes without a full reload
+      setPatients(prev => prev.map(p =>
+        p.id === selectedPatient.id
+          ? { ...p, phone: formData.phone, date_of_birth: formData.dateOfBirth, gender: formData.gender }
+          : p
+      ));
       setSuccessMessage('Patient updated successfully');
       setShowSuccess(true);
       setEditPatientOpen(false);
       setSelectedPatient(null);
-      void loadPatients(); // Reload the patient list
     } catch (error: unknown) {
       console.error('❌ Error updating patient:', error);
       setErrorMessage('Failed to update patient');
@@ -269,9 +293,12 @@ const AdminPatientManagement: React.FC = () => {
   // Resend welcome email to patient
   const handleResendEmail = async (patientId: string) => {
     try {
-      const response = await apiService.post<{ message: string }>(`/patients/${patientId}/resend-welcome-email`);
-      setSuccessMessage(response.data?.message || 'Welcome email resent successfully.');
-      setShowSuccess(true);
+      const response = await apiService.post<ResendEmailData>(`/patients/${patientId}/resend_welcome_email/`);
+      
+      if (response.data?.email) {
+        setSuccessMessage(`Registration email sent successfully to ${response.data.email}`);
+        setShowSuccess(true);
+      }
     } catch (error: unknown) {
       console.error('❌ Error resending email:', error);
       setErrorMessage(getErrorMessage(error, 'Failed to send registration email. Please try again.'));
@@ -294,15 +321,60 @@ const AdminPatientManagement: React.FC = () => {
     handleCloseActionsMenu();
   };
 
-  const handleMenuEditPatient = async () => {
+  const handleMenuEditPatient = () => {
     if (!actionPatient) return;
-    await handleEditPatient(actionPatient.id);
+    setSelectedPatient(actionPatient);
+    setEditFormData({
+      phone: actionPatient.phone || '',
+      dateOfBirth: actionPatient.date_of_birth ? actionPatient.date_of_birth.split('T')[0] : '',
+      gender: ['M','F','O','P'].includes(actionPatient.gender ?? '') ? (actionPatient.gender ?? '') : '',
+    });
+    setEditPatientOpen(true);
     handleCloseActionsMenu();
   };
 
   const handleMenuRemovePatient = () => {
     setRemovePatientOpen(true);
     handleCloseActionsMenu();
+  };
+
+  const handleMenuAssignTherapist = () => {
+    if (!actionPatient) return;
+    setSelectedTherapistId(actionPatient.primary_therapist ?? '');
+    void loadTherapists();
+    setAssignTherapistOpen(true);
+    handleCloseActionsMenu();
+  };
+
+  const handleConfirmAssignTherapist = async () => {
+    if (!actionPatient) return;
+    try {
+      await apiService.patch(`/patients/${actionPatient.id}/`, {
+        assignedTherapistId: selectedTherapistId || null,
+      });
+      const therapistName = selectedTherapistId
+        ? (therapists.find((t) => t.id === selectedTherapistId)?.name ?? '')
+        : null;
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === actionPatient.id
+            ? { ...p, primary_therapist: selectedTherapistId || null, primary_therapist_name: therapistName }
+            : p
+        )
+      );
+      setSuccessMessage(
+        selectedTherapistId
+          ? `Therapist assigned to ${actionPatient.first_name} ${actionPatient.last_name}`
+          : `Therapist unassigned from ${actionPatient.first_name} ${actionPatient.last_name}`
+      );
+      setShowSuccess(true);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Failed to assign therapist'));
+      setShowError(true);
+    } finally {
+      setAssignTherapistOpen(false);
+      setActionPatient(null);
+    }
   };
 
   const handleConfirmRemovePatient = async () => {
@@ -352,6 +424,7 @@ const AdminPatientManagement: React.FC = () => {
   // Load patients on mount
   useEffect(() => {
     void loadPatients();
+    void loadTherapists();
   }, []);
 
   // Filter patients when search or status changes
@@ -391,82 +464,62 @@ const AdminPatientManagement: React.FC = () => {
   // Handle add patient
   const handleAddPatient = async (formData: PatientFormData) => {
     try {
-      // Generate username from email (prefix before @) or first.last
-      const generateUsername = (email: string, firstName: string, lastName: string): string => {
-        if (email && email.includes('@')) {
-          return email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        }
-        return `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z0-9_.]/g, '_');
+      const genderMap: Record<string, string> = {
+        male: 'M',
+        female: 'F',
+        other: 'O',
+        'prefer-not-to-say': 'P',
       };
 
-      const username = generateUsername(formData.email, formData.firstName, formData.lastName);
+      // Generate username from first + last name
+      const username = `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`.replace(/[^a-z0-9.]/g, '');
 
-      // Transform form data to match backend API
+      // Transform form data to backend format (camelCase to match Node.js controller)
       const patientData = {
-        // User data (required)
+        // Required user fields
         username,
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phone,
-        
-        // Patient data
-        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : undefined,
-        street: formData.address.street || undefined,
-        city: formData.address.city || undefined,
-        state: formData.address.state || undefined,
-        zipCode: formData.address.zipCode || undefined,
-        
+
+        // Patient fields
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
+        gender: genderMap[formData.gender] || 'P',
+
+        // Address
+        street: formData.address.street,
+        city: formData.address.city,
+        state: formData.address.state,
+        zipCode: formData.address.zipCode,
+
         // Emergency contact
-        emergencyContactName: formData.emergencyContact.name || undefined,
-        emergencyContactPhone: formData.emergencyContact.phone || undefined,
-        emergencyContactRelationship: formData.emergencyContact.relationship || undefined,
-        emergencyContactEmail: formData.emergencyContact.email || undefined,
-        
-        // Gender
-        gender: formData.gender || undefined,
-        
+        emergencyContactName: formData.emergencyContact.name,
+        emergencyContactPhone: formData.emergencyContact.phone,
+        emergencyContactRelationship: formData.emergencyContact.relationship,
+        emergencyContactEmail: formData.emergencyContact.email,
+
         // Insurance
-        insuranceProvider: formData.insurance.provider || undefined,
-        insurancePolicyNumber: formData.insurance.policyNumber || undefined,
-        insuranceGroupNumber: formData.insurance.groupNumber || undefined,
-        insuranceMemberID: formData.insurance.memberID || undefined,
-        insuranceEffectiveDate: formData.insurance.effectiveDate
-          ? new Date(formData.insurance.effectiveDate).toISOString().split('T')[0]
-          : undefined,
-        
+        insuranceProvider: formData.insurance.provider,
+        insurancePolicyNumber: formData.insurance.policyNumber,
+        insuranceGroupNumber: formData.insurance.groupNumber,
+        insuranceMemberID: formData.insurance.memberID,
+
         // Medical
-        medicalHistory: formData.medical.medicalHistory || undefined,
-        allergies: formData.medical.allergies.join(', ') || undefined,
-        primaryDiagnosis: formData.medical.primaryDiagnosis || undefined,
-        assignedTherapistId: formData.medical.primaryTherapist || undefined,
+        medicalHistory: formData.medical.medicalHistory,
+        allergies: formData.medical.allergies.join(', '),
+        primaryDiagnosis: formData.medical.primaryDiagnosis,
       };
 
       console.log('📤 Sending patient data to API:', patientData);
 
       const response = await apiService.post('/patients/', patientData);
-
-      // apiService.post swallows HTTP errors instead of throwing — detect them here
-      if (response.success === false) {
-        const errMsg =
-          response.message ||
-          (Array.isArray(response.errors) && response.errors[0]) ||
-          'Failed to create patient';
-        throw new Error(errMsg);
-      }
-
-      console.log('✅ Patient created successfully:', response);
-
-      const emailSent = (response as unknown as Record<string, unknown>).email_sent !== false;
-      setSuccessMessage(
-        emailSent
-          ? 'Patient created successfully! Welcome email sent with login credentials.'
-          : 'Patient created successfully. Note: Welcome email could not be sent — please share credentials manually.'
-      );
-      setShowSuccess(true);
       
-      // Clear search term to show the new patient
-      setSearchTerm('');
+      console.log('✅ Patient created successfully:', response.data);
+
+      setSuccessMessage('Patient created successfully! Registration email has been sent.');
+      setShowSuccess(true);
+      setAddPatientOpen(false);
       
       // Reload patients
       await loadPatients();
@@ -476,7 +529,6 @@ const AdminPatientManagement: React.FC = () => {
       const errorMsg = getErrorMessage(error, 'Failed to create patient');
       setErrorMessage(errorMsg);
       setShowError(true);
-      throw error; // Re-throw so AddPatientForm stays open for retry
     }
   };
 
@@ -757,7 +809,7 @@ const AdminPatientManagement: React.FC = () => {
                         {new Date(patient.date_of_birth).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : patient.gender === 'other' ? 'Other' : patient.gender === 'prefer-not-to-say' ? 'Prefer not to say' : patient.gender || 'Not specified'}
+                        {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : patient.gender === 'O' ? 'Other' : 'Not specified'}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -802,11 +854,17 @@ const AdminPatientManagement: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Resend Email</ListItemText>
         </MenuItem>
-        <MenuItem onClick={() => void handleMenuEditPatient()}>
+        <MenuItem onClick={handleMenuEditPatient}>
           <ListItemIcon>
             <Edit fontSize="small" />
           </ListItemIcon>
           <ListItemText>Edit Patient</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleMenuAssignTherapist}>
+          <ListItemIcon>
+            <PersonAdd fontSize="small" color="primary" />
+          </ListItemIcon>
+          <ListItemText>Add Therapist</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleMenuCompletePatient}>
           <ListItemIcon>
@@ -823,11 +881,20 @@ const AdminPatientManagement: React.FC = () => {
       </Menu>
 
       {/* Add Patient Dialog */}
-      <AddPatientForm
+      <Dialog
         open={addPatientOpen}
         onClose={() => setAddPatientOpen(false)}
-        onSubmit={handleAddPatient}
-      />
+        maxWidth="md"
+        fullWidth
+      >
+        <AddPatientForm
+          open={addPatientOpen}
+          onClose={() => setAddPatientOpen(false)}
+          onSubmit={(formData) => {
+            void handleAddPatient(formData);
+          }}
+        />
+      </Dialog>
 
       {/* Edit Patient Dialog */}
       <Dialog
@@ -839,120 +906,100 @@ const AdminPatientManagement: React.FC = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Edit Patient Profile</DialogTitle>
+        <DialogTitle>
+          Edit Patient Profile
+          {selectedPatient && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {selectedPatient.first_name} {selectedPatient.last_name}
+            </Typography>
+          )}
+        </DialogTitle>
         <DialogContent dividers>
           {selectedPatient && (
-            <Grid container spacing={2}>
+            <Grid container spacing={2} sx={{ pt: 1 }}>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  defaultValue={selectedPatient.first_name}
-                  id="edit-first-name"
+                <TextField fullWidth label="First Name" value={selectedPatient.first_name}
+                  InputProps={{ readOnly: true }}
+                  helperText="Name changes require an account update"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  defaultValue={selectedPatient.last_name}
-                  id="edit-last-name"
+                <TextField fullWidth label="Last Name" value={selectedPatient.last_name}
+                  InputProps={{ readOnly: true }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  defaultValue={selectedPatient.email}
-                  id="edit-email"
+                <TextField fullWidth label="Email" value={selectedPatient.email}
+                  InputProps={{ readOnly: true }}
+                  helperText="Email changes require an account update"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  defaultValue={selectedPatient.phone}
-                  id="edit-phone"
+                <TextField fullWidth label="Phone"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, phone: e.target.value }))}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Date of Birth"
-                  type="date"
-                  defaultValue={selectedPatient.date_of_birth}
-                  id="edit-dob"
+                <TextField fullWidth label="Date of Birth" type="date"
+                  value={editFormData.dateOfBirth}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Gender"
-                  select
-                  defaultValue={selectedPatient.gender}
-                  SelectProps={{ native: true }}
-                  id="edit-gender"
-                >
-                  <option value="M">Male</option>
-                  <option value="F">Female</option>
-                  <option value="O">Other</option>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Status"
-                  select
-                  defaultValue={selectedPatient.status}
-                  SelectProps={{ native: true }}
-                  id="edit-status"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="discharged">Discharged</option>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Admission Date"
-                  type="date"
-                  defaultValue={selectedPatient.admission_date}
-                  id="edit-admission"
-                  InputLabelProps={{ shrink: true }}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Gender</InputLabel>
+                  <Select
+                    value={editFormData.gender}
+                    label="Gender"
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, gender: e.target.value }))}
+                  >
+                    <MenuItem value=""><em>Not specified</em></MenuItem>
+                    <MenuItem value="M">Male</MenuItem>
+                    <MenuItem value="F">Female</MenuItem>
+                    <MenuItem value="O">Other</MenuItem>
+                    <MenuItem value="P">Prefer not to say</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
             </Grid>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => {
-            setEditPatientOpen(false);
-            setSelectedPatient(null);
-          }}>
+          <Button onClick={() => { setEditPatientOpen(false); setSelectedPatient(null); }}>
             Cancel
           </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              // Gather form data and submit
-              const formData = {
-                first_name: (document.getElementById('edit-first-name') as HTMLInputElement)?.value,
-                last_name: (document.getElementById('edit-last-name') as HTMLInputElement)?.value,
-                email: (document.getElementById('edit-email') as HTMLInputElement)?.value,
-                phone: (document.getElementById('edit-phone') as HTMLInputElement)?.value,
-                date_of_birth: (document.getElementById('edit-dob') as HTMLInputElement)?.value,
-                gender: (document.getElementById('edit-gender') as HTMLSelectElement)?.value,
-                status: (document.getElementById('edit-status') as HTMLSelectElement)?.value,
-                admission_date: (document.getElementById('edit-admission') as HTMLInputElement)?.value,
-              };
-              void handleUpdatePatient(formData);
-            }}
-          >
+          <Button variant="contained" onClick={() => void handleUpdatePatient(editFormData)}>
             Save Changes
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Assign Therapist Dialog */}
+      <Dialog open={assignTherapistOpen} onClose={() => setAssignTherapistOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Assign Therapist</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : ''}
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Therapist</InputLabel>
+            <Select
+              value={selectedTherapistId}
+              label="Therapist"
+              onChange={(e) => setSelectedTherapistId(e.target.value)}
+            >
+              <MenuItem value=""><em>None (Unassign)</em></MenuItem>
+              {therapists.map((t) => (
+                <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAssignTherapistOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={() => void handleConfirmAssignTherapist()}>Save</Button>
         </DialogActions>
       </Dialog>
 

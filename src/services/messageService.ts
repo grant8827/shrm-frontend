@@ -26,19 +26,19 @@ export interface Message {
 export const messageService = {
   // Get available users for messaging
   getUsers: async (): Promise<any[]> => {
-    const response = await apiClient.get('/auth/');
+    const response = await apiClient.get('/api/auth/');
     return response.data.results || response.data;
   },
 
   // Get all message threads for current user
   getThreads: async (): Promise<MessageThread[]> => {
-    const response = await apiClient.get('/messages/threads');
+    const response = await apiClient.get('/api/messages/threads');
     return response.data.results || response.data;
   },
 
   // Get messages for a specific thread
   getMessages: async (threadId: string): Promise<Message[]> => {
-    const response = await apiClient.get(`/messages/threads/${threadId}/messages`);
+    const response = await apiClient.get(`/api/messages/threads/${threadId}/messages`);
     return response.data.results || response.data;
   },
 
@@ -47,24 +47,20 @@ export const messageService = {
     recipient_ids: string[];
     content: string;
     priority?: string;
+    subject?: string;
   }): Promise<Message> => {
-    const response = await apiClient.post('/messages/messages', data);
+    const response = await apiClient.post('/api/messages/messages', data);
     return response.data;
   },
 
   // Mark message as read
   markMessageRead: async (messageId: string): Promise<void> => {
-    await apiClient.post(`/messages/messages/${messageId}/mark_read/`);
+    await apiClient.patch(`/api/messages/messages/${messageId}/read`);
   },
 
   // Toggle star on message
   toggleStar: async (messageId: string): Promise<{ is_starred: boolean }> => {
-    const response = await apiClient.post(`/messages/messages/${messageId}/toggle_star/`);
+    const response = await apiClient.patch(`/api/messages/messages/${messageId}/star`);
     return response.data;
-  },
-
-  // Mark all messages in thread as read
-  markThreadRead: async (threadId: string): Promise<void> => {
-    await apiClient.post(`/messages/threads/${threadId}/mark_read/`);
   },
 };
