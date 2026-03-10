@@ -140,12 +140,7 @@ interface ApiUser {
   is_online?: boolean;
 }
 
-interface ThreadLike {
-  id: string;
-  subject?: string;
-  participants: unknown[];
-  updated_at: string;
-}
+
 
 interface ThreadMessageLike {
   id: string;

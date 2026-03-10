@@ -77,7 +77,6 @@ const APPOINTMENT_TYPES = [
 ] as const;
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FULL_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** Return the Monday of the week containing `date` */
 function getWeekStart(date: Date): Date {
