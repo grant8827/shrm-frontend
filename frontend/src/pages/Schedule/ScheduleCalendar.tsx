@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
   Paper,
-  Grid,
   Button,
   IconButton,
   Select,
@@ -432,7 +431,7 @@ export default function ScheduleCalendar() {
               sx={{ bgcolor: theme.palette.primary.main, color: '#fff' }}
             >
               <Box p={1} />
-              {weekDates.map((date, i) => {
+              {weekDates.map((date) => {
                 const d = new Date(date + 'T12:00:00');
                 const today = toISO(new Date());
                 const isToday = date === today;

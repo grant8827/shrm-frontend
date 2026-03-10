@@ -330,25 +330,6 @@ const buildConversationFromThread = (rawThread: unknown, currentUserId: string):
   };
 };
 
-const parseThreadLike = (thread: unknown): ThreadLike | null => {
-  if (!isRecord(thread)) {
-    return null;
-  }
-
-  const id = stringFrom(thread.id);
-  const updatedAt = stringFrom(thread.updated_at);
-  if (!id || !updatedAt) {
-    return null;
-  }
-
-  return {
-    id,
-    subject: stringFrom(thread.subject),
-    participants: Array.isArray(thread.participants) ? thread.participants : [],
-    updated_at: updatedAt,
-  };
-};
-
 const parseThreadMessageLike = (message: unknown): ThreadMessageLike | null => {
   if (!isRecord(message)) {
     return null;

@@ -890,9 +890,7 @@ const AdminPatientManagement: React.FC = () => {
         <AddPatientForm
           open={addPatientOpen}
           onClose={() => setAddPatientOpen(false)}
-          onSubmit={(formData) => {
-            void handleAddPatient(formData);
-          }}
+          onSubmit={handleAddPatient}
         />
       </Dialog>
 
