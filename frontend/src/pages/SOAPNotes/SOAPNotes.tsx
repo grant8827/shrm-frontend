@@ -39,7 +39,32 @@ import {
 } from '@mui/icons-material';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
+
+// Safe date formatter — returns fallback string instead of crashing on invalid dates
+const safeFormat = (value: string | null | undefined, pattern: string, fallback = '—'): string => {
+  if (!value) return fallback;
+  try {
+    const d = parseISO(value);
+    return isValid(d) ? format(d, pattern) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+// Format a date-only ISO string (YYYY-MM-DD or YYYY-MM-DDThh:mm:ssZ) as a local date
+// without the UTC→local shift that causes off-by-one-day display
+const formatSessionDate = (value: string | null | undefined, fallback = '—'): string => {
+  if (!value) return fallback;
+  // Take only the date portion to avoid timezone conversion
+  const datePart = value.slice(0, 10);
+  try {
+    const d = parseISO(datePart);
+    return isValid(d) ? format(d, 'MMM dd, yyyy') : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 // Transform backend camelCase response → frontend snake_case interface
 const transformNote = (note: any): SOAPNote => ({
@@ -345,7 +370,7 @@ const SOAPNotes: React.FC = () => {
               soapNotes.map((note) => (
                 <Card key={note.id} variant="outlined">
                   <CardContent>
-                    <Typography variant="subtitle2">{format(new Date(note.session_date), 'MMM dd, yyyy')}</Typography>
+                    <Typography variant="subtitle2">{formatSessionDate(note.session_date)}</Typography>
                     <Typography variant="body2" sx={{ mt: 0.5 }}>{note.patient_name}</Typography>
                     <Typography variant="caption" color="text.secondary">{note.therapist_name}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -360,7 +385,7 @@ const SOAPNotes: React.FC = () => {
                       />
                     </Box>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                      Updated {format(new Date(note.updated_at), 'MMM dd, yyyy HH:mm')}
+                      Updated {safeFormat(note.updated_at, 'MMM dd, yyyy HH:mm')}
                     </Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                       <IconButton size="small" color="primary" onClick={() => handleOpenDialog(note)} disabled={loading}>
@@ -413,7 +438,7 @@ const SOAPNotes: React.FC = () => {
                 soapNotes.map((note) => (
                 <TableRow key={note.id}>
                   <TableCell>
-                    {format(new Date(note.session_date), 'MMM dd, yyyy')}
+                    {formatSessionDate(note.session_date)}
                   </TableCell>
                   <TableCell>{note.patient_name}</TableCell>
                   <TableCell>{note.therapist_name}</TableCell>
@@ -427,7 +452,7 @@ const SOAPNotes: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    {format(new Date(note.updated_at), 'MMM dd, yyyy HH:mm')}
+                    {safeFormat(note.updated_at, 'MMM dd, yyyy HH:mm')}
                   </TableCell>
                   <TableCell align="center">
                     <IconButton

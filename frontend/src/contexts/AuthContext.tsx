@@ -144,6 +144,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const encryptedToken = encryptionService.encrypt(token);
         localStorage.setItem('theracare_token', encryptedToken);
         localStorage.setItem('user', JSON.stringify(user));
+
+        // Set auth token for API requests (same as initAuth does on session restore)
+        const { apiClient } = await import('../services/apiClient');
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         dispatch({
           type: 'LOGIN_SUCCESS',
@@ -200,7 +204,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Call logout API
       await authService.logout();
       
-      // Clear local storage
+      // Clear auth header and local storage
+      const { apiClient } = await import('../services/apiClient');
+      delete apiClient.defaults.headers.common['Authorization'];
       localStorage.removeItem('theracare_token');
       localStorage.removeItem('user');
       
@@ -209,6 +215,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout even if API call fails
+      const { apiClient } = await import('../services/apiClient');
+      delete apiClient.defaults.headers.common['Authorization'];
       localStorage.removeItem('theracare_token');
       localStorage.removeItem('user');
       dispatch({ type: 'LOGOUT' });

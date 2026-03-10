@@ -47,6 +47,7 @@ export const messageService = {
     recipient_ids: string[];
     content: string;
     priority?: string;
+    subject?: string;
   }): Promise<Message> => {
     const response = await apiClient.post('/api/messages/messages', data);
     return response.data;
@@ -54,12 +55,12 @@ export const messageService = {
 
   // Mark message as read
   markMessageRead: async (messageId: string): Promise<void> => {
-    await apiClient.patch(`/api/messages/${messageId}/read`);
+    await apiClient.patch(`/api/messages/messages/${messageId}/read`);
   },
 
   // Toggle star on message
   toggleStar: async (messageId: string): Promise<{ is_starred: boolean }> => {
-    const response = await apiClient.patch(`/api/messages/${messageId}/star`);
+    const response = await apiClient.patch(`/api/messages/messages/${messageId}/star`);
     return response.data;
   },
 };

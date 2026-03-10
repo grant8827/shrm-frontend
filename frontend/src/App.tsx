@@ -37,6 +37,7 @@ import TelehealthTranscripts from './pages/Telehealth/TelehealthTranscripts';
 import VideoSession from './pages/Telehealth/VideoSessionSimple';
 import JoinSession from './pages/Telehealth/JoinSession';
 import Reports from './pages/Reports/Reports';
+import ScheduleCalendar from './pages/Schedule/ScheduleCalendar';
 
 // Components
 import { DashboardRedirect } from './components/DashboardRedirect';
@@ -175,6 +176,14 @@ function App() {
                   />
                   <Route path="/telehealth/session/:sessionId" element={<VideoSession />} />
                   <Route path="/telehealth/join/:roomId" element={<JoinSession />} />
+                  <Route
+                    path="/schedule"
+                    element={
+                      <ProtectedRoute requiredRole={["admin", "staff", "therapist"]}>
+                        <ScheduleCalendar />
+                      </ProtectedRoute>
+                    }
+                  />
                   
                   {/* Smart Dashboard Redirect */}
                   <Route index element={<DashboardRedirect />} />

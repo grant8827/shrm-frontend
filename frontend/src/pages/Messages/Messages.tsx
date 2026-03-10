@@ -259,6 +259,77 @@ const parseParticipant = (value: unknown): Participant | null => {
   };
 };
 
+// Build a Conversation directly from the backend thread response (no per-thread message fetch)
+const buildConversationFromThread = (rawThread: unknown, currentUserId: string): Conversation | null => {
+  if (!isRecord(rawThread)) return null;
+  const id = stringFrom(rawThread.id);
+  const updatedAt = stringFrom(rawThread.updated_at);
+  if (!id || !updatedAt) return null;
+
+  const parsedParticipants = Array.isArray(rawThread.participants)
+    ? (rawThread.participants as unknown[]).map(parseParticipant).filter((p): p is Participant => p !== null)
+    : [];
+
+  const rawLastMsg = isRecord(rawThread.last_message) ? rawThread.last_message : null;
+  const subject = stringFrom(rawThread.subject) || 'No Subject';
+
+  const lastMessage: Message = rawLastMsg
+    ? {
+        id: stringFrom(rawLastMsg.id) || `${id}-last`,
+        threadId: id,
+        senderId: isRecord(rawLastMsg.sender) ? stringFrom(rawLastMsg.sender.id) : '',
+        senderName: isRecord(rawLastMsg.sender)
+          ? stringFrom(rawLastMsg.sender.full_name) || stringFrom(rawLastMsg.sender.username)
+          : '',
+        senderRole: isRecord(rawLastMsg.sender) ? toSenderRole(rawLastMsg.sender.role) : 'patient',
+        receiverId: parsedParticipants.find(p => p.id !== (isRecord(rawLastMsg.sender) ? rawLastMsg.sender.id : ''))?.id || '',
+        receiverName: parsedParticipants.find(p => p.id !== (isRecord(rawLastMsg.sender) ? rawLastMsg.sender.id : ''))?.name || '',
+        subject,
+        content: stringFrom(rawLastMsg.content),
+        timestamp: stringFrom(rawLastMsg.created_at) || updatedAt,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        priority: 'normal',
+        attachments: [],
+        isEncrypted: false,
+        deliveryStatus: 'sent',
+        tags: [],
+      }
+    : {
+        id: `${id}-placeholder`,
+        threadId: id,
+        senderId: currentUserId,
+        senderName: '',
+        senderRole: 'patient',
+        receiverId: '',
+        receiverName: '',
+        subject,
+        content: 'No messages yet',
+        timestamp: updatedAt,
+        isRead: true,
+        isStarred: false,
+        isArchived: false,
+        priority: 'normal',
+        attachments: [],
+        isEncrypted: false,
+        deliveryStatus: 'sent',
+        tags: [],
+      };
+
+  const unreadCount = typeof rawThread.unread_count === 'number' ? rawThread.unread_count : 0;
+
+  return {
+    id,
+    participants: parsedParticipants,
+    lastMessage,
+    unreadCount,
+    isGroup: parsedParticipants.length > 2,
+    title: stringFrom(rawThread.subject) || undefined,
+    updatedAt,
+  };
+};
+
 const parseThreadLike = (thread: unknown): ThreadLike | null => {
   if (!isRecord(thread)) {
     return null;
@@ -418,92 +489,20 @@ const Messages: React.FC = () => {
     }
   }, [state.user?.id, state.user?.role]);
 
-  // Load messages and conversations from backend when component mounts
+  // Load conversations (thread list only — messages fetched lazily on click)
   useEffect(() => {
-    const loadMessagesAndConversations = async () => {
+    const loadConversations = async () => {
       try {
         setIsLoadingMessages(true);
-        const threads = await messageService.getThreads();
-        
-        // Convert threads to conversations
-        const loadedConversations: Conversation[] = [];
-        const allMessages: Message[] = [];
-        
-        for (const rawThread of threads) {
-          const thread = parseThreadLike(rawThread);
-          if (!thread) {
-            continue;
-          }
-
-          const threadMessages = await messageService.getMessages(thread.id);
-          const parsedThreadMessages = threadMessages
-            .map((rawMessage) => parseThreadMessageLike(rawMessage))
-            .filter((message): message is ThreadMessageLike => message !== null);
-
-          const parsedParticipants = thread.participants
-            .map((participant) => parseParticipant(participant))
-            .filter((participant): participant is Participant => participant !== null);
-          
-          // Convert backend messages to frontend Message type
-          const convertedMessages = parsedThreadMessages.map((msg) => {
-            const senderId = stringFrom(msg.sender?.id);
-            const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
-
-            return {
-              id: msg.id,
-            threadId: thread.id,
-            senderId,
-            senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
-            senderRole: toSenderRole(msg.sender?.role),
-            receiverId: otherParticipant?.id || '',
-            receiverName: otherParticipant?.name || '',
-            subject: thread.subject || 'No Subject',
-            content: msg.content,
-            timestamp: msg.created_at,
-            isRead: msg.is_read,
-            isStarred: msg.is_starred,
-            isArchived: false,
-            priority: toPriority(msg.priority),
-            attachments: msg.attachments || [],
-            isEncrypted: true,
-            deliveryStatus: 'sent' as Message['deliveryStatus'],
-            tags: [],
-            };
-          });
-          
-          allMessages.push(...convertedMessages);
-          
-          // Create conversation from thread
-          if (convertedMessages.length > 0) {
-            const lastMessage = convertedMessages[convertedMessages.length - 1];
-            const participants = parsedParticipants;
-            
-            const unreadCount = convertedMessages.filter(
-              (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
-            ).length;
-            
-            loadedConversations.push({
-              id: thread.id,
-              participants,
-              lastMessage,
-              unreadCount,
-              isGroup: thread.participants.length > 2,
-              title: thread.subject,
-              updatedAt: thread.updated_at,
-            });
-          }
-        }
-        
-        // Sort conversations by last message time
-        loadedConversations.sort((a, b) => 
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-        
-        setConversations(loadedConversations);
-        setMessages(allMessages);
+        const rawThreads = await messageService.getThreads();
+        const loaded = (Array.isArray(rawThreads) ? rawThreads : [])
+          .map((t) => buildConversationFromThread(t, state.user?.id ?? ''))
+          .filter((c): c is Conversation => c !== null);
+        loaded.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        setConversations(loaded);
+        setMessages([]); // messages are loaded lazily per thread
       } catch (error) {
-        console.error('Failed to load messages:', error);
-        setMessages([]);
+        console.error('Failed to load threads:', error);
         setConversations([]);
       } finally {
         setIsLoadingMessages(false);
@@ -511,7 +510,7 @@ const Messages: React.FC = () => {
     };
 
     if (state.user?.id) {
-      void loadMessagesAndConversations();
+      void loadConversations();
     }
   }, [state.user?.id]);
 
@@ -561,104 +560,94 @@ const Messages: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
 
-  // Handle conversation selection and mark messages as read
-  const handleConversationSelect = (conversationId: string) => {
+  // Handle conversation selection — lazy-load messages for the clicked thread
+  const handleConversationSelect = async (conversationId: string) => {
     setSelectedConversation(conversationId);
-    
-    // Mark all messages in this conversation as read
-    setMessages(prev => prev.map(msg => 
-      msg.threadId === conversationId && msg.senderId !== state.user?.id
-        ? { ...msg, isRead: true }
-        : msg
+    // Optimistically clear unread badge
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId ? { ...c, unreadCount: 0 } : c
     ));
-    
-    // Update the conversation's unread count to 0
-    setConversations(prev => prev.map(conv =>
-      conv.id === conversationId
-        ? { ...conv, unreadCount: 0 }
-        : conv
-    ));
-  };
-
-  // Reload conversations when needed (defined as async function)
-  const reloadConversations = async () => {
     try {
-      const threads = await messageService.getThreads();
-      const loadedConversations: Conversation[] = [];
-      const allMessages: Message[] = [];
-      
-      for (const rawThread of threads) {
-        const thread = parseThreadLike(rawThread);
-        if (!thread) {
-          continue;
-        }
-
-        const threadMessages = await messageService.getMessages(thread.id);
-        const parsedThreadMessages = threadMessages
-          .map((rawMessage) => parseThreadMessageLike(rawMessage))
-          .filter((message): message is ThreadMessageLike => message !== null);
-
-        const parsedParticipants = thread.participants
-          .map((participant) => parseParticipant(participant))
-          .filter((participant): participant is Participant => participant !== null);
-        
-        const convertedMessages = parsedThreadMessages.map((msg) => {
+      const conv = conversations.find(c => c.id === conversationId);
+      const participants = conv?.participants ?? [];
+      const rawMsgs = await messageService.getMessages(conversationId);
+      const converted: Message[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+        .map(parseThreadMessageLike)
+        .filter((m): m is ThreadMessageLike => m !== null)
+        .map((msg) => {
           const senderId = stringFrom(msg.sender?.id);
-          const otherParticipant = parsedParticipants.find((participant) => participant.id !== senderId);
-
+          const other = participants.find(p => p.id !== senderId);
           return {
             id: msg.id,
-          threadId: thread.id,
-          senderId,
-          senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
-          senderRole: toSenderRole(msg.sender?.role),
-          receiverId: otherParticipant?.id || '',
-          receiverName: otherParticipant?.name || '',
-          subject: thread.subject || 'No Subject',
-          content: msg.content,
-          timestamp: msg.created_at,
-          isRead: msg.is_read,
-          isStarred: msg.is_starred,
-          isArchived: false,
-          priority: toPriority(msg.priority),
-          attachments: msg.attachments || [],
-          isEncrypted: true,
-          deliveryStatus: 'sent' as Message['deliveryStatus'],
-          tags: [],
+            threadId: conversationId,
+            senderId,
+            senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+            senderRole: toSenderRole(msg.sender?.role),
+            receiverId: other?.id || '',
+            receiverName: other?.name || '',
+            subject: conv?.title || 'No Subject',
+            content: msg.content,
+            timestamp: msg.created_at,
+            isRead: msg.is_read,
+            isStarred: msg.is_starred,
+            isArchived: false,
+            priority: toPriority(msg.priority),
+            attachments: msg.attachments || [],
+            isEncrypted: false,
+            deliveryStatus: 'sent' as Message['deliveryStatus'],
+            tags: [],
           };
         });
-        
-        allMessages.push(...convertedMessages);
-        
-        if (convertedMessages.length > 0) {
-          const lastMessage = convertedMessages[convertedMessages.length - 1];
-          const participants = parsedParticipants;
-          
-          const unreadCount = convertedMessages.filter(
-            (msg: Message) => !msg.isRead && msg.senderId !== state.user?.id
-          ).length;
-          
-          loadedConversations.push({
-            id: thread.id,
-            participants,
-            lastMessage,
-            unreadCount,
-            isGroup: thread.participants.length > 2,
-            title: thread.subject,
-            updatedAt: thread.updated_at,
+      setMessages(prev => [...prev.filter(m => m.threadId !== conversationId), ...converted]);
+    } catch (err) {
+      console.error('Failed to load thread messages:', err);
+    }
+  };
+
+  // Reload thread list, then refresh messages for whichever thread is open
+  const reloadConversations = async () => {
+    try {
+      const rawThreads = await messageService.getThreads();
+      const loaded = (Array.isArray(rawThreads) ? rawThreads : [])
+        .map((t) => buildConversationFromThread(t, state.user?.id ?? ''))
+        .filter((c): c is Conversation => c !== null);
+      loaded.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setConversations(loaded);
+
+      // Refresh messages for the currently open thread
+      if (selectedConversation) {
+        const conv = loaded.find(c => c.id === selectedConversation);
+        const participants = conv?.participants ?? [];
+        const rawMsgs = await messageService.getMessages(selectedConversation);
+        const converted: Message[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+          .map(parseThreadMessageLike)
+          .filter((m): m is ThreadMessageLike => m !== null)
+          .map((msg) => {
+            const senderId = stringFrom(msg.sender?.id);
+            const other = participants.find(p => p.id !== senderId);
+            return {
+              id: msg.id,
+              threadId: selectedConversation,
+              senderId,
+              senderName: stringFrom(msg.sender?.full_name) || stringFrom(msg.sender?.username),
+              senderRole: toSenderRole(msg.sender?.role),
+              receiverId: other?.id || '',
+              receiverName: other?.name || '',
+              subject: conv?.title || 'No Subject',
+              content: msg.content,
+              timestamp: msg.created_at,
+              isRead: msg.is_read,
+              isStarred: msg.is_starred,
+              isArchived: false,
+              priority: toPriority(msg.priority),
+              attachments: msg.attachments || [],
+              isEncrypted: false,
+              deliveryStatus: 'sent' as Message['deliveryStatus'],
+              tags: [],
+            };
           });
-        }
+        setMessages(prev => [...prev.filter(m => m.threadId !== selectedConversation), ...converted]);
       }
-      
-      loadedConversations.sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
-      
-      console.log('Reloaded conversations:', loadedConversations.length);
-      console.log('Reloaded messages:', allMessages.length);
-      
-      setConversations(loadedConversations);
-      setMessages(allMessages);
     } catch (error) {
       console.error('Failed to reload conversations:', error);
     }
@@ -768,6 +757,7 @@ const Messages: React.FC = () => {
       // Call backend API to send message
       const response = await messageService.sendMessage({
         recipient_ids: [formData.receiverId],
+        subject: formData.subject,
         content: formData.content,
         priority: formData.priority,
       });

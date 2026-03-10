@@ -468,26 +468,47 @@ const AdminPatientManagement: React.FC = () => {
         male: 'M',
         female: 'F',
         other: 'O',
-        prefer_not_to_say: 'P',
+        'prefer-not-to-say': 'P',
       };
 
-      // Transform form data to backend format
+      // Generate username from first + last name
+      const username = `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`.replace(/[^a-z0-9.]/g, '');
+
+      // Transform form data to backend format (camelCase to match Node.js controller)
       const patientData = {
-        first_name_write: formData.firstName,
-        last_name_write: formData.lastName,
-        date_of_birth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
+        // Required user fields
+        username,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phone,
+
+        // Patient fields
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
         gender: genderMap[formData.gender] || 'P',
-        phone_write: formData.phone,
-        email_write: formData.email,
-        street_address_write: formData.address.street,
-        city_write: formData.address.city,
-        zip_code_write: formData.address.zipCode,
-        emergency_contact_name_write: formData.emergencyContact.name,
-        emergency_contact_phone_write: formData.emergencyContact.phone,
-        emergency_contact_relationship_write: formData.emergencyContact.relationship,
-        admission_date: new Date().toISOString().split('T')[0],
-        status: 'active',
-        create_portal_access: true,
+
+        // Address
+        street: formData.address.street,
+        city: formData.address.city,
+        state: formData.address.state,
+        zipCode: formData.address.zipCode,
+
+        // Emergency contact
+        emergencyContactName: formData.emergencyContact.name,
+        emergencyContactPhone: formData.emergencyContact.phone,
+        emergencyContactRelationship: formData.emergencyContact.relationship,
+        emergencyContactEmail: formData.emergencyContact.email,
+
+        // Insurance
+        insuranceProvider: formData.insurance.provider,
+        insurancePolicyNumber: formData.insurance.policyNumber,
+        insuranceGroupNumber: formData.insurance.groupNumber,
+        insuranceMemberID: formData.insurance.memberID,
+
+        // Medical
+        medicalHistory: formData.medical.medicalHistory,
+        allergies: formData.medical.allergies.join(', '),
+        primaryDiagnosis: formData.medical.primaryDiagnosis,
       };
 
       console.log('📤 Sending patient data to API:', patientData);
@@ -938,6 +959,7 @@ const AdminPatientManagement: React.FC = () => {
                     <MenuItem value="M">Male</MenuItem>
                     <MenuItem value="F">Female</MenuItem>
                     <MenuItem value="O">Other</MenuItem>
+                    <MenuItem value="P">Prefer not to say</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
