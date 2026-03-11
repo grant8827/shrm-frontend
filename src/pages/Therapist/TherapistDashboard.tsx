@@ -239,6 +239,9 @@ const TherapistDashboard: React.FC = () => {
               <Button 
                 size="small" 
                 onClick={() => navigate('/appointments')}
+                startIcon={<Event />}
+              >
+                View Full Schedule
               </Button>
             </CardActions>
           </Card>
