@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Normalize baseURL: strip trailing /api (or /api/) so that call-site paths
+// like '/api/patients/' are never doubled into /api/api/patients/
+const rawBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const baseURL = rawBase.replace(/\/api\/?$/, '');
 
 export const apiClient = axios.create({
   baseURL,
