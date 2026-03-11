@@ -573,7 +573,6 @@ const VideoSession: React.FC = () => {
             <Chip
               label={
                 connectionState === 'connecting' ? 'Connecting…' :
-                connectionState === 'checking' ? 'Checking ICE…' :
                 connectionState === 'failed' ? 'ICE Failed' :
                 connectionState === 'disconnected' ? 'Disconnected' :
                 connectionState === 'closed' ? 'Closed' : connectionState
