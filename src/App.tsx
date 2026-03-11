@@ -42,9 +42,35 @@ import ScheduleCalendar from './pages/Schedule/ScheduleCalendar';
 // Components
 import { DashboardRedirect } from './components/DashboardRedirect';
 import { Unauthorized } from './components/Unauthorized';
+import { IdleWarningDialog } from './components/IdleWarningDialog';
+import { useIdleTimeout } from './hooks/useIdleTimeout';
 
 // Styles
 import { theme } from './utils/theme';
+
+// 5 min idle → 3 min countdown → auto-logout
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const WARNING_DURATION_S = 3 * 60;
+
+function IdleManager() {
+  const { state, logout } = useAuth();
+  const { showWarning, countdown, handleStayLoggedIn, handleLogout } = useIdleTimeout({
+    idleTimeout: IDLE_TIMEOUT_MS,
+    warningDuration: WARNING_DURATION_S,
+    onLogout: logout,
+    enabled: state.isAuthenticated,
+  });
+
+  return (
+    <IdleWarningDialog
+      open={showWarning}
+      countdown={countdown}
+      warningDuration={WARNING_DURATION_S}
+      onStayLoggedIn={handleStayLoggedIn}
+      onLogout={handleLogout}
+    />
+  );
+}
 
 // Helper component to pass user to AdminDashboard
 function AdminRoutes() {
@@ -73,6 +99,7 @@ function App() {
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <AuthProvider>
           <NotificationProvider>
+            <IdleManager />
             <Router>
               <Routes>
                 {/* Public Routes */}
