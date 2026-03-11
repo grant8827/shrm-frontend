@@ -10,7 +10,8 @@ interface UseWebRTCResult {
   remoteVideoRef: React.RefObject<HTMLVideoElement>;
   isRemoteVideoReady: boolean;
   isRemotePlaybackBlocked: boolean;
-  initializePeerConnection: (localStream: MediaStream, isInitiator: boolean) => Promise<void>;
+  /** Pass iceServers from the /join API response to use backend-configured TURN credentials */
+  initializePeerConnection: (localStream: MediaStream, isInitiator: boolean, externalIceServers?: RTCIceServer[]) => Promise<void>;
   createOffer: (isRestart?: boolean) => Promise<void>;
   handleOffer: (offer: RTCSessionDescriptionInit, localStream: MediaStream) => Promise<void>;
   handleAnswer: (answer: RTCSessionDescriptionInit) => Promise<void>;
@@ -99,17 +100,17 @@ export const useWebRTC = ({
         });
       }
     } else {
-      servers.push({
-        urls: [
-          'turn:openrelay.metered.ca:80?transport=tcp',
-          'turn:openrelay.metered.ca:443?transport=tcp',
-          'turn:openrelay.metered.ca:443?transport=udp',
-          'turn:openrelay.metered.ca:3478?transport=udp',
-          'turns:openrelay.metered.ca:443?transport=tcp',
-        ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      });
+      // No dedicated TURN configured — use extra public STUN servers as fallback.
+      // NOTE: STUN alone fails for ~20% of peers (symmetric NAT).
+      // Set VITE_TURN_URLS / VITE_TURN_USERNAME / VITE_TURN_CREDENTIAL in production
+      // OR configure TURN_URLS / TURN_USERNAME / TURN_CREDENTIAL in backend env vars
+      // so the /join endpoint serves them.
+      servers.push(
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.nextcloud.com:443' },
+        { urls: 'stun:stun.nextcloud.com:3478' },
+      );
     }
 
     const wantsRelay = (import.meta.env.VITE_WEBRTC_FORCE_RELAY as string | undefined) === 'true';
@@ -141,14 +142,18 @@ export const useWebRTC = ({
     setConnectionState('closed');
   }, []);
 
-  const initializePeerConnection = useCallback(async (localStream: MediaStream, isInitiator: boolean) => {
+  const initializePeerConnection = useCallback(async (localStream: MediaStream, isInitiator: boolean, externalIceServers?: RTCIceServer[]) => {
     if (peerConnectionRef.current) {
       console.warn('[useWebRTC] PeerConnection already exists, closing it.');
       closePeerConnection();
     }
 
-    console.log('[useWebRTC] Initializing RTCPeerConnection');
-    const pc = new RTCPeerConnection(buildIceConfiguration());
+    const iceConfig = externalIceServers && externalIceServers.length > 0
+      ? { iceServers: externalIceServers, iceCandidatePoolSize: 10 }
+      : buildIceConfiguration();
+
+    console.log('[useWebRTC] Initializing RTCPeerConnection with', iceConfig.iceServers?.length ?? 0, 'ICE server(s)');
+    const pc = new RTCPeerConnection(iceConfig);
     peerConnectionRef.current = pc;
 
     // Add local tracks

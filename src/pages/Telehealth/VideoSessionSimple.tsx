@@ -75,6 +75,9 @@ const VideoSession: React.FC = () => {
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
 
+  // ICE servers from /join endpoint (contains backend-configured TURN credentials)
+  const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
+
   // --- Hooks ---
   const {
     localVideoRef,
@@ -105,17 +108,29 @@ const VideoSession: React.FC = () => {
     handleAnswer,
     addIceCandidate,
     closePeerConnection,
+    connectionState,
   } = useWebRTC({
     sendMessage,
     onError: showError,
   });
 
-  // Fetch session details
+  // Fetch session details + call /join to get backend-configured ICE/TURN servers
   useEffect(() => {
     const fetchSession = async () => {
       try {
         const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data as SessionDetails;
+        // Call /join to stamp joinedAt and retrieve ICE server config from backend env vars
+        try {
+          const joinRes = await apiClient.post(`/api/telehealth/sessions/${sessionId}/join`, {});
+          const servers: RTCIceServer[] = (joinRes.data as any)?.iceServers ?? [];
+          if (servers.length > 0) {
+            setIceServers(servers);
+            console.log('[VIDEO] /join returned', servers.length, 'ICE server(s)');
+          }
+        } catch (joinErr) {
+          console.warn('[VIDEO] /join failed (continuing with default ICE config):', joinErr);
+        }
         // If session is still 'scheduled', therapist/admin/staff auto-start it;
         // clients see a "not started" screen.
         if (session.status === 'scheduled') {
@@ -285,7 +300,8 @@ const VideoSession: React.FC = () => {
           // CRITICAL ORDER:
           // 1. Initialize peer connection FIRST so it is ready to handle an
           //    incoming offer before we announce our presence to the room.
-          await initializePeerConnection(stream, false);
+          // Pass iceServers from /join so backend-configured TURN credentials are used.
+          await initializePeerConnection(stream, false, iceServers.length > 0 ? iceServers : undefined);
 
           // 2. Connect signaling and join the room AFTER the PC is prepared.
           await connectWebSocket();
@@ -553,6 +569,21 @@ const VideoSession: React.FC = () => {
             icon={<PeopleIcon />} 
           />
           {isRemoteVideoReady && <Chip label="Connected" color="success" size="small" />}
+          {!isRemoteVideoReady && participantCount > 1 && connectionState !== 'new' && (
+            <Chip
+              label={
+                connectionState === 'connecting' ? 'Connecting…' :
+                connectionState === 'checking' ? 'Checking ICE…' :
+                connectionState === 'failed' ? 'ICE Failed' :
+                connectionState === 'disconnected' ? 'Disconnected' :
+                connectionState === 'closed' ? 'Closed' : connectionState
+              }
+              color={
+                connectionState === 'failed' || connectionState === 'disconnected' ? 'error' : 'warning'
+              }
+              size="small"
+            />
+          )}
           {participantName && <Chip label={participantName} size="small" variant="outlined" sx={{ color: 'white', borderColor: 'white' }} />}
         </Box>
       </Paper>
@@ -583,6 +614,22 @@ const VideoSession: React.FC = () => {
           {isRemoteVideoReady && isRemotePlaybackBlocked && (
             <Box sx={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
               <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
+            </Box>
+          )}
+
+          {/* ICE failure overlay — show retry button */}
+          {(connectionState === 'failed' || connectionState === 'disconnected') && (
+            <Box sx={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
+              <Alert
+                severity="error"
+                action={
+                  <Button color="inherit" size="small" onClick={() => void createOffer(true)}>
+                    Retry
+                  </Button>
+                }
+              >
+                Connection {connectionState} — click Retry to reconnect
+              </Alert>
             </Box>
           )}
 
