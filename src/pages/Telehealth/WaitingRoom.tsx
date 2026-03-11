@@ -40,8 +40,16 @@ interface SessionInfo {
   title?: string;
   scheduled_at?: string;
   status: string;
-  patient_details?: { id: string; name: string };
-  therapist_details?: { id: string; name: string };
+  patient_details?: { id: string; first_name?: string; last_name?: string; name?: string };
+  therapist_details?: { id: string; first_name?: string; last_name?: string; name?: string };
+}
+
+/** Build a display name from a participant details object */
+function displayName(details?: { first_name?: string; last_name?: string; name?: string }): string | undefined {
+  if (!details) return undefined;
+  if (details.name) return details.name;
+  const full = `${details.first_name ?? ''} ${details.last_name ?? ''}`.trim();
+  return full || undefined;
 }
 
 const POLL_INTERVAL_MS = 10_000;
@@ -164,8 +172,8 @@ const WaitingRoom: React.FC = () => {
   const isTherapist = user?.role === UserRole.THERAPIST || user?.role === UserRole.ADMIN || user?.role === UserRole.STAFF;
 
   const otherParticipantLabel = isTherapist
-    ? session?.patient_details?.name ?? 'Patient'
-    : session?.therapist_details?.name ?? 'Provider';
+    ? displayName(session?.patient_details) ?? 'Patient'
+    : displayName(session?.therapist_details) ?? 'Provider';
 
   const handleJoin = () => {
     navigate(`/telehealth/session/${sessionId}`);

@@ -116,10 +116,20 @@ const VideoSession: React.FC = () => {
       try {
         const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data as SessionDetails;
-        // Block entry if session hasn't started (still scheduled)
+        // If session is still 'scheduled', therapist/admin/staff auto-start it;
+        // clients see a "not started" screen.
         if (session.status === 'scheduled') {
-          setSessionError('not_started');
-          return;
+          const canStart = user && ['admin', 'therapist', 'staff'].includes(user.role);
+          if (canStart) {
+            try {
+              await apiClient.post(`/api/telehealth/sessions/${sessionId}/start/`);
+            } catch {
+              // Might already be starting — continue anyway
+            }
+          } else {
+            setSessionError('not_started');
+            return;
+          }
         }
         setRoomId(session.room_id);
         setSessionData(session);

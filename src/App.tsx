@@ -36,6 +36,7 @@ import TelehealthDashboard from './pages/Telehealth/TelehealthDashboard';
 import TelehealthTranscripts from './pages/Telehealth/TelehealthTranscripts';
 import VideoSession from './pages/Telehealth/VideoSessionSimple';
 import JoinSession from './pages/Telehealth/JoinSession';
+import WaitingRoom from './pages/Telehealth/WaitingRoom';
 import Reports from './pages/Reports/Reports';
 import ScheduleCalendar from './pages/Schedule/ScheduleCalendar';
 
@@ -201,6 +202,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/telehealth/waiting/:sessionId" element={<WaitingRoom />} />
                   <Route path="/telehealth/session/:sessionId" element={<VideoSession />} />
                   <Route path="/telehealth/join/:roomId" element={<JoinSession />} />
                   <Route
