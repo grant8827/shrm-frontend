@@ -54,7 +54,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
 
   const fetchPatients = async () => {
     try {
-      const response = await apiClient.get('/patients/');
+      const response = await apiClient.get('/api/patients/');
       // Handle paginated response
       const patientList = response.data?.results || response.data || [];
       setPatients(patientList);
@@ -89,7 +89,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
     try {
       const requestData = { patient_id: selectedPatientId };
 
-      const response = await apiClient.post('/telehealth/sessions/create_emergency/', requestData);
+      const response = await apiClient.post('/api/telehealth/sessions/create_emergency/', requestData);
       
       // Store the session URL
       setCreatedSessionUrl(response.data.session_url);

@@ -100,10 +100,10 @@ const StaffDashboard: React.FC = () => {
     const loadData = async () => {
       try {
         // TODO: Load from actual API
-        // const patientsResponse = await apiClient.get('/patients/');
-        // const appointmentsResponse = await apiClient.get('/appointments/');
-        // const soapNotesResponse = await apiClient.get('/soap-notes/?status=pending');
-        // const messagesResponse = await apiClient.get('/messages/?unread=true');
+        // const patientsResponse = await apiClient.get('/api/patients/);
+        // const appointmentsResponse = await apiClient.get('/api/appointments/);
+        // const soapNotesResponse = await apiClient.get('/api/soap-notes/?status=pending);
+        // const messagesResponse = await apiClient.get('/api/messages/?unread=true);
         
         setPatients([]);
         setAppointments([]);

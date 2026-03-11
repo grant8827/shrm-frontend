@@ -53,7 +53,7 @@ const TelehealthTranscripts: React.FC = () => {
     const loadTranscripts = async () => {
       setLoading(true);
       try {
-        const response = await apiClient.get('/telehealth/sessions/transcripts/');
+        const response = await apiClient.get('/api/telehealth/sessions/transcripts/');
         const records = Array.isArray(response.data) ? response.data : [];
         setTranscripts(records);
       } catch (error) {

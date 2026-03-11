@@ -36,7 +36,7 @@ const ClientDashboard: React.FC = () => {
     const loadAppointments = async () => {
       try {
         // TODO: Replace with actual API call
-        // const response = await apiClient.get('/appointments/');
+        // const response = await apiClient.get('/api/appointments/);
         // const allAppointments = response.data;
         
         // For now, show empty state

@@ -145,8 +145,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       setError(null);
 
       // Fetch real data from API
-      const usersRes = await apiClient.get('/auth/');
-      const patientsRes = await apiClient.get('/patients/');
+      const usersRes = await apiClient.get('/api/auth/');
+      const patientsRes = await apiClient.get('/api/patients/');
       
       // Handle both paginated and non-paginated responses
       const allUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results || []);
@@ -178,7 +178,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       let todayAppointments = 0;
       let pendingAppointments = 0;
       try {
-        const appointmentsRes = await apiClient.get('/appointments/');
+        const appointmentsRes = await apiClient.get('/api/appointments/');
         const allAppointments = Array.isArray(appointmentsRes.data) 
           ? appointmentsRes.data 
           : (appointmentsRes.data?.results || []);
@@ -285,7 +285,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         console.log('Updating user with data:', updateData);
         
         // Use PATCH for partial update
-        await apiClient.patch(`/auth/${_selectedUser.id}/`, updateData);
+        await apiClient.patch(`/api/auth/${_selectedUser.id}/`, updateData);
       } else {
         // Create new user - validate passwords match
         if (editUserData.password !== editUserData.password_confirm) {
@@ -306,7 +306,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         };
         
         console.log('Creating user with data:', createData);
-        await apiClient.post('/auth/register/', createData);
+        await apiClient.post('/api/auth/register/', createData);
       }
       setUserDialogOpen(false);
       _setSelectedUser(null);
@@ -360,19 +360,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         case 'lock':
           // Suspend user account (prevent login)
           if (window.confirm('Are you sure you want to suspend this user account?')) {
-            await apiClient.patch(`/auth/${userId}/`, { is_active: false });
+            await apiClient.patch(`/api/auth/${userId}/`, { is_active: false });
             await loadDashboardData();
           }
           break;
         case 'unlock':
           // Unsuspend user account (allow login)
-          await apiClient.patch(`/auth/${userId}/`, { is_active: true });
+          await apiClient.patch(`/api/auth/${userId}/`, { is_active: true });
           await loadDashboardData();
           break;
         case 'delete':
           // Soft delete - remove from view but keep in database
           if (window.confirm('Are you sure you want to delete this user? They will be removed from the list but data will be preserved.')) {
-            await apiClient.delete(`/auth/${userId}/`);
+            await apiClient.delete(`/api/auth/${userId}/`);
             await loadDashboardData();
           }
           break;

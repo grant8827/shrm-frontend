@@ -197,7 +197,7 @@ const SOAPNotes: React.FC = () => {
     if (note) {
       setSoapData({
         patientId: note.patient,
-        date: format(new Date(note.session_date), 'yyyy-MM-dd'),
+        date: safeFormat(note.session_date, 'yyyy-MM-dd', format(new Date(), 'yyyy-MM-dd')),
         subjective: note.subjective || '',
         objective: note.objective || '',
         assessment: note.assessment || '',

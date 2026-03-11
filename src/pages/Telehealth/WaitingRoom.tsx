@@ -68,7 +68,7 @@ const WaitingRoom: React.FC = () => {
     if (!sessionId) return;
     const load = async () => {
       try {
-        const res = await apiClient.get(`/telehealth/sessions/${sessionId}/`);
+        const res = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         setSession(res.data as SessionInfo);
       } catch (err) {
         console.error('[WaitingRoom] Failed to load session:', err);
@@ -93,12 +93,12 @@ const WaitingRoom: React.FC = () => {
 
     try {
       // Check self
-      const selfRes = await apiClient.get(`/telehealth/presence/${user.id}`);
+      const selfRes = await apiClient.get(`/api/telehealth/presence/${user.id}`);
       setSelfOnline((selfRes.data as { online: boolean }).online);
 
       // Check other participant
       if (otherUserId) {
-        const otherRes = await apiClient.get(`/telehealth/presence/${otherUserId}`);
+        const otherRes = await apiClient.get(`/api/telehealth/presence/${otherUserId}`);
         setProviderOnline((otherRes.data as { online: boolean }).online);
       } else {
         setProviderOnline(false);

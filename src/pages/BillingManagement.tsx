@@ -117,7 +117,7 @@ const BillingManagement: React.FC = () => {
 
   const fetchBills = async () => {
     try {
-      const response = await apiClient.get('/billing/invoices');
+      const response = await apiClient.get('/api/billing/invoices');
       const list: any[] = response.data.results || response.data;
       setBills(list.map((inv: any) => {
         const isPaid = inv.status === 'paid';
@@ -152,7 +152,7 @@ const BillingManagement: React.FC = () => {
 
   const fetchPatients = async () => {
     try {
-      const response = await apiClient.get('/patients/');
+      const response = await apiClient.get('/api/patients/');
       const list: any[] = response.data.results || response.data;
       setPatients(list.map((p: any) => ({
         id: p.id,
@@ -172,7 +172,7 @@ const BillingManagement: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const response = await apiClient.get('/billing/summary');
+      const response = await apiClient.get('/api/billing/summary');
       const s = response.data;
       setSummary({
         totalRevenue: s.totalPaid ?? 0,
@@ -229,10 +229,10 @@ const BillingManagement: React.FC = () => {
         status: 'pending',
       };
       if (editMode && selectedBill) {
-        await apiClient.patch(`/billing/invoices/${selectedBill.id}`, payload);
+        await apiClient.patch(`/api/billing/invoices/${selectedBill.id}`, payload);
         showSuccess('Bill updated successfully');
       } else {
-        await apiClient.post('/billing/invoices', payload);
+        await apiClient.post('/api/billing/invoices', payload);
         showSuccess('Bill created successfully');
       }
       handleCloseDialog();
@@ -248,7 +248,7 @@ const BillingManagement: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this bill?')) return;
     
     try {
-      await apiClient.delete(`/billing/invoices/${billId}`);
+      await apiClient.delete(`/api/billing/invoices/${billId}`);
       showSuccess('Bill deleted successfully');
       fetchBills();
       fetchSummary();
@@ -277,7 +277,7 @@ const BillingManagement: React.FC = () => {
     if (!selectedBill) return;
 
     try {
-      await apiClient.post(`/billing/invoices/${selectedBill.id}/payment`, {
+      await apiClient.post(`/api/billing/invoices/${selectedBill.id}/payment`, {
         amount: parseFloat(paymentData.amount) || 0,
         paymentMethod: paymentData.payment_method || undefined,
       });

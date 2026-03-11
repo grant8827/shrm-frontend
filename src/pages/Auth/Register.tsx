@@ -80,7 +80,7 @@ const Register: React.FC = () => {
         setSuccess('');
 
         // Make API call to register using apiClient
-        await apiClient.post('/auth/register/', {
+        await apiClient.post('/api/auth/register/', {
           username: values.username,
           email: values.email,
           password: values.password,

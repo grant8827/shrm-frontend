@@ -84,7 +84,7 @@ const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
     try {
       const { apiClient } = await import('../services/apiClient');
-      const response = await apiClient.post<{ message: string; user?: { must_change_password?: boolean } }>('/users/change-password/', {
+      const response = await apiClient.post<{ message: string; user?: { must_change_password?: boolean } }>('/api/users/change-password/', {
         currentPassword,
         newPassword,
       });

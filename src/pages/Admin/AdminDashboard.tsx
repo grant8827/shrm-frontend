@@ -134,8 +134,8 @@ const AdminDashboard: React.FC = () => {
       setLoadingScheduleData(true);
       try {
         const [therapistsRes, patientsRes] = await Promise.all([
-          apiClient.get('/schedule/therapists'),
-          apiClient.get('/patients/'),
+          apiClient.get('/api/schedule/therapists'),
+          apiClient.get('/api/patients/'),
         ]);
         const therapists = therapistsRes.data as { id: string; full_name: string }[];
         setTherapistList(therapists);
@@ -169,7 +169,7 @@ const AdminDashboard: React.FC = () => {
       try {
         setIsLoadingUsers(true);
         console.log('Loading users for admin dashboard...');
-        const response = await apiClient.get('/auth/');
+        const response = await apiClient.get('/api/auth/');
         console.log('Users API response:', response.data);
         
         const users = (response.data.results || response.data).map((user: any) => ({
@@ -915,11 +915,11 @@ const AdminDashboard: React.FC = () => {
                 
                 console.log('Sending user data:', userData);
                 
-                const response = await apiClient.post('/auth/register/', userData);
+                const response = await apiClient.post('/api/auth/register/', userData);
                 console.log('User created:', response.data);
                 
                 // Reload users list after successful creation
-                const usersResponse = await apiClient.get('/auth/');
+                const usersResponse = await apiClient.get('/api/auth/');
                 const users = (usersResponse.data.results || usersResponse.data).map((user: any) => ({
                   id: user.id,
                   name: user.full_name || user.username || 'Unknown User',

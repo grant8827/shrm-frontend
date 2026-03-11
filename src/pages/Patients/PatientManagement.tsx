@@ -88,7 +88,7 @@ const PatientManagement: React.FC = () => {
   const loadTherapists = async () => {
     try {
       // Fetch therapists (users with role ADMIN or THERAPIST)
-      const response = await apiClient.get('/auth/?role=ADMIN,THERAPIST');
+      const response = await apiClient.get('/api/auth/?role=ADMIN,THERAPIST');
       const therapistList = response.data.results.map((user: any) => ({
         id: user.id,
         name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username

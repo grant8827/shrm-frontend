@@ -144,7 +144,7 @@ const AppointmentScheduling: React.FC = () => {
     const loadPatients = async () => {
       try {
         setIsLoadingPatients(true);
-        const response = await apiClient.get('/patients/');
+        const response = await apiClient.get('/api/patients/');
         console.log('Patients API Response:', response.data);
         
         const allPatients = Array.isArray(response.data.results) 
@@ -177,7 +177,7 @@ const AppointmentScheduling: React.FC = () => {
     const loadTherapists = async () => {
       try {
         setIsLoadingTherapists(true);
-        const response = await apiClient.get('/users/therapists/');
+        const response = await apiClient.get('/api/users/therapists/');
         console.log('Therapists API Response:', response.data);
         
         const allUsers = Array.isArray(response.data.results) 
@@ -210,7 +210,7 @@ const AppointmentScheduling: React.FC = () => {
     const loadAppointmentTypes = async () => {
       try {
         console.log('Fetching appointment types from /appointments/types/...');
-        const response = await apiClient.get('/appointments/types/');
+        const response = await apiClient.get('/api/appointments/types/');
         console.log('Appointment types response:', response.data);
         const types = Array.isArray(response.data.results) 
           ? response.data.results 
@@ -329,7 +329,7 @@ const AppointmentScheduling: React.FC = () => {
         // Try to load appointment types one more time
         console.log('Attempting to reload appointment types...');
         try {
-          const response = await apiClient.get('/appointments/types/');
+          const response = await apiClient.get('/api/appointments/types/');
           const types = Array.isArray(response.data.results) 
             ? response.data.results 
             : Array.isArray(response.data) 
@@ -379,11 +379,11 @@ const AppointmentScheduling: React.FC = () => {
 
       if (editingAppointment) {
         // Update existing appointment
-        await apiClient.put(`/appointments/${editingAppointment.id}/`, appointmentPayload);
+        await apiClient.put(`/api/appointments/${editingAppointment.id}/`, appointmentPayload);
         alert('Appointment updated successfully!');
       } else {
         // Create new appointment
-        await apiClient.post('/appointments/', appointmentPayload);
+        await apiClient.post('/api/appointments/', appointmentPayload);
         alert('Appointment scheduled successfully!');
       }
 
@@ -426,7 +426,7 @@ const AppointmentScheduling: React.FC = () => {
   // Confirm appointment (patient confirms their appointment)
   const confirmAppointment = async (appointmentId: string) => {
     try {
-      await apiClient.patch(`/appointments/${appointmentId}/`, { status: 'confirmed' });
+      await apiClient.patch(`/api/appointments/${appointmentId}/`, { status: 'confirmed' });
       alert('Appointment confirmed successfully!');
       await loadAppointments(); // Reload to show updated status
     } catch (error: any) {
@@ -442,7 +442,7 @@ const AppointmentScheduling: React.FC = () => {
   const loadAppointments = async () => {
     try {
       console.log('Loading appointments from API...');
-      const response = await apiClient.get('/appointments/');
+      const response = await apiClient.get('/api/appointments/');
       console.log('Appointments API response:', response.data);
       
       const appointmentsData = Array.isArray(response.data.results) 
@@ -547,11 +547,11 @@ const AppointmentScheduling: React.FC = () => {
   const updateAppointmentStatus = async (appointmentId: string, status: Appointment['status']) => {
     try {
       if (status === 'confirmed') {
-        await apiClient.post(`/appointments/${appointmentId}/confirm/`);
+        await apiClient.post(`/api/appointments/${appointmentId}/confirm/`);
       } else if (status === 'cancelled') {
-        await apiClient.post(`/appointments/${appointmentId}/cancel/`);
+        await apiClient.post(`/api/appointments/${appointmentId}/cancel/`);
       } else if (status === 'completed') {
-        await apiClient.post(`/appointments/${appointmentId}/complete/`);
+        await apiClient.post(`/api/appointments/${appointmentId}/complete/`);
       }
       
       // Update local state

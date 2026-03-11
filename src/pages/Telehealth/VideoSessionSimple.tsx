@@ -114,7 +114,7 @@ const VideoSession: React.FC = () => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await apiClient.get(`/telehealth/sessions/${sessionId}/`);
+        const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data as SessionDetails;
         // Block entry if session hasn't started (still scheduled)
         if (session.status === 'scheduled') {
@@ -335,7 +335,7 @@ const VideoSession: React.FC = () => {
             const formData = new FormData();
             formData.append('recording', blob, 'session-recording.webm');
             try {
-              await apiClient.post(`/telehealth/sessions/${sessionId}/upload_recording/`, formData, {
+              await apiClient.post(`/api/telehealth/sessions/${sessionId}/upload_recording/`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
               });
               showSuccess('Recording saved successfully');
@@ -451,7 +451,7 @@ const VideoSession: React.FC = () => {
         
         if (transcriptText.length > 0) {
             try {
-                await apiClient.post(`/telehealth/sessions/${sessionId}/save_transcript/`, {
+                await apiClient.post(`/api/telehealth/sessions/${sessionId}/save_transcript/`, {
                   transcript: transcriptText.join('\n')
                 });
                 showSuccess('Transcript saved');

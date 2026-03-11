@@ -81,7 +81,7 @@ const CompleteRegistration: React.FC = () => {
     setError(null);
     
     try {
-      const response = await apiClient.post<TokenData>('/auth/registration/validate-token/', { token });
+      const response = await apiClient.post<TokenData>('/api/auth/registration/validate-token/', { token });
       setTokenData(response.data);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -156,7 +156,7 @@ const CompleteRegistration: React.FC = () => {
     setError(null);
     
     try {
-      const response = await apiClient.post<CompleteRegistrationResponse>('/auth/registration/complete/', {
+      const response = await apiClient.post<CompleteRegistrationResponse>('/api/auth/registration/complete/', {
         token,
         username: formData.username,
         password: formData.password,

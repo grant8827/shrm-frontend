@@ -196,7 +196,7 @@ const VideoSession: React.FC = () => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
-        const response = await apiClient.get(`/telehealth/sessions/${sessionId}/`);
+        const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data;
         setRoomId(session.room_id);
         setSessionData(session);

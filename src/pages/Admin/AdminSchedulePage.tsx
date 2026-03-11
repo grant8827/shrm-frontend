@@ -38,8 +38,8 @@ const AdminSchedulePage: React.FC = () => {
       setLoading(true);
       try {
         const [therapistsRes, patientsRes] = await Promise.all([
-          apiClient.get('/schedule/therapists'),
-          apiClient.get('/patients/'),
+          apiClient.get('/api/schedule/therapists'),
+          apiClient.get('/api/patients/'),
         ]);
         const therapists = therapistsRes.data as { id: string; full_name: string }[];
         setTherapistList(therapists);

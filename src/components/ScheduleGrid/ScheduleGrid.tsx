@@ -138,7 +138,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
     try {
       const startDate = dates[0];
       const endDate = dates[6];
-      const res = await apiClient.get(`/schedule/${therapistId}`, {
+      const res = await apiClient.get(`/api/schedule/${therapistId}`, {
         params: { startDate, endDate },
       });
       setGrid((res.data as { grid: Grid }).grid ?? {});
@@ -208,7 +208,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
         }));
 
         try {
-          await apiClient.post('/schedule/toggle', { therapistId, date, slot });
+          await apiClient.post('/api/schedule/toggle', { therapistId, date, slot });
         } catch (err: unknown) {
           // Roll back on failure
           setGrid((prev) => ({

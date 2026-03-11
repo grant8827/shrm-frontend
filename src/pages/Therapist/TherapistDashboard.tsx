@@ -67,10 +67,10 @@ const TherapistDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       // TODO: Replace with actual API endpoints
-      // const appointmentsRes = await apiClient.get('/appointments/?today=true');
-      // const patientsRes = await apiClient.get('/patients/?status=active');
-      // const messagesRes = await apiClient.get('/messages/?unread=true');
-      // const soapNotesRes = await apiClient.get('/soap-notes/?status=pending');
+      // const appointmentsRes = await apiClient.get('/api/appointments/?today=true);
+      // const patientsRes = await apiClient.get('/api/patients/?status=active);
+      // const messagesRes = await apiClient.get('/api/messages/?unread=true);
+      // const soapNotesRes = await apiClient.get('/api/soap-notes/?status=pending);
       
       // setTodayAppointments(appointmentsRes.data);
       // setStats({
@@ -239,9 +239,6 @@ const TherapistDashboard: React.FC = () => {
               <Button 
                 size="small" 
                 onClick={() => navigate('/appointments')}
-                startIcon={<Event />}
-              >
-                View Full Schedule
               </Button>
             </CardActions>
           </Card>

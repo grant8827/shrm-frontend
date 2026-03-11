@@ -83,7 +83,7 @@ const AdminSettings: React.FC = () => {
       if (editUserId) {
         try {
           setLoading(true);
-          const response = await apiClient.get(`/auth/${editUserId}/`);
+          const response = await apiClient.get(`/api/auth/${editUserId}/`);
           const userData = response.data;
           setEditingUser(userData);
           setProfileData({
@@ -150,7 +150,7 @@ const AdminSettings: React.FC = () => {
         phone_number: profileData.phone,
       };
 
-      await apiClient.patch(`/auth/${userId}/`, updateData);
+      await apiClient.patch(`/api/auth/${userId}/`, updateData);
       showSuccess(editUserId ? 'User updated successfully' : 'Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);

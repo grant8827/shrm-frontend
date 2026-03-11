@@ -108,7 +108,7 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
 
     try {
       // Fetch patients from database
-      const response = await apiClient.get('/patients/');
+      const response = await apiClient.get('/api/patients/');
       const allUsers = Array.isArray(response.data?.results)
         ? response.data.results
         : Array.isArray(response.data)

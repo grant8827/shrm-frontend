@@ -128,7 +128,7 @@ const TelehealthDashboard: React.FC = () => {
 
   const loadPatients = async () => {
     try {
-      const response = await apiClient.get('/patients/');
+      const response = await apiClient.get('/api/patients/');
       const patientList = response.data?.results || response.data || [];
       setPatients(patientList);
     } catch (error) {
@@ -139,7 +139,7 @@ const TelehealthDashboard: React.FC = () => {
   const loadSessions = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/telehealth/sessions/');
+      const response = await apiClient.get('/api/telehealth/sessions/');
       
       console.log('Sessions response:', response);
       
@@ -230,7 +230,7 @@ const TelehealthDashboard: React.FC = () => {
         notes: newSession.notes,
       };
 
-      await apiClient.post('/telehealth/sessions/', sessionData);
+      await apiClient.post('/api/telehealth/sessions/', sessionData);
       
       showSuccess('Telehealth session scheduled successfully');
       setOpenNewSessionDialog(false);
@@ -280,7 +280,7 @@ const TelehealthDashboard: React.FC = () => {
     }
     
     try {
-      await apiClient.post(`/telehealth/sessions/${sessionId}/cancel/`);
+      await apiClient.post(`/api/telehealth/sessions/${sessionId}/cancel/`);
       showSuccess('Session cancelled successfully');
       await loadSessions();
     } catch (error) {

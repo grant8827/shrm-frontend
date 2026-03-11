@@ -95,7 +95,7 @@ const BookingModal: React.FC<BookingModalProps> = ({
     setError(null);
 
     try {
-      const res = await apiClient.post('/schedule/book', {
+      const res = await apiClient.post('/api/schedule/book', {
         therapistId,
         date,
         slot,

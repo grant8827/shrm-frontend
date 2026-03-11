@@ -40,7 +40,7 @@ const JoinSession: React.FC = () => {
       setError(null);
 
       // Search for session by room_id
-      const response = await apiClient.get(`/telehealth/sessions/`, {
+      const response = await apiClient.get(`/api/telehealth/sessions/`, {
         params: { room_id: roomId }
       });
 
