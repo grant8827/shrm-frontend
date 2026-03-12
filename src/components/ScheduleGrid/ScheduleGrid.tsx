@@ -431,6 +431,11 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                           Book
                         </Typography>
                       )}
+                      {value === '1' && mode === 'therapist' && (
+                        <Typography variant="caption" fontSize={9} sx={{ color: '#fff', fontWeight: 600, opacity: 0.9 }}>
+                          Available
+                        </Typography>
+                      )}
                     </Box>
                   </Tooltip>
                 );

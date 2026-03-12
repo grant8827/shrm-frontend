@@ -545,6 +545,10 @@ export default function ScheduleCalendar() {
                           <Typography variant="caption" fontWeight={600} fontSize={10}>
                             Booked
                           </Typography>
+                        ) : value === '1' && !past && isTherapist ? (
+                          <Typography variant="caption" fontWeight={600} fontSize={10} sx={{ color: '#1565c0' }}>
+                            Available
+                          </Typography>
                         ) : null}
                       </Box>
                     </Tooltip>
