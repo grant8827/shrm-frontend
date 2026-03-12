@@ -692,13 +692,13 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
                   variant="outlined"
                   startIcon={<Description />}
                   onClick={() => setShowTranscript(true)}
-                  disabled={!transcript && realtimeEntries.length === 0}
+                  disabled={realtimeEntries.length === 0}
                   size="small"
                 >
                   View Full Transcript
                 </Button>
 
-                {(transcript || realtimeEntries.length > 0) && (
+                {realtimeEntries.length > 0 && (
                   <>
                     <Button
                       variant="outlined"
