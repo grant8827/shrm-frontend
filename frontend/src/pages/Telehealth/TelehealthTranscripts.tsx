@@ -83,7 +83,7 @@ const TelehealthTranscripts: React.FC = () => {
     };
 
     loadTranscripts();
-  }, [showError]);
+  }, []);
 
   const filteredTranscripts = useMemo(() => {
     if (!sessionFilter) {
