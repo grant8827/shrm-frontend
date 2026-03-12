@@ -17,6 +17,7 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import ChangePassword from './pages/Auth/ChangePassword';
 import CompleteRegistration from './pages/Auth/CompleteRegistration';
+import ResetPassword from './pages/Auth/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import TherapistDashboard from './pages/Therapist/TherapistDashboard';
 import ClientDashboard from './pages/Client/ClientDashboard';
@@ -109,6 +110,7 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="/complete-registration/:token" element={<CompleteRegistration />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Protected Routes */}
                 <Route

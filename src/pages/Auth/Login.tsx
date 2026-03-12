@@ -19,6 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import ChangePasswordDialog from '../../components/ChangePasswordDialog';
+import { ForgotPasswordDialog } from '../../components/ForgotPasswordDialog';
 
 const validationSchema = yup.object({
   username: yup
@@ -35,6 +36,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loggedInUsername, setLoggedInUsername] = useState('');
   const { login } = useAuth();
   const { showError, showSuccess } = useNotification();
@@ -198,7 +200,12 @@ const Login: React.FC = () => {
 
           {/* Additional Actions */}
           <Box textAlign="center">
-            <Link href="#" variant="body2" sx={{ display: 'block', mb: 1 }}>
+            <Link
+              component="button"
+              variant="body2"
+              sx={{ display: 'block', mb: 1, background: 'none', border: 'none', cursor: 'pointer' }}
+              onClick={() => setShowForgotPassword(true)}
+            >
               Forgot your password?
             </Link>
             <Link href="#" variant="body2">
@@ -220,6 +227,12 @@ const Login: React.FC = () => {
         open={showPasswordChangeDialog}
         onPasswordChanged={handlePasswordChanged}
         username={loggedInUsername}
+      />
+
+      {/* Forgot Password Dialog */}
+      <ForgotPasswordDialog
+        open={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
       />
     </Container>
   );
