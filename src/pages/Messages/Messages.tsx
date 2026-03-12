@@ -377,68 +377,23 @@ const Messages: React.FC = () => {
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        console.log('Loading users for messaging. User role:', state.user?.role);
-        console.log('Auth token exists:', !!localStorage.getItem('access_token'));
-        
-        // For admin users, load ALL users from the system
-        if (state.user?.role === UserRole.ADMIN) {
-          // Fetch all users with pagination handling
-          let allUsers: ApiUser[] = [];
-          let nextUrl: string | null = '/api/auth/';
-          
-          // Keep fetching until no more pages
-          while (nextUrl) {
-            console.log('Fetching users from:', nextUrl);
-            try {
-              const apiResponse: { data: unknown } = await apiClient.get(nextUrl);
-              console.log('API Response:', apiResponse);
-              const { users: pageUsers, next } = parseAuthUsersPayload(apiResponse.data);
-              console.log('Page users:', pageUsers);
-              allUsers = [...allUsers, ...pageUsers];
-              
-              // Check for next page
-              nextUrl = next;
-            } catch (apiError: unknown) {
-              console.error('API call failed:', apiError);
-              throw apiError;
-            }
-          }
-          
-          const users = allUsers.map(mapApiUser);
-          
-          console.log(`Admin: Loaded ${users.length} total users:`, users);
-          setAvailableUsers(users);
-        } else {
-          // For non-admin users, load users from first page only
-          console.log('Fetching users from /api/auth/');
-          const response: { data: unknown } = await apiClient.get('/api/auth/');
-          console.log('API Response:', response);
-          const { users: pageUsers } = parseAuthUsersPayload(response.data);
-          const users = pageUsers.map(mapApiUser);
-          console.log(`Non-admin: Loaded ${users.length} users:`, users);
-          setAvailableUsers(users);
-        }
+        // Role-filtered recipient list from the server
+        const response: { data: { results: ApiUser[] } } = await apiClient.get('/api/messages/recipients');
+        const users = (response.data?.results ?? []).map(mapApiUser);
+        setAvailableUsers(users);
       } catch (error: unknown) {
-        console.error('Failed to load users from API:', error);
-        
-        // Fallback: Try to load users from existing message threads
+        console.error('Failed to load recipients from API:', error);
+
+        // Fallback: derive contact list from existing threads
         try {
-          console.log('Trying fallback: loading users from message threads...');
           const threads = await messageService.getThreads();
           const uniqueUsers = new Map<string, { id: string; name: string; role: string; isOnline: boolean }>();
-          
           threads.forEach((thread) => {
             const rawParticipants = Array.isArray(thread.participants) ? thread.participants : [];
             rawParticipants.forEach((participantValue: unknown) => {
-              if (!isRecord(participantValue)) {
-                return;
-              }
-
+              if (!isRecord(participantValue)) return;
               const participantId = stringFrom(participantValue.id);
-              if (!participantId || uniqueUsers.has(participantId)) {
-                return;
-              }
-
+              if (!participantId || uniqueUsers.has(participantId)) return;
               uniqueUsers.set(participantId, {
                 id: participantId,
                 name: stringFrom(participantValue.full_name) || stringFrom(participantValue.username) || 'Unknown',
@@ -447,14 +402,8 @@ const Messages: React.FC = () => {
               });
             });
           });
-          
-          const usersFromThreads = Array.from(uniqueUsers.values());
-          console.log(`Loaded ${usersFromThreads.length} users from threads:`, usersFromThreads);
-          setAvailableUsers(usersFromThreads);
-        } catch (threadError) {
-          console.error('Failed to load users from threads:', threadError);
-          // Don't use mock data - keep empty array to show proper error message
-          console.error('No users available. Please check API connectivity.');
+          setAvailableUsers(Array.from(uniqueUsers.values()));
+        } catch {
           setAvailableUsers([]);
         }
       }
