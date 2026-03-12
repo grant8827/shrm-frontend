@@ -24,9 +24,6 @@ import {
   Avatar,
   Tabs,
   Tab,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Menu,
   ListItemIcon,
@@ -34,7 +31,6 @@ import {
   DialogContentText,
   Snackbar,
   Alert,
-  CircularProgress,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -127,7 +123,6 @@ const PatientManagement: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [tabValue, setTabValue] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [actionAnchorEl, setActionAnchorEl] = useState<null | HTMLElement>(null);
   const [actionPatient, setActionPatient] = useState<PatientItem | null>(null);
