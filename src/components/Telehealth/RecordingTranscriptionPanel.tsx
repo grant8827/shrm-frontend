@@ -42,7 +42,6 @@ import {
   RecordingQuality,
   TranscriptionSettings,
   TranscriptionState,
-  SessionTranscript,
   TranscriptEntry,
   RecordingControls,
   TranscriptionProvider
@@ -107,7 +106,6 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
   });
   
   const [transcriptionState, setTranscriptionState] = useState<TranscriptionState | null>(null);
-  const [transcript, setTranscript] = useState<SessionTranscript | null>(null);
   const [realtimeEntries, setRealtimeEntries] = useState<TranscriptEntry[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
