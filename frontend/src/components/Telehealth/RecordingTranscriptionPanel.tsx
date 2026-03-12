@@ -48,17 +48,39 @@ import {
   TranscriptionProvider
 } from '../../types';
 import { telehealthService } from '../../services/telehealthService';
+import { apiClient } from '../../services/apiClient';
 
 interface RecordingTranscriptionPanelProps {
   sessionId: string;
   onRecordingStateChange?: (isRecording: boolean) => void;
   onTranscriptionUpdate?: (entries: TranscriptEntry[]) => void;
+  /** Full name of the therapist in this session */
+  therapistName?: string;
+  /** Full name of the patient in this session */
+  patientName?: string;
 }
+
+/** Returns display label, MUI color, and a light background for a speaker */
+const getSpeakerStyle = (
+  speakerName: string | undefined,
+  therapistName?: string,
+  patientName?: string
+): { label: string; color: 'primary' | 'success' | 'default'; bg: string } => {
+  if (!speakerName) return { label: 'Unknown', color: 'default', bg: '#f5f5f5' };
+  if (therapistName && speakerName === therapistName)
+    return { label: 'Therapist', color: 'primary', bg: '#e3f2fd' };
+  if (patientName && speakerName === patientName)
+    return { label: 'Patient', color: 'success', bg: '#e8f5e9' };
+  // Fallback: guess from the name itself or call them Therapist/Patient
+  return { label: 'Participant', color: 'default', bg: '#f5f5f5' };
+};
 
 const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = ({
   sessionId,
   onRecordingStateChange,
-  onTranscriptionUpdate
+  onTranscriptionUpdate,
+  therapistName,
+  patientName,
 }) => {
 
   // Recording state
@@ -263,6 +285,26 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     }
   };
 
+  const saveTranscriptToBackend = async (entries: TranscriptEntry[]) => {
+    const finalEntries = entries.filter((e) => !e.isInterim);
+    if (!sessionId || finalEntries.length === 0) return;
+    try {
+      const payload = finalEntries.map((e) => ({
+        speakerName: e.speakerName || 'Unknown',
+        speakerRole: (() => {
+          if (therapistName && e.speakerName === therapistName) return 'therapist';
+          if (patientName && e.speakerName === patientName) return 'patient';
+          return 'participant';
+        })(),
+        text: e.text,
+        timestamp: e.startTime instanceof Date ? e.startTime.getTime() : Number(e.startTime),
+      }));
+      await apiClient.post('/api/telehealth/transcripts', { sessionId, entries: payload });
+    } catch (err) {
+      console.error('Failed to save transcript to backend:', err);
+    }
+  };
+
   const stopTranscription = async () => {
     try {
       const result = await telehealthService.stopTranscription(sessionId);
@@ -272,6 +314,8 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
         if (result.data) {
           setTranscript(result.data);
         }
+        // Auto-save all entries to backend
+        void saveTranscriptToBackend(realtimeEntries);
       } else {
         setError(result.message || 'Failed to stop transcription');
       }
@@ -557,19 +601,34 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
                     backgroundColor: 'grey.50'
                   }}
                 >
-                  {realtimeEntries.slice(-3).map((entry) => (
-                    <Typography 
-                      key={entry.id} 
-                      variant="body2" 
-                      sx={{ 
-                        mb: 0.5,
-                        opacity: entry.isInterim ? 0.7 : 1,
-                        fontStyle: entry.isInterim ? 'italic' : 'normal'
-                      }}
-                    >
-                      <strong>{entry.speakerName || 'Speaker'}:</strong> {entry.text}
-                    </Typography>
-                  ))}
+                  {realtimeEntries.slice(-3).map((entry) => {
+                    const style = getSpeakerStyle(entry.speakerName, therapistName, patientName);
+                    return (
+                      <Box key={entry.id} sx={{ mb: 0.75, opacity: entry.isInterim ? 0.7 : 1 }}>
+                        <Box display="flex" alignItems="center" gap={0.5} mb={0.25}>
+                          <Chip
+                            label={entry.speakerName || style.label}
+                            size="small"
+                            color={style.color}
+                            variant="outlined"
+                            sx={{ fontSize: '0.65rem', height: 18 }}
+                          />
+                          <Chip
+                            label={style.label}
+                            size="small"
+                            color={style.color}
+                            sx={{ fontSize: '0.65rem', height: 18 }}
+                          />
+                        </Box>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontStyle: entry.isInterim ? 'italic' : 'normal', pl: 0.5 }}
+                        >
+                          {entry.text}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
                 </Paper>
               )}
 
@@ -717,29 +776,59 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
             }}
           >
             {realtimeEntries.length > 0 ? (
-              realtimeEntries.map((entry) => (
-                <Box key={entry.id} sx={{ mb: 2 }}>
-                  <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                    <Typography variant="subtitle2" color="primary">
-                      {entry.speakerName || 'Unknown Speaker'}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {new Date(entry.startTime).toLocaleTimeString()}
-                    </Typography>
-                    {entry.confidence && (
+              realtimeEntries.map((entry) => {
+                const style = getSpeakerStyle(entry.speakerName, therapistName, patientName);
+                return (
+                  <Box
+                    key={entry.id}
+                    sx={{
+                      mb: 1.5,
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: style.bg,
+                      borderLeft: 4,
+                      borderColor: style.color === 'primary'
+                        ? 'primary.main'
+                        : style.color === 'success'
+                        ? 'success.main'
+                        : 'grey.400',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                       <Chip
-                        label={`${Math.round(entry.confidence * 100)}%`}
+                        label={style.label}
                         size="small"
-                        variant="outlined"
-                        color={entry.confidence > 0.8 ? 'success' : 'warning'}
+                        color={style.color}
+                        sx={{ fontWeight: 700 }}
                       />
-                    )}
+                      <Typography variant="caption" fontWeight={600}>
+                        {entry.speakerName || 'Unknown'}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {new Date(entry.startTime).toLocaleTimeString()}
+                      </Typography>
+                      {entry.confidence && (
+                        <Chip
+                          label={`${Math.round(entry.confidence * 100)}%`}
+                          size="small"
+                          variant="outlined"
+                          color={entry.confidence > 0.8 ? 'success' : 'warning'}
+                        />
+                      )}
+                    </Box>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        pl: 1,
+                        fontStyle: entry.isInterim ? 'italic' : 'normal',
+                        opacity: entry.isInterim ? 0.75 : 1,
+                      }}
+                    >
+                      {entry.text}
+                    </Typography>
                   </Box>
-                  <Typography variant="body1" sx={{ pl: 2 }}>
-                    {entry.text}
-                  </Typography>
-                </Box>
-              ))
+                );
+              })
             ) : (
               <Typography variant="body2" color="textSecondary" align="center">
                 No transcript available yet. Start recording and transcription to see content here.

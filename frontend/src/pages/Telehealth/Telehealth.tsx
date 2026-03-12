@@ -931,6 +931,20 @@ const Telehealth: React.FC<TelehealthProps> = () => {
               onTranscriptionUpdate={(entries) => {
                 console.log('Transcription updated:', entries);
               }}
+              therapistName={
+                session?.participants.find(
+                  (p) => p.role === ParticipantRole.THERAPIST || p.role === ParticipantRole.HOST
+                )?.userName ||
+                (user?.role === 'therapist'
+                  ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                  : undefined)
+              }
+              patientName={
+                session?.participants.find((p) => p.role === ParticipantRole.PATIENT)?.userName ||
+                (user?.role === 'client'
+                  ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                  : undefined)
+              }
             />
           </Box>
         )}

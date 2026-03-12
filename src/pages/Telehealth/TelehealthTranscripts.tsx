@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -24,16 +25,33 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { apiClient } from '../../services/apiClient';
 
+interface TranscriptEntry {
+  speakerName: string;
+  speakerRole: 'therapist' | 'patient' | 'participant';
+  text: string;
+  timestamp: number;
+}
+
 interface TranscriptRecord {
-  id: number;
-  session: number;
+  id: string;
+  session: string;
   session_time: string;
   session_title: string;
   patient_name: string;
   therapist_name: string;
-  transcript: string;
+  entries: TranscriptEntry[];
   created_at: string;
 }
+
+const getSpeakerStyle = (
+  role: string
+): { label: string; color: 'primary' | 'success' | 'default'; bg: string; borderColor: string } => {
+  if (role === 'therapist')
+    return { label: 'Therapist', color: 'primary', bg: '#e3f2fd', borderColor: '#1976d2' };
+  if (role === 'patient')
+    return { label: 'Patient', color: 'success', bg: '#e8f5e9', borderColor: '#388e3c' };
+  return { label: 'Participant', color: 'default', bg: '#f5f5f5', borderColor: '#9e9e9e' };
+};
 
 const TelehealthTranscripts: React.FC = () => {
   const navigate = useNavigate();
@@ -53,7 +71,7 @@ const TelehealthTranscripts: React.FC = () => {
     const loadTranscripts = async () => {
       setLoading(true);
       try {
-        const response = await apiClient.get('/api/telehealth/sessions/transcripts/');
+        const response = await apiClient.get('/api/telehealth/sessions/transcripts');
         const records = Array.isArray(response.data) ? response.data : [];
         setTranscripts(records);
       } catch (error) {
@@ -73,6 +91,13 @@ const TelehealthTranscripts: React.FC = () => {
     }
     return transcripts.filter((item) => String(item.session) === sessionFilter);
   }, [transcripts, sessionFilter]);
+
+  const formatTimestamp = (ms: number): string => {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   if (!user || !['admin', 'therapist'].includes(user.role)) {
     return (
@@ -159,15 +184,69 @@ const TelehealthTranscripts: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          {selectedTranscript?.patient_name} • {selectedTranscript?.session_time ? format(parseISO(selectedTranscript.session_time), 'PPp') : ''}
+          <Box>
+            <Typography variant="h6">
+              {selectedTranscript?.session_title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {selectedTranscript?.patient_name} &bull; Therapist: {selectedTranscript?.therapist_name}
+              {selectedTranscript?.session_time
+                ? ` • ${format(parseISO(selectedTranscript.session_time), 'PPp')}`
+                : ''}
+            </Typography>
+            <Box display="flex" gap={1} mt={0.5}>
+              <Chip label="Therapist" color="primary" size="small" />
+              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Therapist speech</Typography>
+              <Chip label="Patient" color="success" size="small" sx={{ ml: 1 }} />
+              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Patient speech</Typography>
+            </Box>
+          </Box>
         </DialogTitle>
         <DialogContent dividers>
-          <Typography
-            variant="body2"
-            sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}
-          >
-            {selectedTranscript?.transcript || 'No transcript content'}
-          </Typography>
+          {selectedTranscript && selectedTranscript.entries.length > 0 ? (
+            <Box>
+              {selectedTranscript.entries.map((entry, i) => {
+                const style = getSpeakerStyle(entry.speakerRole);
+                return (
+                  <Box
+                    key={i}
+                    sx={{
+                      mb: 1.5,
+                      p: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: style.bg,
+                      borderLeft: 4,
+                      borderColor: style.borderColor,
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                      <Chip
+                        label={style.label}
+                        size="small"
+                        color={style.color}
+                        sx={{ fontWeight: 700, minWidth: 80 }}
+                      />
+                      <Typography variant="caption" fontWeight={600}>
+                        {entry.speakerName}
+                      </Typography>
+                      {entry.timestamp > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {formatTimestamp(entry.timestamp)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography variant="body1" sx={{ pl: 1, lineHeight: 1.7 }}>
+                      {entry.text}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+              No transcript entries available for this session.
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSelectedTranscript(null)}>Close</Button>

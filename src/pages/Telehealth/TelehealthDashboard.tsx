@@ -30,6 +30,12 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   VideoCall,
@@ -81,6 +87,24 @@ interface TelehealthSession {
   notes?: string;
 }
 
+interface SavedTranscriptEntry {
+  speakerName: string;
+  speakerRole: 'therapist' | 'patient' | 'participant';
+  text: string;
+  timestamp: number;
+}
+
+interface SavedTranscript {
+  id: string;
+  session: string;
+  session_title: string;
+  session_time: string;
+  patient_name: string;
+  therapist_name: string;
+  entries: SavedTranscriptEntry[];
+  created_at: string;
+}
+
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -109,6 +133,11 @@ const TelehealthDashboard: React.FC = () => {
   const [openEmergencyDialog, setOpenEmergencyDialog] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
 
+  // Transcript state
+  const [transcripts, setTranscripts] = useState<SavedTranscript[]>([]);
+  const [loadingTranscripts, setLoadingTranscripts] = useState(false);
+  const [selectedTranscript, setSelectedTranscript] = useState<SavedTranscript | null>(null);
+
   // New session form state
   const [newSession, setNewSession] = useState({
     title: '',
@@ -118,19 +147,49 @@ const TelehealthDashboard: React.FC = () => {
     notes: '',
   });
 
-  // Load on mount and poll every 30s so all parties see new sessions
+  // Mock data - replace with actual API calls
   useEffect(() => {
     loadSessions();
     loadPatients();
-    const interval = setInterval(() => loadSessions(), 30000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Load transcripts when the Transcripts tab becomes active
+  useEffect(() => {
+    if (tabValue === 4) void loadTranscripts();
+  }, [tabValue]);
+
+  const loadTranscripts = async () => {
+    setLoadingTranscripts(true);
+    try {
+      const response = await apiClient.get('/api/telehealth/sessions/transcripts');
+      setTranscripts(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error('Failed to load transcripts:', err);
+    } finally {
+      setLoadingTranscripts(false);
+    }
+  };
+
+  const getSpeakerStyle = (
+    role: string
+  ): { label: string; color: 'primary' | 'success' | 'default'; bg: string; borderColor: string } => {
+    if (role === 'therapist') return { label: 'Therapist', color: 'primary', bg: '#e3f2fd', borderColor: '#1976d2' };
+    if (role === 'patient') return { label: 'Patient', color: 'success', bg: '#e8f5e9', borderColor: '#388e3c' };
+    return { label: 'Participant', color: 'default', bg: '#f5f5f5', borderColor: '#9e9e9e' };
+  };
+
+  const formatTimestamp = (ms: number): string => {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   const loadPatients = async () => {
     try {
       const response = await apiClient.get('/api/patients/');
-      const patientList = response.data?.results || response.data || [];
-      setPatients(patientList);
+      const list = response.data?.results || response.data || [];
+      setPatients(list);
     } catch (error) {
       console.error('Failed to load patients:', error);
     }
@@ -139,37 +198,23 @@ const TelehealthDashboard: React.FC = () => {
   const loadSessions = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/telehealth/sessions/');
+      // Fetch sessions from real API
+      let response;
+      try {
+        response = await apiClient.get('/api/telehealth/sessions');
+      } catch (error: any) {
+        throw error;
+      }
       
       console.log('Sessions response:', response);
       
-      const sessionData = response.data.results || response.data || [];
+      const sessionData = response.data?.results || response.data || [];
       console.log('Session data:', sessionData);
-      
-      // Map backend status to frontend status
-      const mapStatus = (backendStatus: string): 'scheduled' | 'in-progress' | 'completed' | 'cancelled' => {
-        switch (backendStatus) {
-          case 'scheduled':
-          case 'waiting_room':
-            return 'scheduled';
-          case 'connecting':
-          case 'active':
-          case 'on_hold':
-            return 'in-progress';
-          case 'ended':
-            return 'completed';
-          case 'cancelled':
-          case 'failed':
-            return 'cancelled';
-          default:
-            return 'scheduled';
-        }
-      };
       
       // Transform backend data to frontend format
       const transformedSessions: TelehealthSession[] = sessionData.map((session: any) => ({
         id: session.id,
-        title: session.title || 'Telehealth Session',
+        title: session.title,
         patient: {
           id: session.patient,
           name: session.patient_details 
@@ -178,31 +223,23 @@ const TelehealthDashboard: React.FC = () => {
           avatar: undefined
         },
         therapist: {
-          id: session.therapist || '',
+          id: session.therapist,
           name: session.therapist_details
             ? `${session.therapist_details.first_name || ''} ${session.therapist_details.last_name || ''}`.trim()
-            : 'Not Assigned'
+            : 'Unknown Therapist'
         },
         scheduledAt: session.scheduled_at,
         duration: session.duration,
-        status: mapStatus(session.status),
+        status: session.status,
         isEmergency: session.is_emergency || false,
         sessionUrl: session.session_url,
-        hasRecording: session.has_recording || false,
-        hasTranscript: session.has_transcript || false,
+        hasRecording: session.has_recording,
+        hasTranscript: session.has_transcript,
         notes: session.notes
       }));
       
       console.log('Transformed sessions:', transformedSessions);
       setSessions(transformedSessions);
-
-      // Auto-switch to Emergency tab if there are active emergency sessions
-      const activeEmergency = transformedSessions.filter(
-        (s: TelehealthSession) => s.isEmergency && s.status === 'in-progress'
-      );
-      if (activeEmergency.length > 0) {
-        setTabValue(2);
-      }
     } catch (error: any) {
       console.error('Failed to load sessions:', error);
       console.error('Error response:', error.response);
@@ -215,22 +252,18 @@ const TelehealthDashboard: React.FC = () => {
   const handleCreateSession = async () => {
     try {
       // Validate form
-      if (!newSession.title || !newSession.patientId || !newSession.scheduledAt) {
-        showError('Please fill in all required fields');
+      if (!newSession.patientId) {
+        showError('Please select a patient');
         return;
       }
 
       // Create session via API
       const sessionData = {
-        title: newSession.title,
         patientId: newSession.patientId,
-        therapistId: user?.id,
-        scheduledAt: new Date(newSession.scheduledAt).toISOString(),
         scheduledDuration: newSession.duration,
-        notes: newSession.notes,
       };
 
-      await apiClient.post('/api/telehealth/sessions/', sessionData);
+      await apiClient.post('/api/telehealth/sessions', sessionData);
       
       showSuccess('Telehealth session scheduled successfully');
       setOpenNewSessionDialog(false);
@@ -255,9 +288,17 @@ const TelehealthDashboard: React.FC = () => {
     }
   };
 
-  const handleJoinSession = (sessionId: string) => {
-    // Go through the Waiting Room so presence is checked before entering
-    navigate(`/telehealth/waiting/${sessionId}`);
+  const handleJoinSession = async (sessionId: string) => {
+    // Start the session (sets status to active) so VideoSession page doesn't block entry
+    const session = sessions.find(s => s.id === sessionId);
+    if (session && session.status === 'scheduled') {
+      try {
+        await apiClient.post(`/api/telehealth/sessions/${sessionId}/start`);
+      } catch (err) {
+        console.warn('Could not start session (may already be active):', err);
+      }
+    }
+    navigate(`/telehealth/session/${sessionId}`);
   };
 
   const handleOpenTranscriptsPage = (sessionId?: string) => {
@@ -269,7 +310,7 @@ const TelehealthDashboard: React.FC = () => {
   };
 
   const handleCopySessionLink = (session: TelehealthSession) => {
-    const link = `${window.location.origin}${session.sessionUrl}`;
+    const link = session.sessionUrl || `${window.location.origin}/telehealth/session/${session.id}`;
     navigator.clipboard.writeText(link);
     showSuccess('Session link copied to clipboard');
   };
@@ -280,7 +321,7 @@ const TelehealthDashboard: React.FC = () => {
     }
     
     try {
-      await apiClient.post(`/api/telehealth/sessions/${sessionId}/cancel/`);
+      await apiClient.delete(`/api/telehealth/sessions/${sessionId}`);
       showSuccess('Session cancelled successfully');
       await loadSessions();
     } catch (error) {
@@ -317,7 +358,6 @@ const TelehealthDashboard: React.FC = () => {
   const upcomingSessions = filterSessions('scheduled');
   const completedSessions = filterSessions('completed');
   const emergencySessions = sessions.filter(s => s.isEmergency);
-  const activeEmergencySessions = emergencySessions.filter(s => s.status === 'in-progress');
 
   return (
     <Box sx={{ p: 3 }}>
@@ -433,34 +473,16 @@ const TelehealthDashboard: React.FC = () => {
         )}
       </Grid>
 
-      {/* Active emergency session banner */}
-      {activeEmergencySessions.length > 0 && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              variant="outlined"
-              startIcon={<VideoCall />}
-              onClick={() => handleJoinSession(activeEmergencySessions[0].id)}
-            >
-              Join Now
-            </Button>
-          }
-        >
-          <strong>Emergency session active</strong> — an urgent telehealth session is waiting for you.
-        </Alert>
-      )}
-
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_e, v) => setTabValue(v)}>
+        <Tabs value={tabValue} onChange={(_e, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto">
           <Tab icon={<Schedule />} label="Upcoming" iconPosition="start" />
           <Tab icon={<History />} label="Past Sessions" iconPosition="start" />
           <Tab icon={<Warning />} label="Emergency Session" iconPosition="start" />
           <Tab icon={<People />} label="All Sessions" iconPosition="start" />
+          {user && ['admin', 'therapist'].includes(user.role) && (
+            <Tab icon={<Transcribe />} label="Transcripts" iconPosition="start" />
+          )}
         </Tabs>
       </Paper>
 
@@ -814,6 +836,127 @@ const TelehealthDashboard: React.FC = () => {
           ))}
         </List>
       </TabPanel>
+
+      {/* Transcripts Tab */}
+      <TabPanel value={tabValue} index={4}>
+        {loadingTranscripts ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Patient</TableCell>
+                  <TableCell>Session</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Therapist</TableCell>
+                  <TableCell align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {transcripts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                      <Typography color="text.secondary">No transcripts saved yet</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  transcripts.map((row) => (
+                    <TableRow key={row.id} hover>
+                      <TableCell>{row.patient_name}</TableCell>
+                      <TableCell>{row.session_title}</TableCell>
+                      <TableCell>
+                        {row.session_time
+                          ? format(parseISO(row.session_time), 'PPp')
+                          : format(parseISO(row.created_at), 'PPp')}
+                      </TableCell>
+                      <TableCell>{row.therapist_name}</TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<Transcribe />}
+                          onClick={() => setSelectedTranscript(row)}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </TabPanel>
+
+      {/* Transcript Viewer Dialog */}
+      <Dialog
+        open={Boolean(selectedTranscript)}
+        onClose={() => setSelectedTranscript(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box>
+            <Typography variant="h6">{selectedTranscript?.session_title}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {selectedTranscript?.patient_name} &bull; Therapist: {selectedTranscript?.therapist_name}
+              {selectedTranscript?.session_time
+                ? ` • ${format(parseISO(selectedTranscript.session_time), 'PPp')}`
+                : ''}
+            </Typography>
+            <Box display="flex" gap={1} mt={0.5}>
+              <Chip label="Therapist" color="primary" size="small" />
+              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Therapist speech</Typography>
+              <Chip label="Patient" color="success" size="small" sx={{ ml: 1 }} />
+              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Patient speech</Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedTranscript && selectedTranscript.entries.length > 0 ? (
+            <Box>
+              {selectedTranscript.entries.map((entry, i) => {
+                const style = getSpeakerStyle(entry.speakerRole);
+                return (
+                  <Box
+                    key={i}
+                    sx={{
+                      mb: 1.5, p: 1.5, borderRadius: 2,
+                      backgroundColor: style.bg,
+                      borderLeft: 4,
+                      borderColor: style.borderColor,
+                    }}
+                  >
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                      <Chip label={style.label} size="small" color={style.color} sx={{ fontWeight: 700, minWidth: 80 }} />
+                      <Typography variant="caption" fontWeight={600}>{entry.speakerName}</Typography>
+                      {entry.timestamp > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {formatTimestamp(entry.timestamp)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography variant="body1" sx={{ pl: 1, lineHeight: 1.7 }}>
+                      {entry.text}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+              No transcript entries available for this session.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedTranscript(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* New Session Dialog */}
       <Dialog
