@@ -14,7 +14,6 @@ import {
   Drawer,
   List,
   ListItem,
-  ListItemText,
   Divider,
 } from '@mui/material';
 import {
@@ -37,6 +36,13 @@ import { useWebRTC } from '../../hooks/telehealth/useWebRTC';
 import { webSocketService, WebSocketMessage } from '../../services/webSocketService';
 import type { SessionDetails } from '../../types'; // Update this path if needed based on where SessionDetails is actually defined
 
+interface TranscriptEntry {
+  speakerName: string;
+  speakerRole: 'therapist' | 'patient' | 'participant';
+  text: string;
+  timestamp: number;
+}
+
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
@@ -54,7 +60,8 @@ const VideoSession: React.FC = () => {
   // Recording and Transcription
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptText, setTranscriptText] = useState<string[]>([]);
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
+  const transcriptEntriesRef = useRef<TranscriptEntry[]>([]);
   const [showTranscript, setShowTranscript] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSpeechDetected, setIsSpeechDetected] = useState(false);
@@ -312,7 +319,19 @@ const VideoSession: React.FC = () => {
     }
   }, [stopLocalMedia, closePeerConnection]);
 
-  const endSession = () => {
+  const endSession = async () => {
+    // Auto-save transcript if transcription was running and has entries
+    if (transcriptEntriesRef.current.length > 0 && sessionId) {
+      try {
+        await apiClient.post('/api/telehealth/transcripts', {
+          sessionId,
+          entries: transcriptEntriesRef.current,
+        });
+        showSuccess('Transcript saved');
+      } catch (error) {
+        console.error('Failed to auto-save transcript on session end:', error);
+      }
+    }
     cleanupSession();
     showSuccess('Session ended');
     navigate('/telehealth/dashboard');
@@ -419,9 +438,14 @@ const VideoSession: React.FC = () => {
           setInterimTranscript(interimText);
           
           if (finalText) {
-            const timestamp = new Date().toLocaleTimeString();
-            const entry = `[${timestamp}] [${speakerLabel}] ${finalText.trim()}`;
-            setTranscriptText(prev => [...prev, entry]);
+            const entry: TranscriptEntry = {
+              speakerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || speakerLabel,
+              speakerRole: user?.role === 'client' ? 'patient' : 'therapist',
+              text: finalText.trim(),
+              timestamp: Date.now(),
+            };
+            transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+            setTranscriptEntries(prev => [...prev, entry]);
             setInterimTranscript('');
           }
         };
@@ -451,11 +475,11 @@ const VideoSession: React.FC = () => {
           audioContextRef.current = null;
         }
         
-        if (transcriptText.length > 0) {
+        if (transcriptEntriesRef.current.length > 0) {
             try {
                 await apiClient.post('/api/telehealth/transcripts', {
                   sessionId,
-                  content: transcriptText.join('\n'),
+                  entries: transcriptEntriesRef.current,
                 });
                 showSuccess('Transcript saved');
             } catch (error) {
@@ -463,6 +487,8 @@ const VideoSession: React.FC = () => {
                 showError('Failed to save transcript');
             }
         }
+        transcriptEntriesRef.current = [];
+        setTranscriptEntries([]);
         setIsTranscribing(false);
         showSuccess('Transcription stopped');
       }
@@ -634,17 +660,51 @@ const VideoSession: React.FC = () => {
       
       {/* Transcript Drawer */}
       <Drawer anchor="left" open={showTranscript} onClose={() => setShowTranscript(false)} sx={{ '& .MuiDrawer-paper': { width: 400, p: 2 } }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Session Transcript</Typography>
+        <Typography variant="h6" sx={{ mb: 1 }}>Session Transcript</Typography>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
+          <Chip size="small" label="Patient" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
+        </Box>
         <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
           {isTranscribing && isSpeechDetected && <Typography variant="caption" color="success.main">Listening...</Typography>}
-          <List>
-            {transcriptText.map((entry, idx) => (
-              <React.Fragment key={idx}>
-                <ListItem><ListItemText primary={entry} sx={{ whiteSpace: 'pre-wrap' }} /></ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-            {interimTranscript && <ListItem><ListItemText primary={`[Live] ${interimTranscript}`} sx={{ fontStyle: 'italic', color: 'text.secondary' }} /></ListItem>}
+          <List disablePadding>
+            {transcriptEntries.map((entry, idx) => {
+              const isTherapist = entry.speakerRole === 'therapist';
+              return (
+                <React.Fragment key={idx}>
+                  <ListItem alignItems="flex-start" sx={{ px: 0 }}>
+                    <Box sx={{
+                      width: '100%',
+                      p: 1.5,
+                      borderRadius: 1,
+                      bgcolor: isTherapist ? '#e3f2fd' : '#e8f5e9',
+                      borderLeft: `4px solid ${isTherapist ? '#1565c0' : '#2e7d32'}`,
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Chip
+                          size="small"
+                          label={entry.speakerName}
+                          color={isTherapist ? 'primary' : 'success'}
+                          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">{entry.text}</Typography>
+                    </Box>
+                  </ListItem>
+                  <Divider />
+                </React.Fragment>
+              );
+            })}
+            {interimTranscript && (
+              <ListItem sx={{ px: 0 }}>
+                <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                  [Live] {interimTranscript}
+                </Typography>
+              </ListItem>
+            )}
           </List>
         </Box>
         <Button fullWidth variant="outlined" onClick={() => setShowTranscript(false)}>Close</Button>

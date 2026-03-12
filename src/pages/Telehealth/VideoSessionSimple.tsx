@@ -14,7 +14,6 @@ import {
   Drawer,
   List,
   ListItem,
-  ListItemText,
   Divider,
 } from '@mui/material';
 import {
@@ -35,7 +34,14 @@ import { apiClient } from '../../services/apiClient';
 import { useTelehealthMedia } from '../../hooks/telehealth/useTelehealthMedia';
 import { useWebRTC } from '../../hooks/telehealth/useWebRTC';
 import { webSocketService, WebSocketMessage } from '../../services/webSocketService';
-import { SessionDetails } from '../../types';
+import type { SessionDetails } from '../../types'; // Update this path if needed based on where SessionDetails is actually defined
+
+interface TranscriptEntry {
+  speakerName: string;
+  speakerRole: 'therapist' | 'patient' | 'participant';
+  text: string;
+  timestamp: number;
+}
 
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -54,7 +60,8 @@ const VideoSession: React.FC = () => {
   // Recording and Transcription
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptText, setTranscriptText] = useState<string[]>([]);
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
+  const transcriptEntriesRef = useRef<TranscriptEntry[]>([]);
   const [showTranscript, setShowTranscript] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSpeechDetected, setIsSpeechDetected] = useState(false);
@@ -74,9 +81,6 @@ const VideoSession: React.FC = () => {
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
-
-  // ICE servers from /join endpoint (contains backend-configured TURN credentials)
-  const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
 
   // --- Hooks ---
   const {
@@ -108,43 +112,21 @@ const VideoSession: React.FC = () => {
     handleAnswer,
     addIceCandidate,
     closePeerConnection,
-    connectionState,
   } = useWebRTC({
     sendMessage,
     onError: showError,
   });
 
-  // Fetch session details + call /join to get backend-configured ICE/TURN servers
+  // Fetch session details
   useEffect(() => {
     const fetchSession = async () => {
       try {
         const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data as SessionDetails;
-        // Call /join to stamp joinedAt and retrieve ICE server config from backend env vars
-        try {
-          const joinRes = await apiClient.post(`/api/telehealth/sessions/${sessionId}/join`, {});
-          const servers: RTCIceServer[] = (joinRes.data as any)?.iceServers ?? [];
-          if (servers.length > 0) {
-            setIceServers(servers);
-            console.log('[VIDEO] /join returned', servers.length, 'ICE server(s)');
-          }
-        } catch (joinErr) {
-          console.warn('[VIDEO] /join failed (continuing with default ICE config):', joinErr);
-        }
-        // If session is still 'scheduled', therapist/admin/staff auto-start it;
-        // clients see a "not started" screen.
+        // Block entry if session hasn't started (still scheduled)
         if (session.status === 'scheduled') {
-          const canStart = user && ['admin', 'therapist', 'staff'].includes(user.role);
-          if (canStart) {
-            try {
-              await apiClient.post(`/api/telehealth/sessions/${sessionId}/start/`);
-            } catch {
-              // Might already be starting — continue anyway
-            }
-          } else {
-            setSessionError('not_started');
-            return;
-          }
+          setSessionError('not_started');
+          return;
         }
         setRoomId(session.room_id);
         setSessionData(session);
@@ -185,14 +167,14 @@ const VideoSession: React.FC = () => {
     // Clear any stale listeners from a previous connection to prevent duplicate handlers
     webSocketService.clearListeners();
 
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token') || '';
-
     try {
-      await webSocketService.connect(sessionId ?? roomId, user.id, {
-        token,
-        displayName: `${(user.firstName ?? '')} ${(user.lastName ?? '')}`.trim() || 'Participant',
-        role: (user.role as string) ?? 'client',
-      });
+      await webSocketService.connect(
+        sessionId ?? roomId,
+        user.id,
+        state.token ?? undefined,
+        `${user.firstName} ${user.lastName}`.trim() || user.username,
+        user.role,
+      );
     } catch (err) {
       console.error('[VIDEO] Socket.io connection error:', err);
       showError('Failed to connect to session server');
@@ -300,8 +282,7 @@ const VideoSession: React.FC = () => {
           // CRITICAL ORDER:
           // 1. Initialize peer connection FIRST so it is ready to handle an
           //    incoming offer before we announce our presence to the room.
-          // Pass iceServers from /join so backend-configured TURN credentials are used.
-          await initializePeerConnection(stream, false, iceServers.length > 0 ? iceServers : undefined);
+          await initializePeerConnection(stream, false);
 
           // 2. Connect signaling and join the room AFTER the PC is prepared.
           await connectWebSocket();
@@ -338,7 +319,19 @@ const VideoSession: React.FC = () => {
     }
   }, [stopLocalMedia, closePeerConnection]);
 
-  const endSession = () => {
+  const endSession = async () => {
+    // Auto-save transcript if transcription was running and has entries
+    if (transcriptEntriesRef.current.length > 0 && sessionId) {
+      try {
+        await apiClient.post('/api/telehealth/transcripts', {
+          sessionId,
+          entries: transcriptEntriesRef.current,
+        });
+        showSuccess('Transcript saved');
+      } catch (error) {
+        console.error('Failed to auto-save transcript on session end:', error);
+      }
+    }
     cleanupSession();
     showSuccess('Session ended');
     navigate('/telehealth/dashboard');
@@ -358,11 +351,13 @@ const VideoSession: React.FC = () => {
           
           mediaRecorder.onstop = async () => {
             const blob = new Blob(chunks, { type: 'video/webm' });
-            const formData = new FormData();
-            formData.append('recording', blob, 'session-recording.webm');
+            const blobUrl = URL.createObjectURL(blob);
             try {
-              await apiClient.post(`/api/telehealth/sessions/${sessionId}/upload_recording/`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+              await apiClient.post('/api/telehealth/recordings', {
+                sessionId,
+                fileUrl: blobUrl,
+                fileSize: blob.size,
+                storageProvider: 'local',
               });
               showSuccess('Recording saved successfully');
             } catch (error) {
@@ -443,9 +438,14 @@ const VideoSession: React.FC = () => {
           setInterimTranscript(interimText);
           
           if (finalText) {
-            const timestamp = new Date().toLocaleTimeString();
-            const entry = `[${timestamp}] [${speakerLabel}] ${finalText.trim()}`;
-            setTranscriptText(prev => [...prev, entry]);
+            const entry: TranscriptEntry = {
+              speakerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || speakerLabel,
+              speakerRole: user?.role === 'client' ? 'patient' : 'therapist',
+              text: finalText.trim(),
+              timestamp: Date.now(),
+            };
+            transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+            setTranscriptEntries(prev => [...prev, entry]);
             setInterimTranscript('');
           }
         };
@@ -475,10 +475,11 @@ const VideoSession: React.FC = () => {
           audioContextRef.current = null;
         }
         
-        if (transcriptText.length > 0) {
+        if (transcriptEntriesRef.current.length > 0) {
             try {
-                await apiClient.post(`/api/telehealth/sessions/${sessionId}/save_transcript/`, {
-                  transcript: transcriptText.join('\n')
+                await apiClient.post('/api/telehealth/transcripts', {
+                  sessionId,
+                  entries: transcriptEntriesRef.current,
                 });
                 showSuccess('Transcript saved');
             } catch (error) {
@@ -486,6 +487,8 @@ const VideoSession: React.FC = () => {
                 showError('Failed to save transcript');
             }
         }
+        transcriptEntriesRef.current = [];
+        setTranscriptEntries([]);
         setIsTranscribing(false);
         showSuccess('Transcription stopped');
       }
@@ -569,20 +572,6 @@ const VideoSession: React.FC = () => {
             icon={<PeopleIcon />} 
           />
           {isRemoteVideoReady && <Chip label="Connected" color="success" size="small" />}
-          {!isRemoteVideoReady && participantCount > 1 && connectionState !== 'new' && (
-            <Chip
-              label={
-                connectionState === 'connecting' ? 'Connecting…' :
-                connectionState === 'failed' ? 'ICE Failed' :
-                connectionState === 'disconnected' ? 'Disconnected' :
-                connectionState === 'closed' ? 'Closed' : connectionState
-              }
-              color={
-                connectionState === 'failed' || connectionState === 'disconnected' ? 'error' : 'warning'
-              }
-              size="small"
-            />
-          )}
           {participantName && <Chip label={participantName} size="small" variant="outlined" sx={{ color: 'white', borderColor: 'white' }} />}
         </Box>
       </Paper>
@@ -613,22 +602,6 @@ const VideoSession: React.FC = () => {
           {isRemoteVideoReady && isRemotePlaybackBlocked && (
             <Box sx={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
               <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
-            </Box>
-          )}
-
-          {/* ICE failure overlay — show retry button */}
-          {(connectionState === 'failed' || connectionState === 'disconnected') && (
-            <Box sx={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <Alert
-                severity="error"
-                action={
-                  <Button color="inherit" size="small" onClick={() => void createOffer(true)}>
-                    Retry
-                  </Button>
-                }
-              >
-                Connection {connectionState} — click Retry to reconnect
-              </Alert>
             </Box>
           )}
 
@@ -687,17 +660,51 @@ const VideoSession: React.FC = () => {
       
       {/* Transcript Drawer */}
       <Drawer anchor="left" open={showTranscript} onClose={() => setShowTranscript(false)} sx={{ '& .MuiDrawer-paper': { width: 400, p: 2 } }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Session Transcript</Typography>
+        <Typography variant="h6" sx={{ mb: 1 }}>Session Transcript</Typography>
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
+          <Chip size="small" label="Patient" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
+        </Box>
         <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
           {isTranscribing && isSpeechDetected && <Typography variant="caption" color="success.main">Listening...</Typography>}
-          <List>
-            {transcriptText.map((entry, idx) => (
-              <React.Fragment key={idx}>
-                <ListItem><ListItemText primary={entry} sx={{ whiteSpace: 'pre-wrap' }} /></ListItem>
-                <Divider />
-              </React.Fragment>
-            ))}
-            {interimTranscript && <ListItem><ListItemText primary={`[Live] ${interimTranscript}`} sx={{ fontStyle: 'italic', color: 'text.secondary' }} /></ListItem>}
+          <List disablePadding>
+            {transcriptEntries.map((entry, idx) => {
+              const isTherapist = entry.speakerRole === 'therapist';
+              return (
+                <React.Fragment key={idx}>
+                  <ListItem alignItems="flex-start" sx={{ px: 0 }}>
+                    <Box sx={{
+                      width: '100%',
+                      p: 1.5,
+                      borderRadius: 1,
+                      bgcolor: isTherapist ? '#e3f2fd' : '#e8f5e9',
+                      borderLeft: `4px solid ${isTherapist ? '#1565c0' : '#2e7d32'}`,
+                    }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Chip
+                          size="small"
+                          label={entry.speakerName}
+                          color={isTherapist ? 'primary' : 'success'}
+                          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">{entry.text}</Typography>
+                    </Box>
+                  </ListItem>
+                  <Divider />
+                </React.Fragment>
+              );
+            })}
+            {interimTranscript && (
+              <ListItem sx={{ px: 0 }}>
+                <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                  [Live] {interimTranscript}
+                </Typography>
+              </ListItem>
+            )}
           </List>
         </Box>
         <Button fullWidth variant="outlined" onClick={() => setShowTranscript(false)}>Close</Button>
