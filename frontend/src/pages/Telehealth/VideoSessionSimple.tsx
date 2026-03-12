@@ -171,9 +171,11 @@ const VideoSession: React.FC = () => {
       await webSocketService.connect(
         sessionId ?? roomId,
         user.id,
-        state.token ?? undefined,
-        `${user.firstName} ${user.lastName}`.trim() || user.username,
-        user.role,
+        {
+          token: state.token ?? '',
+          displayName: `${user.firstName} ${user.lastName}`.trim() || user.username,
+          role: user.role,
+        },
       );
     } catch (err) {
       console.error('[VIDEO] Socket.io connection error:', err);
