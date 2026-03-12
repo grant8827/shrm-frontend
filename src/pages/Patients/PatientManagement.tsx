@@ -39,19 +39,17 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {
-  Add,
   Search,
   MoreVert,
-  EmailOutlined,
-  Edit,
-  DeleteOutline,
   CheckCircleOutline,
+  HighlightOff,
+  Block,
+  AssignmentTurnedIn,
   Person,
   Phone,
   MedicalServices,
   PersonAdd,
 } from '@mui/icons-material';
-import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
 
 interface PatientItem {
@@ -82,23 +80,7 @@ const PatientManagement: React.FC = () => {
 
   useEffect(() => {
     void loadPatients();
-    void loadTherapists();
   }, []);
-
-  const loadTherapists = async () => {
-    try {
-      // Fetch therapists (users with role ADMIN or THERAPIST)
-      const response = await apiClient.get('/api/auth/?role=ADMIN,THERAPIST');
-      const therapistList = response.data.results.map((user: any) => ({
-        id: user.id,
-        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username
-      }));
-      setTherapists(therapistList);
-    } catch (error) {
-      console.error('Error loading therapists:', error);
-      setTherapists([]);
-    }
-  };
 
   const loadPatients = async () => {
     try {
@@ -144,35 +126,12 @@ const PatientManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<PatientItem | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [addPatientOpen, setAddPatientOpen] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [actionAnchorEl, setActionAnchorEl] = useState<null | HTMLElement>(null);
   const [actionPatient, setActionPatient] = useState<PatientItem | null>(null);
-  const [editPatientOpen, setEditPatientOpen] = useState(false);
-  const [removePatientOpen, setRemovePatientOpen] = useState(false);
   const [completePatientOpen, setCompletePatientOpen] = useState(false);
-  const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([]);
-  const [assignTherapistOpen, setAssignTherapistOpen] = useState(false);
-  const [selectedTherapistId, setSelectedTherapistId] = useState<string>('');
-  const [editPatientData, setEditPatientData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-  });
-  
-  const [newPatientData, setNewPatientData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    date_of_birth: '',
-    diagnosis: '',
-    assigned_therapist: '',
-  });
-  
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -187,89 +146,6 @@ const PatientManagement: React.FC = () => {
 
   const handleCloseActions = () => {
     setActionAnchorEl(null);
-  };
-
-  const handleResendEmail = async () => {
-    if (!actionPatient) return;
-
-    try {
-      await apiClient.post(`/api/patients/${actionPatient.id}/resend_welcome_email/`);
-      setSnackbar({ open: true, message: `Registration email resent to ${actionPatient.email}`, severity: 'success' });
-    } catch {
-      setSnackbar({ open: true, message: 'Failed to resend registration email', severity: 'error' });
-    } finally {
-      handleCloseActions();
-    }
-  };
-
-  const handleOpenEditPatient = () => {
-    if (!actionPatient) return;
-
-    setEditPatientData({
-      name: actionPatient.name,
-      email: actionPatient.email,
-      phone: actionPatient.phone,
-    });
-    setEditPatientOpen(true);
-    handleCloseActions();
-  };
-
-  const handleSaveEditPatient = async () => {
-    if (!actionPatient) return;
-
-    const nameParts = editPatientData.name.trim().split(/\s+/);
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ');
-
-    if (!firstName || !lastName || !editPatientData.email.trim()) {
-      setSnackbar({ open: true, message: 'Name (first and last) and email are required', severity: 'error' });
-      return;
-    }
-
-    try {
-      await apiClient.patch(`/api/patients/${actionPatient.id}/`, {
-        first_name_write: firstName,
-        last_name_write: lastName,
-        email_write: editPatientData.email.trim(),
-        phone_write: editPatientData.phone.trim(),
-      });
-
-      setPatients(prev => prev.map(patient => (
-        patient.id === actionPatient.id
-          ? {
-              ...patient,
-              name: editPatientData.name.trim(),
-              email: editPatientData.email.trim(),
-              phone: editPatientData.phone.trim(),
-            }
-          : patient
-      )));
-
-      setSnackbar({ open: true, message: 'Patient updated successfully', severity: 'success' });
-      setEditPatientOpen(false);
-    } catch {
-      setSnackbar({ open: true, message: 'Failed to update patient', severity: 'error' });
-    }
-  };
-
-  const handleOpenRemovePatient = () => {
-    setRemovePatientOpen(true);
-    handleCloseActions();
-  };
-
-  const handleRemovePatient = async () => {
-    if (!actionPatient) return;
-
-    try {
-      await apiClient.delete(`/api/patients/${actionPatient.id}/`);
-      setPatients(prev => prev.filter(patient => patient.id !== actionPatient.id));
-      setSnackbar({ open: true, message: 'Patient removed successfully', severity: 'success' });
-    } catch {
-      setSnackbar({ open: true, message: 'Failed to remove patient', severity: 'error' });
-    } finally {
-      setRemovePatientOpen(false);
-      setActionPatient(null);
-    }
   };
 
   const handleOpenCompletePatient = () => {
@@ -301,171 +177,24 @@ const PatientManagement: React.FC = () => {
     }
   };
 
-  const handleOpenAssignTherapist = () => {
-    setSelectedTherapistId(actionPatient?.assignedTherapistId || '');
-    setAssignTherapistOpen(true);
-    handleCloseActions();
-  };
-
-  const handleAssignTherapist = async () => {
-    if (!actionPatient) return;
-    try {
-      await apiClient.patch(`/api/patients/${actionPatient.id}/`, {
-        assignedTherapistId: selectedTherapistId || null,
-      });
-      const therapistName = selectedTherapistId
-        ? (therapists.find((t) => t.id === selectedTherapistId)?.name || '')
-        : '';
-      setPatients((prev) =>
-        prev.map((p) =>
-          p.id === actionPatient.id
-            ? { ...p, assignedTherapist: therapistName, assignedTherapistId: selectedTherapistId }
-            : p
-        )
-      );
-      setSnackbar({
-        open: true,
-        message: selectedTherapistId
-          ? `Therapist assigned to ${actionPatient.name} successfully`
-          : `Therapist removed from ${actionPatient.name}`,
-        severity: 'success',
-      });
-    } catch {
-      setSnackbar({ open: true, message: 'Failed to assign therapist', severity: 'error' });
-    } finally {
-      setAssignTherapistOpen(false);
-      setActionPatient(null);
-    }
-  };
 
   const getStatusColor = (status: string): 'success' | 'default' => {
     return status === 'active' ? 'success' : 'default';
   };
 
-  const handleCreatePatient = async () => {
+  const handleSetStatus = async (newStatus: string) => {
+    if (!actionPatient) return;
+    handleCloseActions();
     try {
-      setIsLoading(true);
-      setFormErrors({});
-
-      const errors: Record<string, string> = {};
-      if (!newPatientData.first_name.trim()) errors.first_name = 'Required';
-      if (!newPatientData.last_name.trim()) errors.last_name = 'Required';
-      if (!newPatientData.email.trim()) {
-        errors.email = 'Required';
-      } else {
-        // Email validation regex
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(newPatientData.email)) {
-          errors.email = 'Invalid email format';
-        }
-      }
-      
-      // Date of birth validation
-      if (newPatientData.date_of_birth) {
-        const dob = new Date(newPatientData.date_of_birth);
-        const today = new Date();
-        if (dob > today) {
-          errors.date_of_birth = 'Date of birth cannot be in the future';
-        }
-      }
-
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        setIsLoading(false);
-        return;
-      }
-
-      // Generate username from email or name with timestamp to ensure uniqueness
-      const generateUsername = (email: string, firstName: string, lastName: string): string => {
-        const timestamp = Date.now().toString().slice(-6);
-        if (email && email.includes('@')) {
-          const emailPrefix = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_');
-          return `${emailPrefix}_${timestamp}`;
-        }
-        return `${firstName}.${lastName}_${timestamp}`.toLowerCase().replace(/[^a-z0-9_.]/g, '_');
-      };
-
-      const username = generateUsername(
-        newPatientData.email,
-        newPatientData.first_name,
-        newPatientData.last_name
-      );
-
-      // Use correct field names matching backend API
-      const patientData = {
-        username,
-        email: newPatientData.email.toLowerCase().trim(),
-        firstName: newPatientData.first_name.trim(),
-        lastName: newPatientData.last_name.trim(),
-        phoneNumber: newPatientData.phone.trim() || undefined,
-        dateOfBirth: newPatientData.date_of_birth || undefined,
-        assignedTherapistId: newPatientData.assigned_therapist || undefined,
-        medicalHistory: newPatientData.diagnosis.trim() || undefined,
-      };
-
-      console.log('Creating patient:', patientData);
-
-      const response = await apiClient.post('/api/patients/', patientData);
-      console.log('Patient created:', response.data);
-
-      setSnackbar({ open: true, message: 'Patient added successfully. Registration email sent.', severity: 'success' });
-      setAddPatientOpen(false);
-      setNewPatientData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        phone: '',
-        date_of_birth: '',
-        diagnosis: '',
-        assigned_therapist: '',
-      });
-      
-      // Refresh the patient list to show the new patient
-      await loadPatients();
-    } catch (error: unknown) {
-      console.error('Failed to add patient:', error);
-
-      if (axios.isAxiosError(error) && error.response?.data && typeof error.response.data === 'object') {
-        const backendErrors = error.response.data as Record<string, unknown>;
-        const formattedErrors: Record<string, string> = {};
-
-        Object.keys(backendErrors).forEach((key) => {
-          const errorValue = backendErrors[key];
-          if (Array.isArray(errorValue) && errorValue.length > 0) {
-            formattedErrors[key] = String(errorValue[0]);
-          } else if (typeof errorValue === 'string') {
-            formattedErrors[key] = errorValue;
-          }
-        });
-
-        setFormErrors(formattedErrors);
-        
-        // Extract error message from backend
-        let errorMessage = 'Failed to add patient';
-        if (typeof backendErrors.error === 'string') {
-          errorMessage = backendErrors.error;
-        } else if (typeof backendErrors.detail === 'string') {
-          errorMessage = backendErrors.detail;
-        } else if (typeof backendErrors.message === 'string') {
-          errorMessage = backendErrors.message;
-        }
-        
-        setSnackbar({
-          open: true,
-          message: errorMessage,
-          severity: 'error',
-        });
-      } else {
-        setSnackbar({ 
-          open: true, 
-          message: axios.isAxiosError(error) && error.message 
-            ? `Failed to add patient: ${error.message}` 
-            : 'Failed to add patient', 
-          severity: 'error' 
-        });
-      }
+      await apiClient.patch(`/api/patients/${actionPatient.id}/`, { status: newStatus });
+      setPatients(prev => prev.map(p =>
+        p.id === actionPatient.id ? { ...p, status: newStatus } : p
+      ));
+      setSnackbar({ open: true, message: `Patient status set to ${newStatus}`, severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to update patient status', severity: 'error' });
     } finally {
-      setIsLoading(false);
+      setActionPatient(null);
     }
   };
 
@@ -475,14 +204,6 @@ const PatientManagement: React.FC = () => {
         <Typography variant="h4" component="h1">
           Patient Management
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<Add />}
-          onClick={() => setAddPatientOpen(true)}
-          fullWidth={isMobile}
-        >
-          Add New Patient
-        </Button>
       </Box>
 
       {/* Search Bar */}
@@ -662,35 +383,29 @@ const PatientManagement: React.FC = () => {
         open={Boolean(actionAnchorEl)}
         onClose={handleCloseActions}
       >
-        <MenuItem onClick={() => void handleResendEmail()}>
+        <MenuItem onClick={() => void handleSetStatus('active')}>
           <ListItemIcon>
-            <EmailOutlined fontSize="small" />
+            <CheckCircleOutline fontSize="small" color="success" />
           </ListItemIcon>
-          <ListItemText>Resend Email</ListItemText>
+          <ListItemText>Set Active</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleOpenEditPatient}>
+        <MenuItem onClick={() => void handleSetStatus('inactive')}>
           <ListItemIcon>
-            <Edit fontSize="small" />
+            <HighlightOff fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Edit Patient</ListItemText>
+          <ListItemText>Set Inactive</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleOpenAssignTherapist}>
+        <MenuItem onClick={() => void handleSetStatus('suspended')}>
           <ListItemIcon>
-            <PersonAdd fontSize="small" color="primary" />
+            <Block fontSize="small" color="warning" />
           </ListItemIcon>
-          <ListItemText>Add Therapist</ListItemText>
+          <ListItemText>Suspend</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleOpenCompletePatient}>
           <ListItemIcon>
-            <CheckCircleOutline fontSize="small" />
+            <AssignmentTurnedIn fontSize="small" color="primary" />
           </ListItemIcon>
           <ListItemText>Complete</ListItemText>
-        </MenuItem>
-        <MenuItem onClick={handleOpenRemovePatient} sx={{ color: 'error.main' }}>
-          <ListItemIcon>
-            <DeleteOutline fontSize="small" color="error" />
-          </ListItemIcon>
-          <ListItemText>Remove Patient</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -778,60 +493,6 @@ const PatientManagement: React.FC = () => {
       </Dialog>
 
       <Dialog
-        open={editPatientOpen}
-        onClose={() => setEditPatientOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Edit Patient</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'grid', gap: 2 }}>
-            <TextField
-              fullWidth
-              label="Full Name"
-              value={editPatientData.name}
-              onChange={(e) => setEditPatientData(prev => ({ ...prev, name: e.target.value }))}
-            />
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={editPatientData.email}
-              onChange={(e) => setEditPatientData(prev => ({ ...prev, email: e.target.value }))}
-            />
-            <TextField
-              fullWidth
-              label="Phone"
-              value={editPatientData.phone}
-              onChange={(e) => setEditPatientData(prev => ({ ...prev, phone: e.target.value }))}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditPatientOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={() => void handleSaveEditPatient()}>Save</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={removePatientOpen}
-        onClose={() => setRemovePatientOpen(false)}
-      >
-        <DialogTitle>Remove Patient</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to remove {actionPatient?.name || 'this patient'}?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRemovePatientOpen(false)}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={() => void handleRemovePatient()}>
-            Remove
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
         open={completePatientOpen}
         onClose={() => setCompletePatientOpen(false)}
       >
@@ -845,187 +506,6 @@ const PatientManagement: React.FC = () => {
           <Button onClick={() => setCompletePatientOpen(false)}>Cancel</Button>
           <Button color="success" variant="contained" onClick={() => void handleCompletePatient()}>
             Complete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Assign Therapist Dialog */}
-      <Dialog
-        open={assignTherapistOpen}
-        onClose={() => setAssignTherapistOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>
-          Assign Therapist
-          {actionPatient && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Patient: {actionPatient.name}
-            </Typography>
-          )}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 1 }}>
-            <FormControl fullWidth>
-              <InputLabel>Select Therapist</InputLabel>
-              <Select
-                value={selectedTherapistId}
-                label="Select Therapist"
-                onChange={(e) => setSelectedTherapistId(e.target.value)}
-              >
-                <MenuItem value="">
-                  <em>None (Unassign)</em>
-                </MenuItem>
-                {therapists.map((therapist) => (
-                  <MenuItem key={therapist.id} value={therapist.id}>
-                    {therapist.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAssignTherapistOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            startIcon={<PersonAdd />}
-            onClick={() => void handleAssignTherapist()}
-          >
-            Assign
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add New Patient Dialog */}
-      <Dialog 
-        open={addPatientOpen} 
-        onClose={() => setAddPatientOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Add New Patient</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="First Name"
-                  value={newPatientData.first_name}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, first_name: e.target.value }))}
-                  error={!!formErrors.first_name}
-                  helperText={formErrors.first_name}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Last Name"
-                  value={newPatientData.last_name}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, last_name: e.target.value }))}
-                  error={!!formErrors.last_name}
-                  helperText={formErrors.last_name}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={newPatientData.email}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, email: e.target.value }))}
-                  error={!!formErrors.email}
-                  helperText={formErrors.email}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Phone Number"
-                  value={newPatientData.phone}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, phone: e.target.value }))}
-                  error={!!formErrors.phone}
-                  helperText={formErrors.phone}
-                  placeholder="(555) 123-4567"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Date of Birth"
-                  type="date"
-                  value={newPatientData.date_of_birth}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, date_of_birth: e.target.value }))}
-                  error={!!formErrors.date_of_birth}
-                  helperText={formErrors.date_of_birth}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Primary Diagnosis"
-                  value={newPatientData.diagnosis}
-                  onChange={(e) => setNewPatientData(prev => ({ ...prev, diagnosis: e.target.value }))}
-                  error={!!formErrors.diagnosis}
-                  helperText={formErrors.diagnosis}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth error={!!formErrors.assigned_therapist}>
-                  <InputLabel>Assigned Therapist (Optional)</InputLabel>
-                  <Select
-                    value={newPatientData.assigned_therapist}
-                    label="Assigned Therapist (Optional)"
-                    onChange={(e) => setNewPatientData(prev => ({ ...prev, assigned_therapist: e.target.value }))}
-                  >
-                    <MenuItem value="">None</MenuItem>
-                    {therapists.map((therapist) => (
-                      <MenuItem key={therapist.id} value={therapist.id}>
-                        {therapist.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-              <Typography variant="body2">
-                <strong>Note:</strong> A registration link will be emailed to the patient so they can create their own username and password.
-              </Typography>
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setAddPatientOpen(false);
-            setNewPatientData({
-              first_name: '',
-              last_name: '',
-              email: '',
-              phone: '',
-              date_of_birth: '',
-              diagnosis: '',
-              assigned_therapist: '',
-            });
-            setFormErrors({});
-          }}>
-            Cancel
-          </Button>
-          <Button 
-            variant="contained"
-            onClick={() => {
-              void handleCreatePatient();
-            }}
-            disabled={isLoading}
-            startIcon={isLoading ? <CircularProgress size={20} /> : <Add />}
-          >
-            {isLoading ? 'Adding...' : 'Add Patient'}
           </Button>
         </DialogActions>
       </Dialog>
