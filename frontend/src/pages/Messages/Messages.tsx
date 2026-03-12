@@ -220,22 +220,6 @@ const mapApiUser = (user: ApiUser): { id: string; name: string; role: string; is
   isOnline: user.is_online || false,
 });
 
-const parseAuthUsersPayload = (payload: unknown): { users: ApiUser[]; next: string | null } => {
-  if (Array.isArray(payload)) {
-    const users = payload.filter((item): item is ApiUser => isRecord(item) && typeof item.id === 'string');
-    return { users, next: null };
-  }
-
-  if (isRecord(payload)) {
-    const rawResults = Array.isArray(payload.results) ? payload.results : [];
-    const users = rawResults.filter((item): item is ApiUser => isRecord(item) && typeof item.id === 'string');
-    const next = typeof payload.next === 'string' ? payload.next : null;
-    return { users, next };
-  }
-
-  return { users: [], next: null };
-};
-
 const parseParticipant = (value: unknown): Participant | null => {
   if (!isRecord(value)) {
     return null;
