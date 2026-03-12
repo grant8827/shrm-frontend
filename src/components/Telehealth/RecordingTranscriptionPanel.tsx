@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -111,6 +111,10 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
   const [realtimeEntries, setRealtimeEntries] = useState<TranscriptEntry[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
+  // Direct Web Speech API ref — bypasses the broken WebSocket echo path in telehealthService
+  const recognitionRef = useRef<any>(null);
+  const entriesRef = useRef<TranscriptEntry[]>([]);
+
   // UI state
   const [showSettings, setShowSettings] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -125,6 +129,11 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
       startTranscription();
     }
   }, [sessionId]);
+
+  // Keep entriesRef in sync so the save callback always has the latest list
+  useEffect(() => {
+    entriesRef.current = realtimeEntries;
+  }, [realtimeEntries]);
 
   // Update recording duration timer
   useEffect(() => {
@@ -141,26 +150,15 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     };
   }, [isRecording, isPaused]);
 
+  // Clean up speech recognition on unmount
   useEffect(() => {
-    const handleTranscriptionUpdate = (entry: TranscriptEntry) => {
-      setRealtimeEntries(prevEntries => {
-        const lastEntry = prevEntries[prevEntries.length - 1];
-        if (entry.isInterim && lastEntry && lastEntry.isInterim) {
-          // Replace last interim result with the new one
-          return [...prevEntries.slice(0, -1), entry];
-        } else {
-          // Add new entry (either final or the first interim)
-          return [...prevEntries, entry];
-        }
-      });
-    };
-
-    telehealthService.on('transcription-update', handleTranscriptionUpdate);
-
     return () => {
-      telehealthService.off('transcription-update', handleTranscriptionUpdate);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+        recognitionRef.current = null;
+      }
     };
-  }, []); // Remove dependencies to avoid re-subscribing on every render
+  }, []);
 
   const loadRecordingControls = async () => {
     try {
@@ -268,23 +266,6 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     }
   };
 
-  const startTranscription = async () => {
-    try {
-      const result = await telehealthService.startTranscription(sessionId, transcriptionSettings);
-      
-      if (result.success) {
-        setIsTranscribing(true);
-        if (result.data) {
-          setTranscriptionState(result.data);
-        }
-      } else {
-        setError(result.message || 'Failed to start transcription');
-      }
-    } catch (error) {
-      setError('Error starting transcription');
-    }
-  };
-
   const saveTranscriptToBackend = async (entries: TranscriptEntry[]) => {
     const finalEntries = entries.filter((e) => !e.isInterim);
     if (!sessionId || finalEntries.length === 0) return;
@@ -305,45 +286,121 @@ const RecordingTranscriptionPanel: React.FC<RecordingTranscriptionPanelProps> = 
     }
   };
 
+  /**
+   * Start live transcription using the browser Web Speech API directly.
+   * This bypasses the telehealthService WebSocket path which requires a server echo.
+   * Everything captured by the local microphone is labelled as the current speaker
+   * (therapistName if provided, otherwise 'Therapist').
+   */
+  const startTranscription = async () => {
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      setError('Your browser does not support live transcription (Speech Recognition API missing).');
+      return;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      }
+
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = transcriptionSettings.language || 'en-US';
+      recognitionRef.current = recognition;
+
+      const localSpeakerName = therapistName || 'Therapist';
+
+      recognition.onresult = (event: any) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          const text: string = result[0].transcript;
+          const confidence: number = result[0].confidence ?? 1;
+          const isFinal: boolean = result.isFinal;
+
+          const entry: TranscriptEntry = {
+            id: `${Date.now()}-${i}`,
+            sessionId,
+            speakerId: 'local',
+            speakerName: localSpeakerName,
+            text: text.trim(),
+            confidence,
+            startTime: new Date(),
+            endTime: new Date(),
+            duration: 0,
+            isInterim: !isFinal,
+            keywords: [],
+          };
+
+          setRealtimeEntries((prev) => {
+            const last = prev[prev.length - 1];
+            // Replace the previous interim result for this speaker
+            if (!isFinal && last && last.isInterim && last.speakerId === 'local') {
+              return [...prev.slice(0, -1), entry];
+            }
+            return [...prev, entry];
+          });
+
+          if (isFinal) {
+            onTranscriptionUpdate?.([...entriesRef.current, entry]);
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'no-speech') return; // Ignore silence timeouts
+        console.error('Speech recognition error:', event.error);
+        // Auto-restart on recoverable errors
+        if (['audio-capture', 'network'].includes(event.error)) {
+          setTimeout(() => {
+            if (recognitionRef.current === recognition) {
+              try { recognition.start(); } catch { /* ignore */ }
+            }
+          }, 1000);
+        }
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if we're still supposed to be transcribing
+        if (recognitionRef.current === recognition) {
+          try { recognition.start(); } catch { /* ignore */ }
+        }
+      };
+
+      recognition.start();
+      setIsTranscribing(true);
+      setTranscriptionState({
+        sessionId,
+        isActive: true,
+        language: transcriptionSettings.language,
+        startedAt: new Date(),
+        wordCount: 0,
+        confidence: 1,
+        currentSpeaker: localSpeakerName,
+      } as any);
+    } catch (err) {
+      console.error('Failed to start transcription:', err);
+      setError('Failed to start transcription. Please allow microphone access.');
+    }
+  };
+
   const stopTranscription = async () => {
     try {
-      const result = await telehealthService.stopTranscription(sessionId);
-      
-      if (result.success) {
-        setIsTranscribing(false);
-        if (result.data) {
-          setTranscript(result.data);
-        }
-        // Auto-save all entries to backend
-        void saveTranscriptToBackend(realtimeEntries);
-      } else {
-        setError(result.message || 'Failed to stop transcription');
+      if (recognitionRef.current) {
+        const r = recognitionRef.current;
+        recognitionRef.current = null; // nullify first so onend does NOT restart
+        try { r.stop(); } catch { /* ignore */ }
       }
-    } catch (error) {
+      setIsTranscribing(false);
+      // Save all final entries to backend
+      void saveTranscriptToBackend(entriesRef.current);
+    } catch (err) {
       setError('Error stopping transcription');
     }
   };
-
-  const fetchRealtimeTranscription = async () => {
-    try {
-      const result = await telehealthService.getTranscriptionEntries(sessionId);
-      
-      if (result.success && result.data) {
-        setRealtimeEntries(result.data);
-        onTranscriptionUpdate?.(result.data);
-      }
-    } catch (error) {
-      console.error('Error fetching transcription entries:', error);
-    }
-  };
-
-  // Fetch transcription periodically if needed
-  useEffect(() => {
-    if (isTranscribing && transcriptionSettings.realTimeTranscription) {
-      const interval = setInterval(fetchRealtimeTranscription, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isTranscribing, transcriptionSettings.realTimeTranscription]);
 
   const exportTranscript = async (format: 'pdf' | 'docx' | 'txt' | 'json') => {
     try {
