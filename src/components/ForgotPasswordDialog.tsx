@@ -12,7 +12,7 @@ import {
   Box,
 } from '@mui/material';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
-import apiClient from '../services/apiClient';
+import { apiClient } from '../services/apiClient';
 
 interface ForgotPasswordDialogProps {
   open: boolean;

@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import apiClient from '../../services/apiClient';
+import { apiClient } from '../../services/apiClient';
 
 const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
