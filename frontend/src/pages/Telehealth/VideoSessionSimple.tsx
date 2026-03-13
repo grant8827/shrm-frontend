@@ -436,7 +436,7 @@ const VideoSession: React.FC = () => {
   const endSession = async () => {
     // Signal all other participants to stop transcribing and save their side
     if (user && ['admin', 'therapist', 'staff'].includes(user.role) && isTranscribing) {
-      webSocketService.sendMessage({ type: 'stop-transcription' });
+      webSocketService.sendMessage({ type: 'stop-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
     }
     // Save our own side
     await stopAndSaveTranscription();
@@ -504,11 +504,11 @@ const VideoSession: React.FC = () => {
         const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
         startLocalTranscription(speakerRole);
         // Broadcast to all other session participants to start their own mic
-        webSocketService.sendMessage({ type: 'start-transcription' });
+        webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
         setShowTranscript(true);
       } else {
         // Broadcast stop so all participant browsers save and stop
-        webSocketService.sendMessage({ type: 'stop-transcription' });
+        webSocketService.sendMessage({ type: 'stop-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
         await stopAndSaveTranscription();
       }
     } catch (error) {
