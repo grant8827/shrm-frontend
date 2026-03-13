@@ -426,12 +426,13 @@ const AppointmentScheduling: React.FC = () => {
   // Confirm appointment (patient confirms their appointment)
   const confirmAppointment = async (appointmentId: string) => {
     try {
-      await apiClient.patch(`/api/appointments/${appointmentId}/`, { status: 'confirmed' });
+      await apiClient.post(`/api/appointments/${appointmentId}/confirm/`);
       alert('Appointment confirmed successfully!');
       await loadAppointments(); // Reload to show updated status
     } catch (error: any) {
       console.error('Failed to confirm appointment:', error);
-      const errorMessage = error.response?.data?.detail 
+      const errorMessage = error.response?.data?.error
+        || error.response?.data?.detail 
         || error.response?.data?.message 
         || 'Failed to confirm appointment. Please try again.';
       alert(errorMessage);
