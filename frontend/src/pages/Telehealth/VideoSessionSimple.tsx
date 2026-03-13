@@ -81,6 +81,11 @@ const VideoSession: React.FC = () => {
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
+  // Auto-transcription: patient side tracks whether therapist triggered transcription
+  const [autoTranscribeRequested, setAutoTranscribeRequested] = useState(false);
+  // Stable refs so WS closures always read latest values without stale-closure issues
+  const userRef = useRef(user);
+  const sessionIdRef = useRef(sessionId);
 
   // --- Hooks ---
   const {
@@ -160,6 +165,101 @@ const VideoSession: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [sessionStartTime]);
+
+  // Keep refs current on every render
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
+
+  // Stops recognition, saves accumulated entries, clears state
+  const stopAndSaveTranscription = useCallback(async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    setIsTranscribing(false);
+    setIsSpeechDetected(false);
+    const sid = sessionIdRef.current;
+    if (transcriptEntriesRef.current.length > 0 && sid) {
+      try {
+        await apiClient.post('/api/telehealth/transcripts', {
+          sessionId: sid,
+          entries: transcriptEntriesRef.current,
+        });
+        showSuccess('Transcript saved');
+      } catch (error) {
+        console.error('Failed to save transcript:', error);
+        showError('Failed to save transcript');
+      }
+    }
+    transcriptEntriesRef.current = [];
+    setTranscriptEntries([]);
+  }, [showSuccess, showError]);
+
+  // Starts Web Speech API on the local mic, labeling entries by role
+  const startLocalTranscription = useCallback((speakerRole: 'therapist' | 'patient') => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI || recognitionRef.current) return;
+    const u = userRef.current;
+    const speakerName = `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || u?.username || speakerRole;
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interimText = '';
+      let finalText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalText += text + ' ';
+        } else {
+          interimText += text;
+        }
+      }
+      setInterimTranscript(interimText);
+      if (finalText) {
+        const entry: TranscriptEntry = {
+          speakerName,
+          speakerRole,
+          text: finalText.trim(),
+          timestamp: Date.now(),
+        };
+        transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+        setTranscriptEntries(prev => [...prev, entry]);
+        setInterimTranscript('');
+      }
+    };
+    recognition.onspeechstart = () => setIsSpeechDetected(true);
+    recognition.onspeechend = () => setIsSpeechDetected(false);
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('[TRANSCRIBE] Error:', event.error);
+      if (event.error === 'not-allowed') {
+        setIsTranscribing(false);
+        recognitionRef.current = null;
+      }
+    };
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsTranscribing(true);
+  }, []);
+
+  // Patient side: auto-start/stop recognition when therapist broadcasts
+  useEffect(() => {
+    const u = userRef.current;
+    if (!u || ['admin', 'therapist', 'staff'].includes(u.role)) return;
+    if (autoTranscribeRequested) {
+      startLocalTranscription('patient');
+    } else if (recognitionRef.current) {
+      void stopAndSaveTranscription();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoTranscribeRequested]);
 
   const connectWebSocket = useCallback(async () => {
     if (!roomId || !user) return;
@@ -264,6 +364,18 @@ const VideoSession: React.FC = () => {
       showError('Connection to session server lost');
     });
 
+    // start-transcription: therapist broadcast → patients auto-start their mic
+    webSocketService.on('start-transcription', () => {
+      const u = userRef.current;
+      if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
+      setAutoTranscribeRequested(true);
+    });
+
+    // stop-transcription: therapist stopped → patients save and stop
+    webSocketService.on('stop-transcription', () => {
+      setAutoTranscribeRequested(false);
+    });
+
     // Join the room AFTER handlers are registered
     webSocketService.joinRoom(roomId, sessionId ?? undefined);
 
@@ -322,18 +434,12 @@ const VideoSession: React.FC = () => {
   }, [stopLocalMedia, closePeerConnection]);
 
   const endSession = async () => {
-    // Auto-save transcript if transcription was running and has entries
-    if (transcriptEntriesRef.current.length > 0 && sessionId) {
-      try {
-        await apiClient.post('/api/telehealth/transcripts', {
-          sessionId,
-          entries: transcriptEntriesRef.current,
-        });
-        showSuccess('Transcript saved');
-      } catch (error) {
-        console.error('Failed to auto-save transcript on session end:', error);
-      }
+    // Signal all other participants to stop transcribing and save their side
+    if (user && ['admin', 'therapist', 'staff'].includes(user.role) && isTranscribing) {
+      webSocketService.sendMessage({ type: 'stop-transcription' });
     }
+    // Save our own side
+    await stopAndSaveTranscription();
     cleanupSession();
     showSuccess('Session ended');
     navigate('/telehealth/dashboard');
@@ -389,110 +495,21 @@ const VideoSession: React.FC = () => {
 
   const toggleTranscription = async () => {
     if (!sessionId) return;
-    const speakerLabel = user?.role === 'client' ? 'Patient' : 'Therapist';
-    
     try {
       if (!isTranscribing) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
+        if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
           showError('Speech recognition not supported in this browser');
           return;
         }
-        
-        const audioContext = new AudioContext();
-        audioContextRef.current = audioContext;
-        const destination = audioContext.createMediaStreamDestination();
-        
-        if (localStream) {
-          const localAudioTracks = localStream.getAudioTracks();
-          if (localAudioTracks.length > 0) {
-            const localSource = audioContext.createMediaStreamSource(new MediaStream([localAudioTracks[0]]));
-            localSource.connect(destination);
-          }
-        }
-        
-        if (remoteStream) {
-          const remoteAudioTracks = remoteStream.getAudioTracks();
-          if (remoteAudioTracks.length > 0) {
-            const remoteSource = audioContext.createMediaStreamSource(new MediaStream([remoteAudioTracks[0]]));
-            remoteSource.connect(destination);
-          }
-        }
-        
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let interimText = '';
-          let finalText = '';
-          
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalText += transcript + ' ';
-            } else {
-              interimText += transcript;
-            }
-          }
-          
-          setInterimTranscript(interimText);
-          
-          if (finalText) {
-            const entry: TranscriptEntry = {
-              speakerName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || speakerLabel,
-              speakerRole: user?.role === 'client' ? 'patient' : 'therapist',
-              text: finalText.trim(),
-              timestamp: Date.now(),
-            };
-            transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
-            setTranscriptEntries(prev => [...prev, entry]);
-            setInterimTranscript('');
-          }
-        };
-
-        recognition.onspeechstart = () => setIsSpeechDetected(true);
-        recognition.onspeechend = () => setIsSpeechDetected(false);
-        
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error('[TRANSCRIBE] Error:', event.error);
-          if (event.error === 'not-allowed') {
-             setIsTranscribing(false);
-             recognitionRef.current = null;
-          }
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-        setIsTranscribing(true);
+        const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
+        startLocalTranscription(speakerRole);
+        // Broadcast to all other session participants to start their own mic
+        webSocketService.sendMessage({ type: 'start-transcription' });
         setShowTranscript(true);
       } else {
-        if (recognitionRef.current) {
-          recognitionRef.current.stop();
-          recognitionRef.current = null;
-        }
-        if (audioContextRef.current) {
-          audioContextRef.current.close();
-          audioContextRef.current = null;
-        }
-        
-        if (transcriptEntriesRef.current.length > 0) {
-            try {
-                await apiClient.post('/api/telehealth/transcripts', {
-                  sessionId,
-                  entries: transcriptEntriesRef.current,
-                });
-                showSuccess('Transcript saved');
-            } catch (error) {
-                console.error('Failed to save transcript:', error);
-                showError('Failed to save transcript');
-            }
-        }
-        transcriptEntriesRef.current = [];
-        setTranscriptEntries([]);
-        setIsTranscribing(false);
-        showSuccess('Transcription stopped');
+        // Broadcast stop so all participant browsers save and stop
+        webSocketService.sendMessage({ type: 'stop-transcription' });
+        await stopAndSaveTranscription();
       }
     } catch (error) {
       console.error('Transcription error:', error);
