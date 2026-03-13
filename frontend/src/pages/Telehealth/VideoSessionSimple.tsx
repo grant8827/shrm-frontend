@@ -85,7 +85,7 @@ const VideoSession: React.FC = () => {
   const [autoTranscribeRequested, setAutoTranscribeRequested] = useState(false);
   // Stable refs so WS closures always read latest values without stale-closure issues
   const userRef = useRef(user);
-  const sessionIdRef = useRef(sessionId);
+  const sessionIdRef = useRef<string | null>(sessionId ?? null);
 
   // --- Hooks ---
   const {
@@ -110,7 +110,7 @@ const VideoSession: React.FC = () => {
     remoteVideoRef,
     isRemoteVideoReady,
     isRemotePlaybackBlocked,
-    remoteStream,
+    remoteStream: _remoteStream,
     initializePeerConnection,
     createOffer,
     handleOffer,
