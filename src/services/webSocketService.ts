@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 
 export interface WebSocketMessage {
-  type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update' | 'transcription';
+  type: 'ice-candidate' | 'offer' | 'answer' | 'join' | 'leave' | 'chat' | 'recording-start' | 'recording-stop' | 'participant-update' | 'transcription' | 'start-transcription' | 'stop-transcription';
   sessionId: string;
   participantId?: string;
   data?: Record<string, unknown>;
