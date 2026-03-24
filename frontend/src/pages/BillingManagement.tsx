@@ -647,15 +647,16 @@ const BillingManagement: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              {/* Manual transaction ID — hidden when PayPal handles it */}
-              {!isPayPalMethod && (
+              {/* Cash instructions */}
+              {paymentData.payment_method === 'cash' && (
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Transaction ID (Optional)"
-                    value={paymentData.transaction_id}
-                    onChange={(e) => setPaymentData({ ...paymentData, transaction_id: e.target.value })}
-                  />
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      To pay by cash, please contact us:
+                    </Typography>
+                    <Typography variant="body2">📞 <strong>Tel:</strong> 876-465-6760</Typography>
+                    <Typography variant="body2">✉️ <strong>Email:</strong> info@safehavenrestorationministries.com</Typography>
+                  </Alert>
                 </Grid>
               )}
 
@@ -663,7 +664,7 @@ const BillingManagement: React.FC = () => {
               {isPayPalMethod && paymentData.amount && (
                 <Grid item xs={12}>
                   <Alert severity="info" sx={{ mb: 1 }}>
-                    Complete your payment below using a credit or debit card via PayPal.
+                    Complete your payment securely below using a credit or debit card via PayPal.
                     Your payment will be recorded automatically on success.
                   </Alert>
                   <PayPalCheckout
@@ -675,12 +676,30 @@ const BillingManagement: React.FC = () => {
                 </Grid>
               )}
 
+              {/* Bank transfer instructions */}
+              {paymentData.payment_method === 'bank_transfer' && (
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Bank Transfer Details:
+                    </Typography>
+                    <Typography variant="body2"><strong>Bank:</strong> JN</Typography>
+                    <Typography variant="body2"><strong>Branch:</strong> Brown's Town</Typography>
+                    <Typography variant="body2"><strong>Account Name:</strong> GGFM</Typography>
+                    <Typography variant="body2"><strong>Account #:</strong> 014758214</Typography>
+                    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                      Please use your invoice number as the transfer reference, then click Record Payment below.
+                    </Typography>
+                  </Alert>
+                </Grid>
+              )}
+
             </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClosePaymentDialog}>Cancel</Button>
-          {/* Only show manual Record Payment when NOT using PayPal card methods */}
+          {/* Show Record Payment for all methods except credit/debit card (PayPal handles those) */}
           {!isPayPalMethod && (
             <Button
               onClick={() => handleAddPayment()}
