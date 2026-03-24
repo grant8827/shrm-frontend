@@ -1,0 +1,10 @@
+{
+  "short_name": "SafeHaven",
+  "name": "SafeHaven EHR - Therapeutic EHR System",
+  "icons": [],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#ffffff",
+  "description": "HIPAA-Compliant Electronic Health Record system for therapeutic practices"
+}
