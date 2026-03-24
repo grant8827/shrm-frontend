@@ -18,14 +18,17 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
   Receipt as ReceiptIcon,
   AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
+import PayPalCheckout from '../components/PayPalCheckout';
 
 interface Bill {
   id: number;
@@ -59,13 +62,17 @@ interface BillingSummary {
   overdue_count: number;
 }
 
-const PatientBilling: React.FC = () => {
-  const { showError } = useNotification();
+const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
+
+const PatientBillingInner: React.FC = () => {
+  const { showSuccess, showError } = useNotification();
   
   const [bills, setBills] = useState<Bill[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showPayDialog, setShowPayDialog] = useState(false);
+  const [payBill, setPayBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -74,8 +81,9 @@ const PatientBilling: React.FC = () => {
 
   const fetchBills = async () => {
     try {
-      const response = await apiClient.get('/billing/bills/');
-      setBills(response.data.results || response.data);
+      const response = await apiClient.get('/api/billing/invoices');
+      const raw = response.data?.results ?? response.data ?? [];
+      setBills(Array.isArray(raw) ? raw : []);
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
@@ -84,11 +92,46 @@ const PatientBilling: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const response = await apiClient.get('/billing/bills/summary/');
+      const response = await apiClient.get('/api/billing/summary');
       setSummary(response.data);
     } catch (error) {
       console.error('Error fetching summary:', error);
     }
+  };
+
+  const handleOpenPayDialog = (bill: Bill) => {
+    setPayBill(bill);
+    setShowPayDialog(true);
+  };
+
+  const handleClosePayDialog = () => {
+    setShowPayDialog(false);
+    setPayBill(null);
+  };
+
+  const handlePayPalSuccess = async (transactionId: string) => {
+    if (!payBill) return;
+    try {
+      await apiClient.post(`/api/billing/invoices/${payBill.id}/verify-paypal-payment`, {
+        orderId: transactionId,
+        amount: parseFloat(payBill.balance_remaining),
+        paymentMethod: 'paypal',
+      });
+      showSuccess('Payment successful! Your bill has been updated.');
+      handleClosePayDialog();
+      fetchBills();
+      fetchSummary();
+    } catch (error: any) {
+      showError(
+        error.response?.data?.error ??
+        error.response?.data?.detail ??
+        'Payment verification failed. Please contact support.'
+      );
+    }
+  };
+
+  const handlePayPalError = (message: string) => {
+    showError(message);
   };
 
   const getStatusColor = (status: string) => {
@@ -256,6 +299,7 @@ const PatientBilling: React.FC = () => {
                       <TableCell>
                         <IconButton
                           size="small"
+                          title="View Details"
                           onClick={() => {
                             setSelectedBill(bill);
                             setShowDetails(true);
@@ -263,6 +307,16 @@ const PatientBilling: React.FC = () => {
                         >
                           <ReceiptIcon />
                         </IconButton>
+                        {!bill.is_paid && bill.status !== 'cancelled' && parseFloat(bill.balance_remaining) > 0 && (
+                          <IconButton
+                            size="small"
+                            title="Pay Now"
+                            color="primary"
+                            onClick={() => handleOpenPayDialog(bill)}
+                          >
+                            <PaymentIcon />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -357,10 +411,61 @@ const PatientBilling: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowDetails(false)}>Close</Button>
+          {selectedBill && !selectedBill.is_paid && selectedBill.status !== 'cancelled' && parseFloat(selectedBill.balance_remaining) > 0 && (
+            <Button
+              variant="contained"
+              startIcon={<PaymentIcon />}
+              onClick={() => {
+                setShowDetails(false);
+                handleOpenPayDialog(selectedBill);
+              }}
+            >
+              Pay Now
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Pay Now Dialog */}
+      <Dialog open={showPayDialog} onClose={handleClosePayDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Pay Bill</DialogTitle>
+        <DialogContent>
+          {payBill && (
+            <Box sx={{ pt: 1 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                <strong>{payBill.title}</strong>
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Amount due: <strong>${parseFloat(payBill.balance_remaining).toFixed(2)}</strong>
+              </Alert>
+              <PayPalCheckout
+                amount={payBill.balance_remaining}
+                description={`Payment for ${payBill.title}`}
+                onSuccess={handlePayPalSuccess}
+                onError={handlePayPalError}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePayDialog}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
+
+const PatientBilling: React.FC = () => (
+  <PayPalScriptProvider
+    options={{
+      clientId: PAYPAL_CLIENT_ID ?? 'test',
+      currency: 'USD',
+      intent: 'capture',
+      components: 'buttons',
+    }}
+  >
+    <PatientBillingInner />
+  </PayPalScriptProvider>
+);
 
 export default PatientBilling;

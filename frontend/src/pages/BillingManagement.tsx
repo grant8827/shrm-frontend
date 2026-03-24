@@ -24,6 +24,7 @@ import {
   InputLabel,
   Select,
   InputAdornment,
+  Alert,
   useTheme,
   useMediaQuery,
   type ChipProps,
@@ -34,8 +35,13 @@ import {
   Delete as DeleteIcon,
   Payment as PaymentIcon,
 } from '@mui/icons-material';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
+import PayPalCheckout from '../components/PayPalCheckout';
+
+// Payment methods that trigger the PayPal hosted card checkout
+const PAYPAL_CARD_METHODS = ['credit_card', 'debit_card'];
 
 // Matches the transformed invoice shape returned by the backend
 interface Bill {
@@ -95,7 +101,7 @@ const transformInvoice = (inv: any): Bill => {
     amount: total.toFixed(2),
     amount_paid: amountPaid.toFixed(2),
     balance_remaining: balanceRemaining.toFixed(2),
-    status: inv.status ?? 'pending',
+    status: (inv.status ?? 'pending').toLowerCase(),
     issue_date: inv.date ? inv.date.split('T')[0] : (inv.issue_date ?? ''),
     due_date: dueDate ? dueDate.split('T')[0] : '',
     paid_date: inv.paymentDate ? inv.paymentDate.split('T')[0] : null,
@@ -266,16 +272,20 @@ const BillingManagement: React.FC = () => {
   const handleClosePaymentDialog = () => {
     setOpenPaymentDialog(false);
     setSelectedBill(null);
+    setPaymentData({ amount: '', payment_method: '', transaction_id: '' });
   };
 
-  const handleAddPayment = async () => {
+  const handleAddPayment = async (overrideTransactionId?: string) => {
     if (!selectedBill) return;
+
+    const txId = overrideTransactionId ?? paymentData.transaction_id;
 
     try {
       // Backend addPayment expects: { amount, paymentMethod }
       await apiClient.post(`/api/billing/invoices/${selectedBill.id}/payment`, {
         amount: parseFloat(paymentData.amount),
         paymentMethod: paymentData.payment_method,
+        ...(txId ? { transactionId: txId } : {}),
       });
       showSuccess('Payment recorded successfully');
       handleClosePaymentDialog();
@@ -285,6 +295,35 @@ const BillingManagement: React.FC = () => {
       console.error('Error recording payment:', error);
     }
   };
+
+  /** Called by PayPalCheckout on successful card/PayPal payment */
+  const handlePayPalSuccess = async (transactionId: string) => {
+    if (!selectedBill) return;
+    try {
+      // Call the server-side verify endpoint — backend confirms the order is
+      // genuinely COMPLETED with PayPal before recording it.
+      await apiClient.post(`/api/billing/invoices/${selectedBill.id}/verify-paypal-payment`, {
+        orderId: transactionId,
+        amount: parseFloat(paymentData.amount),
+        paymentMethod: paymentData.payment_method || 'paypal',
+      });
+      showSuccess('Payment verified and recorded successfully');
+      handleClosePaymentDialog();
+      fetchBills();
+    } catch (error: any) {
+      showError(
+        error.response?.data?.error ??
+        error.response?.data?.detail ??
+        'Payment verification failed. Please contact support.'
+      );
+    }
+  };
+
+  const handlePayPalError = (message: string) => {
+    showError(message);
+  };
+
+  const isPayPalMethod = PAYPAL_CARD_METHODS.includes(paymentData.payment_method);
 
   const getStatusColor = (status: string): ChipProps['color'] => {
     switch (status) {
@@ -608,30 +647,68 @@ const BillingManagement: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Transaction ID (Optional)"
-                  value={paymentData.transaction_id}
-                  onChange={(e) => setPaymentData({ ...paymentData, transaction_id: e.target.value })}
-                />
-              </Grid>
+              {/* Manual transaction ID — hidden when PayPal handles it */}
+              {!isPayPalMethod && (
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Transaction ID (Optional)"
+                    value={paymentData.transaction_id}
+                    onChange={(e) => setPaymentData({ ...paymentData, transaction_id: e.target.value })}
+                  />
+                </Grid>
+              )}
+
+              {/* PayPal checkout — shown when credit_card or debit_card is selected */}
+              {isPayPalMethod && paymentData.amount && (
+                <Grid item xs={12}>
+                  <Alert severity="info" sx={{ mb: 1 }}>
+                    Complete your payment below using a credit or debit card via PayPal.
+                    Your payment will be recorded automatically on success.
+                  </Alert>
+                  <PayPalCheckout
+                    amount={paymentData.amount}
+                    description={`Payment for ${selectedBill?.title ?? 'medical bill'}`}
+                    onSuccess={handlePayPalSuccess}
+                    onError={handlePayPalError}
+                  />
+                </Grid>
+              )}
+
             </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClosePaymentDialog}>Cancel</Button>
-          <Button
-            onClick={handleAddPayment}
-            variant="contained"
-            disabled={!paymentData.amount || !paymentData.payment_method}
-          >
-            Record Payment
-          </Button>
+          {/* Only show manual Record Payment when NOT using PayPal card methods */}
+          {!isPayPalMethod && (
+            <Button
+              onClick={() => handleAddPayment()}
+              variant="contained"
+              disabled={!paymentData.amount || !paymentData.payment_method}
+            >
+              Record Payment
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
 
-export default BillingManagement;
+const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
+
+const BillingManagementWithPayPal: React.FC = () => (
+  <PayPalScriptProvider
+    options={{
+      clientId: PAYPAL_CLIENT_ID ?? 'test',
+      currency: 'USD',
+      intent: 'capture',
+      components: 'buttons',
+    }}
+  >
+    <BillingManagement />
+  </PayPalScriptProvider>
+);
+
+export default BillingManagementWithPayPal;
