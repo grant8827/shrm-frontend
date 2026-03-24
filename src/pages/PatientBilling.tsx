@@ -18,14 +18,19 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   Payment as PaymentIcon,
   Receipt as ReceiptIcon,
   AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
+import PayPalCheckout from '../components/PayPalCheckout';
+
+const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 
 interface Bill {
   id: string;
@@ -59,13 +64,15 @@ interface BillingSummary {
   overdue_count: number;
 }
 
-const PatientBilling: React.FC = () => {
+const PatientBillingInner: React.FC = () => {
   const { showError, showSuccess } = useNotification();
   
   const [bills, setBills] = useState<Bill[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showPayDialog, setShowPayDialog] = useState(false);
+  const [payBill, setPayBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -127,35 +134,39 @@ const PatientBilling: React.FC = () => {
     }
   };
 
-  const handlePayNow = async (bill: Bill) => {
-    const prevBills = bills;
-    const prevSummary = summary;
-    // Optimistic update
-    setBills(prev => prev.map(b => b.id === bill.id
-      ? { ...b, status: 'paid', is_paid: true, amount_paid: b.amount, balance_remaining: '0', paid_date: new Date().toISOString() }
-      : b
-    ));
-    if (summary) {
-      setSummary({
-        ...summary,
-        total_paid: summary.total_paid + parseFloat(bill.balance_remaining),
-        total_outstanding: Math.max(0, summary.total_outstanding - parseFloat(bill.balance_remaining)),
-        paid_count: summary.paid_count + 1,
-        pending_count: Math.max(0, summary.pending_count - 1),
-      });
-    }
+  const handleOpenPayDialog = (bill: Bill) => {
+    setPayBill(bill);
+    setShowPayDialog(true);
+  };
+
+  const handleClosePayDialog = () => {
+    setShowPayDialog(false);
+    setPayBill(null);
+  };
+
+  const handlePayPalSuccess = async (transactionId: string) => {
+    if (!payBill) return;
     try {
-      await apiClient.post(`/api/billing/invoices/${bill.id}/payment`, {
-        amount: parseFloat(bill.balance_remaining),
+      await apiClient.post(`/api/billing/invoices/${payBill.id}/verify-paypal-payment`, {
+        orderId: transactionId,
+        amount: parseFloat(payBill.balance_remaining),
+        paymentMethod: 'paypal',
       });
-      showSuccess('Payment recorded successfully');
+      showSuccess('Payment successful! Your bill has been updated.');
+      handleClosePayDialog();
       fetchBills();
       fetchSummary();
     } catch (error: any) {
-      setBills(prevBills);
-      setSummary(prevSummary);
-      showError(error.response?.data?.error || error.response?.data?.detail || 'Failed to record payment');
+      showError(
+        error.response?.data?.error ??
+        error.response?.data?.detail ??
+        'Payment verification failed. Please contact support.'
+      );
     }
+  };
+
+  const handlePayPalError = (message: string) => {
+    showError(message);
   };
 
   const getStatusColor = (status: string) => {
@@ -333,11 +344,11 @@ const PatientBilling: React.FC = () => {
                         >
                           <ReceiptIcon />
                         </IconButton>
-                        {!bill.is_paid && bill.status !== 'cancelled' && (
+                        {!bill.is_paid && bill.status !== 'cancelled' && parseFloat(bill.balance_remaining) > 0 && (
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => handlePayNow(bill)}
+                            onClick={() => handleOpenPayDialog(bill)}
                             title="Pay Now"
                           >
                             <PaymentIcon />
@@ -437,10 +448,61 @@ const PatientBilling: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowDetails(false)}>Close</Button>
+          {selectedBill && !selectedBill.is_paid && selectedBill.status !== 'cancelled' && parseFloat(selectedBill.balance_remaining) > 0 && (
+            <Button
+              variant="contained"
+              startIcon={<PaymentIcon />}
+              onClick={() => {
+                setShowDetails(false);
+                handleOpenPayDialog(selectedBill);
+              }}
+            >
+              Pay Now
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Pay Now Dialog */}
+      <Dialog open={showPayDialog} onClose={handleClosePayDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Pay Bill</DialogTitle>
+        <DialogContent>
+          {payBill && (
+            <Box sx={{ pt: 1 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                <strong>{payBill.title}</strong>
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Amount due: <strong>${parseFloat(payBill.balance_remaining).toFixed(2)}</strong>
+              </Alert>
+              <PayPalCheckout
+                amount={payBill.balance_remaining}
+                description={`Payment for ${payBill.title}`}
+                onSuccess={handlePayPalSuccess}
+                onError={handlePayPalError}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePayDialog}>Cancel</Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
+
+const PatientBilling: React.FC = () => (
+  <PayPalScriptProvider
+    options={{
+      clientId: PAYPAL_CLIENT_ID ?? 'test',
+      currency: 'USD',
+      intent: 'capture',
+      components: 'buttons',
+    }}
+  >
+    <PatientBillingInner />
+  </PayPalScriptProvider>
+);
 
 export default PatientBilling;

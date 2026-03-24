@@ -24,6 +24,7 @@ import {
   InputLabel,
   Select,
   InputAdornment,
+  Alert,
   useTheme,
   useMediaQuery,
   type ChipProps,
@@ -34,8 +35,13 @@ import {
   Delete as DeleteIcon,
   Payment as PaymentIcon,
 } from '@mui/icons-material';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { apiClient } from '../services/apiClient';
 import { useNotification } from '../contexts/NotificationContext';
+import PayPalCheckout from '../components/PayPalCheckout';
+
+// Payment methods that trigger the PayPal hosted card checkout
+const PAYPAL_CARD_METHODS = ['credit_card', 'debit_card'];
 
 interface Bill {
   id: string;
@@ -273,13 +279,16 @@ const BillingManagement: React.FC = () => {
     setSelectedBill(null);
   };
 
-  const handleAddPayment = async () => {
+  const handleAddPayment = async (overrideTransactionId?: string) => {
     if (!selectedBill) return;
+
+    const txId = overrideTransactionId ?? paymentData.transaction_id;
 
     try {
       await apiClient.post(`/api/billing/invoices/${selectedBill.id}/payment`, {
         amount: parseFloat(paymentData.amount) || 0,
         paymentMethod: paymentData.payment_method || undefined,
+        ...(txId ? { transactionId: txId } : {}),
       });
       showSuccess('Payment recorded successfully');
       handleClosePaymentDialog();
@@ -290,6 +299,34 @@ const BillingManagement: React.FC = () => {
       console.error('Error recording payment:', error);
     }
   };
+
+  /** Called by PayPalCheckout on successful card/PayPal payment */
+  const handlePayPalSuccess = async (transactionId: string) => {
+    if (!selectedBill) return;
+    try {
+      await apiClient.post(`/api/billing/invoices/${selectedBill.id}/verify-paypal-payment`, {
+        orderId: transactionId,
+        amount: parseFloat(paymentData.amount),
+        paymentMethod: paymentData.payment_method || 'paypal',
+      });
+      showSuccess('Payment verified and recorded successfully');
+      handleClosePaymentDialog();
+      fetchBills();
+      fetchSummary();
+    } catch (error: any) {
+      showError(
+        error.response?.data?.error ??
+        error.response?.data?.detail ??
+        'Payment verification failed. Please contact support.'
+      );
+    }
+  };
+
+  const handlePayPalError = (message: string) => {
+    showError(message);
+  };
+
+  const isPayPalMethod = PAYPAL_CARD_METHODS.includes(paymentData.payment_method);
 
   const getStatusColor = (status: string): ChipProps['color'] => {
     switch (status) {
@@ -614,30 +651,87 @@ const BillingManagement: React.FC = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Transaction ID (Optional)"
-                  value={paymentData.transaction_id}
-                  onChange={(e) => setPaymentData({ ...paymentData, transaction_id: e.target.value })}
-                />
-              </Grid>
+              {/* Cash instructions */}
+              {paymentData.payment_method === 'cash' && (
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      To pay by cash, please contact us:
+                    </Typography>
+                    <Typography variant="body2">📞 <strong>Tel:</strong> 876-465-6760</Typography>
+                    <Typography variant="body2">✉️ <strong>Email:</strong> info@safehavenrestorationministries.com</Typography>
+                  </Alert>
+                </Grid>
+              )}
+
+              {/* PayPal checkout — shown when credit_card or debit_card is selected */}
+              {isPayPalMethod && paymentData.amount && (
+                <Grid item xs={12}>
+                  <Alert severity="info" sx={{ mb: 1 }}>
+                    Complete your payment securely below using a credit or debit card via PayPal.
+                    Your payment will be recorded automatically on success.
+                  </Alert>
+                  <PayPalCheckout
+                    amount={paymentData.amount}
+                    description={`Payment for ${selectedBill?.title ?? 'medical bill'}`}
+                    onSuccess={handlePayPalSuccess}
+                    onError={handlePayPalError}
+                  />
+                </Grid>
+              )}
+
+              {/* Bank transfer instructions */}
+              {paymentData.payment_method === 'bank_transfer' && (
+                <Grid item xs={12}>
+                  <Alert severity="info" icon={false}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                      Bank Transfer Details:
+                    </Typography>
+                    <Typography variant="body2"><strong>Bank:</strong> JN</Typography>
+                    <Typography variant="body2"><strong>Branch:</strong> Brown's Town</Typography>
+                    <Typography variant="body2"><strong>Account Name:</strong> GGFM</Typography>
+                    <Typography variant="body2"><strong>Account #:</strong> 014758214</Typography>
+                    <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                      Please use your invoice number as the transfer reference, then click Record Payment below.
+                    </Typography>
+                  </Alert>
+                </Grid>
+              )}
+
             </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClosePaymentDialog}>Cancel</Button>
-          <Button
-            onClick={handleAddPayment}
-            variant="contained"
-            disabled={!paymentData.amount || !paymentData.payment_method}
-          >
-            Record Payment
-          </Button>
+          {/* Show Record Payment for all methods except credit/debit card (PayPal handles those) */}
+          {!isPayPalMethod && (
+            <Button
+              onClick={() => handleAddPayment()}
+              variant="contained"
+              disabled={!paymentData.amount || !paymentData.payment_method}
+            >
+              Record Payment
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
   );
 };
 
-export default BillingManagement;
+const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
+
+const BillingManagementWithPayPal: React.FC = () => (
+  <PayPalScriptProvider
+    options={{
+      clientId: PAYPAL_CLIENT_ID ?? 'test',
+      currency: 'USD',
+      intent: 'capture',
+      components: 'buttons',
+    }}
+  >
+    <BillingManagement />
+  </PayPalScriptProvider>
+);
+
+export default BillingManagementWithPayPal;
