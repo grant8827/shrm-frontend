@@ -225,6 +225,18 @@ class AuditService {
       return;
     }
 
+    // Don't attempt to send audit logs if the user is not authenticated.
+    // Sending without a token triggers a 401 → refresh → another 401 loop.
+    if (!localStorage.getItem('access_token')) {
+      this.storeFailedLogs([...this.pendingLogs]);
+      this.pendingLogs = [];
+      if (this.batchTimeout) {
+        clearTimeout(this.batchTimeout);
+        this.batchTimeout = undefined;
+      }
+      return;
+    }
+
     const logsToSend = [...this.pendingLogs];
     this.pendingLogs = [];
 

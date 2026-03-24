@@ -63,7 +63,7 @@ class DocumentsService {
       const response = await fetch(`${this.baseUrl}/${documentId}/download`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
 
@@ -101,7 +101,7 @@ class DocumentsService {
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: formData,
       });
@@ -383,7 +383,7 @@ class DocumentsService {
       const response = await fetch(`${this.baseUrl}/${documentId}/preview`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
       });
 

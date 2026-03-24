@@ -39,7 +39,8 @@ class AuthService {
       auditService.logEvent('login_attempt', { username });
       
       // Use direct fetch for login since Django returns data directly (not wrapped in ApiResponse)
-      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+      const rawBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8000';
+      const baseURL = rawBase.replace(/\/api\/?$/, '') + '/api';
       const response = await fetch(`${baseURL}/auth/login/`, {
         method: 'POST',
         headers: {
@@ -82,8 +83,8 @@ class AuthService {
         // Set authorization header for future requests
         apiService.setAuthToken(data.access);
         
-        // Set up automatic token refresh (assuming 24 hour expiry)
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        // Set up automatic token refresh — access token expires in 15 minutes
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         this.setupTokenRefresh(expiresAt);
         
         // Log successful login
@@ -142,14 +143,21 @@ class AuthService {
    */
   async refreshToken(): Promise<string | null> {
     try {
-      const response = await apiService.post<RefreshTokenResponse>('/auth/refresh');
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) return null;
+
+      const response = await apiService.post<RefreshTokenResponse & { refresh?: string }>('/auth/refresh/', { refresh: refreshToken });
       
       if (response.success && response.data) {
-        // Update stored token
         const token = response.data.access;
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // Assume 24h expiry
+        // Store updated tokens
+        localStorage.setItem('access_token', token);
+        if (response.data.refresh) {
+          localStorage.setItem('refresh_token', response.data.refresh);
+        }
+        apiService.setAuthToken(token);
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
         this.setupTokenRefresh(expiresAt);
-        
         return token;
       }
       
@@ -374,7 +382,8 @@ class AuthService {
         
         if (newToken) {
           // Update stored token
-          localStorage.setItem('theracare_token', newToken);
+          localStorage.setItem('access_token', newToken);
+          apiService.setAuthToken(newToken);
         } else {
           // Refresh failed, logout user
           this.logout();

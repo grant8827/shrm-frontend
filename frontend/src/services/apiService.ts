@@ -17,7 +17,10 @@ class ApiService {
   private refreshSubscribers: ((token: string) => void)[] = [];
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+    // Normalize base URL: apiService paths never include /api prefix,
+    // so ensure the base always ends with /api regardless of env var format.
+    const rawBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8000';
+    this.baseURL = rawBase.replace(/\/api\/?$/, '') + '/api';
     
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -182,6 +185,11 @@ class ApiService {
 
       const responseData = this.parseUnknownRecord(response.data);
       const accessToken = responseData?.access;
+      // Save the new refresh token that the backend rotates on each refresh
+      const newRefreshToken = responseData?.refresh;
+      if (typeof newRefreshToken === 'string') {
+        localStorage.setItem('refresh_token', newRefreshToken);
+      }
       return typeof accessToken === 'string' ? accessToken : null;
     } catch (error) {
       console.error('Token refresh failed:', error);

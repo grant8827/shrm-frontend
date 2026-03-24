@@ -187,7 +187,7 @@ class SettingsService {
       const response = await fetch(`${this.baseUrl}/profile-photo`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: formData,
       });

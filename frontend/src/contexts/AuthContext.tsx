@@ -204,10 +204,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Call logout API
       await authService.logout();
       
-      // Clear auth header and local storage
+      // Clear auth header and all stored tokens
       const { apiClient } = await import('../services/apiClient');
       delete apiClient.defaults.headers.common['Authorization'];
       localStorage.removeItem('theracare_token');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       
       // Update state
@@ -218,6 +220,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const { apiClient } = await import('../services/apiClient');
       delete apiClient.defaults.headers.common['Authorization'];
       localStorage.removeItem('theracare_token');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       dispatch({ type: 'LOGOUT' });
     }
