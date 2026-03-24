@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Strip a trailing /api so that request paths like '/api/billing/...' are never doubled.
+const rawBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8000';
+const baseURL = rawBase.replace(/\/api\/?$/, '');
 
 export const apiClient = axios.create({
   baseURL,
