@@ -160,7 +160,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
           <Select
             labelId="patient-select-label"
             value={selectedPatientId}
-            onChange={(e) => setSelectedPatientId(e.target.value as number)}
+            onChange={(e) => setSelectedPatientId(e.target.value as string)}
             label="Select Patient *"
             disabled={loading || success}
           >

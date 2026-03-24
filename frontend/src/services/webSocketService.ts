@@ -164,6 +164,16 @@ class WebSocketService {
     }
   }
 
+  /** Convenience wrapper used by telehealthService to send a WebRTC answer. */
+  sendAnswer(answer: RTCSessionDescriptionInit, _targetParticipantId?: string): void {
+    this.sendMessage({ type: 'answer', answer });
+  }
+
+  /** Convenience wrapper used by telehealthService to send an ICE candidate. */
+  sendIceCandidate(candidate: RTCIceCandidate, _targetParticipantId?: string): void {
+    this.sendMessage({ type: 'ice-candidate', candidate });
+  }
+
   /** Register a listener for a server-emitted event. */
   on(event: string, callback: EventCallback): void {
     if (!this.listeners.has(event)) {
