@@ -145,7 +145,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       setError(null);
 
       // Fetch real data from API
-      const usersRes = await apiClient.get('/api/auth/');
+      const usersRes = await apiClient.get('/api/users/');
       const patientsRes = await apiClient.get('/api/patients/');
       
       // Handle both paginated and non-paginated responses
@@ -359,20 +359,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           break;
         case 'lock':
           // Suspend user account (prevent login)
-          if (window.confirm('Are you sure you want to suspend this user account?')) {
-            await apiClient.patch(`/api/auth/${userId}/`, { is_active: false });
+          if (window.confirm('Are you sure you want to suspend this user? They will not be able to log in until unsuspended.')) {
+            await apiClient.patch(`/api/users/${userId}/`, { isActive: false });
             await loadDashboardData();
           }
           break;
         case 'unlock':
           // Unsuspend user account (allow login)
-          await apiClient.patch(`/api/auth/${userId}/`, { is_active: true });
-          await loadDashboardData();
+          if (window.confirm('Restore access for this user?')) {
+            await apiClient.patch(`/api/users/${userId}/`, { isActive: true });
+            await loadDashboardData();
+          }
           break;
         case 'delete':
-          // Soft delete - remove from view but keep in database
-          if (window.confirm('Are you sure you want to delete this user? They will be removed from the list but data will be preserved.')) {
-            await apiClient.delete(`/api/auth/${userId}/`);
+          if (window.confirm('Permanently delete this user? This cannot be undone — all their data will be removed.')) {
+            await apiClient.delete(`/api/users/${userId}/`);
             await loadDashboardData();
           }
           break;
