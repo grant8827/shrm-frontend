@@ -51,16 +51,65 @@ interface Bill {
 }
 
 interface BillingSummary {
-  total_billed: number;
-  total_paid: number;
-  total_outstanding: number;
-  total_pending: number;
-  total_overdue: number;
-  bill_count: number;
-  paid_count: number;
-  pending_count: number;
-  overdue_count: number;
+  totalBilled: number;
+  totalPaid: number;
+  totalOutstanding: number;
+  totalOverdue: number;
+  invoiceCount: number;
+  paidCount: number;
+  pendingCount: number;
+  overdueCount: number;
 }
+
+// Shape returned by GET /api/billing/invoices (Prisma Invoice with nested relations)
+interface InvoiceFromApi {
+  id: string;
+  patientId: string;
+  invoiceNumber: string;
+  date: string;
+  dueDate: string | null;
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: string;
+  paymentDate: string | null;
+  paymentMethod: string | null;
+  transactionId: string | null;
+  notes: string | null;
+  patient?: { user?: { firstName?: string; lastName?: string } };
+}
+
+const toLocalBill = (inv: InvoiceFromApi): Bill => {
+  const isPaid = inv.status === 'paid';
+  const amountPaid = isPaid ? inv.total : 0;
+  const balanceRemaining = inv.total - amountPaid;
+  const isOverdue =
+    !isPaid &&
+    inv.status !== 'cancelled' &&
+    !!inv.dueDate &&
+    new Date(inv.dueDate) < new Date();
+  const firstName = inv.patient?.user?.firstName ?? '';
+  const lastName = inv.patient?.user?.lastName ?? '';
+  return {
+    id: inv.id as any,
+    patient: inv.patientId as any,
+    patient_name: `${firstName} ${lastName}`.trim(),
+    title: inv.invoiceNumber,
+    description: inv.notes ?? '',
+    amount: String(inv.total),
+    amount_paid: String(amountPaid),
+    balance_remaining: String(balanceRemaining),
+    status: inv.status,
+    issue_date: inv.date,
+    due_date: inv.dueDate ?? '',
+    paid_date: inv.paymentDate,
+    payment_method: inv.paymentMethod ?? '',
+    transaction_id: inv.transactionId ?? '',
+    is_paid: isPaid,
+    is_overdue: isOverdue,
+    created_at: inv.date,
+  };
+};
 
 const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 
@@ -82,8 +131,8 @@ const PatientBillingInner: React.FC = () => {
   const fetchBills = async () => {
     try {
       const response = await apiClient.get('/api/billing/invoices');
-      const raw = response.data?.results ?? response.data ?? [];
-      setBills(Array.isArray(raw) ? raw : []);
+      const raw: InvoiceFromApi[] = response.data?.results ?? response.data ?? [];
+      setBills(Array.isArray(raw) ? raw.map(toLocalBill) : []);
     } catch (error) {
       showError('Failed to load bills');
       console.error('Error fetching bills:', error);
@@ -175,9 +224,9 @@ const PatientBillingInner: React.FC = () => {
                     Total Billed
                   </Typography>
                 </Box>
-                <Typography variant="h4">{formatCurrency(summary.total_billed)}</Typography>
+                <Typography variant="h4">{formatCurrency(summary.totalBilled)}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {summary.bill_count} bills
+                  {summary.invoiceCount} bills
                 </Typography>
               </CardContent>
             </Card>
@@ -193,10 +242,10 @@ const PatientBillingInner: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography variant="h4" color="success.main">
-                  {formatCurrency(summary.total_paid)}
+                  {formatCurrency(summary.totalPaid)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {summary.paid_count} paid bills
+                  {summary.paidCount} paid bills
                 </Typography>
               </CardContent>
             </Card>
@@ -212,10 +261,10 @@ const PatientBillingInner: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography variant="h4" color="warning.main">
-                  {formatCurrency(summary.total_outstanding)}
+                  {formatCurrency(summary.totalOutstanding)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {summary.pending_count} pending
+                  {summary.pendingCount} pending
                 </Typography>
               </CardContent>
             </Card>
@@ -231,10 +280,10 @@ const PatientBillingInner: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography variant="h4" color="error.main">
-                  {formatCurrency(summary.total_overdue)}
+                  {formatCurrency(summary.totalOverdue)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {summary.overdue_count} bills
+                  {summary.overdueCount} bills
                 </Typography>
               </CardContent>
             </Card>
