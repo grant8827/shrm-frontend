@@ -201,22 +201,21 @@ const AdminSettings: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/auth/password/change/`, {
+      const base = ((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8000').replace(/\/api\/?$/, '');
+      const response = await fetch(`${base}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         },
         body: JSON.stringify({
-          current_password: passwordData.currentPassword,
-          new_password: passwordData.newPassword,
-          new_password_confirm: passwordData.confirmPassword
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
         })
       });
 
       if (response.ok) {
         showSuccess('Password updated successfully');
-        // Clear form
         setPasswordData({
           currentPassword: '',
           newPassword: '',
@@ -224,12 +223,10 @@ const AdminSettings: React.FC = () => {
         });
       } else {
         const data = await response.json();
-        if (data.current_password) {
-          setPasswordErrors(prev => ({ ...prev, currentPassword: data.current_password[0] || data.current_password }));
-        } else if (data.new_password) {
-          setPasswordErrors(prev => ({ ...prev, newPassword: Array.isArray(data.new_password) ? data.new_password.join(' ') : data.new_password }));
-        } else if (data.new_password_confirm) {
-          setPasswordErrors(prev => ({ ...prev, confirmPassword: data.new_password_confirm[0] || data.new_password_confirm }));
+        if (data.error?.toLowerCase().includes('current') || data.error?.toLowerCase().includes('incorrect')) {
+          setPasswordErrors(prev => ({ ...prev, currentPassword: data.error }));
+        } else if (data.error) {
+          showError(data.error);
         } else {
           showError(data.detail || 'Failed to update password');
         }

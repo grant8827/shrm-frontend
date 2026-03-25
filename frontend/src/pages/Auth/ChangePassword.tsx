@@ -60,10 +60,9 @@ const ChangePassword: React.FC = () => {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        await apiService.post('/users/password/change/', {
-          current_password: values.currentPassword,
-          new_password: values.newPassword,
-          new_password_confirm: values.newPasswordConfirm,
+        await apiService.post('/auth/change-password', {
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
         });
 
         // Update user object to clear must_change_password flag
@@ -81,9 +80,8 @@ const ChangePassword: React.FC = () => {
           navigate('/dashboard');
         }, 1500);
       } catch (error: any) {
-        const errorMessage = error.response?.data?.current_password?.[0] || 
-                           error.response?.data?.new_password?.[0] || 
-                           error.response?.data?.new_password_confirm?.[0] ||
+        const errorMessage = error.response?.data?.error ||
+                           error.response?.data?.detail ||
                            'Failed to change password. Please try again.';
         showError(errorMessage);
       } finally {
