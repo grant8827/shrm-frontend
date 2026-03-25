@@ -22,6 +22,7 @@ import * as yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const validationSchema = yup.object({
   username: yup
@@ -38,9 +39,32 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false);
+  const [showForgotDialog, setShowForgotDialog] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState('');
   const { login } = useAuth();
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
+
+  const handleForgotSubmit = async () => {
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your email address.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const base = ((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8000').replace(/\/api\/?$/, '');
+      await axios.post(`${base}/api/auth/password-reset-request`, { email: forgotEmail.trim() });
+      setForgotSent(true);
+    } catch {
+      setForgotError('Something went wrong. Please try again.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const hasMustChangePassword = (value: unknown): value is { must_change_password?: boolean } => {
     return !!value && typeof value === 'object';
@@ -191,7 +215,18 @@ const Login: React.FC = () => {
 
           {/* Additional Actions */}
           <Box textAlign="center">
-            <Link href="#" variant="body2" sx={{ display: 'block', mb: 1 }}>
+            <Link
+              component="button"
+              type="button"
+              variant="body2"
+              sx={{ display: 'block', mb: 1, cursor: 'pointer' }}
+              onClick={() => {
+                setForgotEmail('');
+                setForgotSent(false);
+                setForgotError('');
+                setShowForgotDialog(true);
+              }}
+            >
               Forgot your password?
             </Link>
             <Link href="#" variant="body2">
@@ -257,6 +292,55 @@ const Login: React.FC = () => {
           >
             Change Password Now
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Forgot Password Dialog */}
+      <Dialog
+        open={showForgotDialog}
+        onClose={() => setShowForgotDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Reset Your Password</DialogTitle>
+        <DialogContent>
+          {forgotSent ? (
+            <Alert severity="success" sx={{ mt: 1 }}>
+              If that email is registered, a reset link has been sent. Check your inbox and follow the link to set a new password.
+            </Alert>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2, mt: 1 }}>
+                Enter the email address on your account and we'll send you a reset link.
+              </Typography>
+              {forgotError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{forgotError}</Alert>
+              )}
+              <TextField
+                fullWidth
+                label="Email Address"
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleForgotSubmit(); }}
+                autoFocus
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setShowForgotDialog(false)} color="inherit">
+            {forgotSent ? 'Close' : 'Cancel'}
+          </Button>
+          {!forgotSent && (
+            <Button
+              onClick={handleForgotSubmit}
+              variant="contained"
+              disabled={forgotLoading}
+            >
+              {forgotLoading ? <CircularProgress size={20} /> : 'Send Reset Link'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Container>
