@@ -131,7 +131,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [editUserData, setEditUserData] = useState<UserUpdateData>({});
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-  const [userMenuAnchorEl, setUserMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [selectedMenuUserId, setSelectedMenuUserId] = useState<string | null>(null);
 
   // Load dashboard data
@@ -691,7 +691,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                     <IconButton
                       size="small"
                       onClick={(e) => {
-                        setUserMenuAnchorEl(e.currentTarget);
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setUserMenuPosition({ top: rect.bottom, left: rect.right });
                         setSelectedMenuUserId(user.id);
                       }}
                     >
@@ -770,7 +771,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                         <IconButton
                           size="small"
                           onClick={(e) => {
-                            setUserMenuAnchorEl(e.currentTarget);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setUserMenuPosition({ top: rect.bottom, left: rect.right });
                             setSelectedMenuUserId(user.id);
                           }}
                         >
@@ -786,61 +788,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         </TableContainer>
       )}
       
-      {/* User action menu - rendered outside the map loop */}
-      {userMenuAnchorEl && (
-        <Menu
-          anchorEl={userMenuAnchorEl}
-          open={Boolean(userMenuAnchorEl)}
-          onClose={() => {
-            setUserMenuAnchorEl(null);
-            setSelectedMenuUserId(null);
-          }}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'right',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'right',
-          }}
-        >
-        <MenuItem 
-          onClick={() => {
-            if (selectedMenuUserId) {
-              handleUserAction('delete', selectedMenuUserId);
-            }
-            setUserMenuAnchorEl(null);
-            setSelectedMenuUserId(null);
-          }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
-          </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
-        </MenuItem>
-        <MenuItem 
-          onClick={() => {
-            if (selectedMenuUserId) {
-              const user = _users.find(u => u.id === selectedMenuUserId);
-              handleUserAction((user as any)?.is_active ? 'lock' : 'unlock', selectedMenuUserId);
-            }
-            setUserMenuAnchorEl(null);
-            setSelectedMenuUserId(null);
-          }}
-        >
-          <ListItemIcon>
-            {(_users.find(u => u.id === selectedMenuUserId) as any)?.is_active ? (
-              <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
-            ) : (
-              <LockOpenIcon fontSize="small" sx={{ color: 'success.main' }} />
-            )}
-          </ListItemIcon>
-          <ListItemText>
-            {(_users.find(u => u.id === selectedMenuUserId) as any)?.is_active ? 'Suspend' : 'Unsuspend'}
-          </ListItemText>
-        </MenuItem>
-      </Menu>
-      )}
     </Box>
   );
 
@@ -965,6 +912,54 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       </Box>
 
       {tabPanels[activeTab]?.component}
+
+      {/* User action menu — uses anchorPosition so it never depends on a live DOM node */}
+      <Menu
+        anchorReference="anchorPosition"
+        anchorPosition={userMenuPosition ?? undefined}
+        open={Boolean(userMenuPosition)}
+        onClose={() => {
+          setUserMenuPosition(null);
+          setSelectedMenuUserId(null);
+        }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (selectedMenuUserId) {
+              const selectedUser = _users.find((u: any) => u.id === selectedMenuUserId);
+              handleUserAction((selectedUser as any)?.is_active ? 'lock' : 'unlock', selectedMenuUserId);
+            }
+            setUserMenuPosition(null);
+            setSelectedMenuUserId(null);
+          }}
+        >
+          <ListItemIcon>
+            {(_users.find((u: any) => u.id === selectedMenuUserId) as any)?.is_active ? (
+              <BlockIcon fontSize="small" sx={{ color: 'warning.main' }} />
+            ) : (
+              <LockOpenIcon fontSize="small" sx={{ color: 'success.main' }} />
+            )}
+          </ListItemIcon>
+          <ListItemText>
+            {(_users.find((u: any) => u.id === selectedMenuUserId) as any)?.is_active ? 'Suspend' : 'Unsuspend'}
+          </ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (selectedMenuUserId) {
+              handleUserAction('delete', selectedMenuUserId);
+            }
+            setUserMenuPosition(null);
+            setSelectedMenuUserId(null);
+          }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          <ListItemText sx={{ color: 'error.main' }}>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
 
       {/* Add/Edit User Dialog */}
       <Dialog open={userDialogOpen} onClose={() => {
