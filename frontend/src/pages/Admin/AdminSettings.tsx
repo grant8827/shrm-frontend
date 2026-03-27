@@ -75,6 +75,7 @@ const AdminSettings: React.FC = () => {
     email: state.user?.email || '',
     phone: '',
     title: 'System Administrator',
+    bio: '',
   });
 
   // Load user data if editing another user
@@ -83,7 +84,7 @@ const AdminSettings: React.FC = () => {
       if (editUserId) {
         try {
           setLoading(true);
-          const response = await apiClient.get(`/auth/${editUserId}/`);
+          const response = await apiClient.get(`/api/users/${editUserId}/`);
           const userData = response.data;
           setEditingUser(userData);
           setProfileData({
@@ -94,12 +95,26 @@ const AdminSettings: React.FC = () => {
             title: userData.role === 'therapist' ? 'Therapist' : 
                    userData.role === 'staff' ? 'Staff' :
                    userData.role === 'client' ? 'Client' : 'Administrator',
+            bio: userData.bio || '',
           });
         } catch (error) {
           console.error('Error loading user data:', error);
           showError('Failed to load user data');
         } finally {
           setLoading(false);
+        }
+      } else {
+        // Load the logged-in admin's own saved profile (bio, phone, etc.)
+        try {
+          const response = await apiClient.get('/api/users/current/');
+          const userData = response.data;
+          setProfileData(prev => ({
+            ...prev,
+            phone: userData.phone_number || userData.phoneNumber || '',
+            bio: userData.bio || '',
+          }));
+        } catch (error) {
+          // silently fail — form still usable with defaults from AuthContext
         }
       }
     };
@@ -148,9 +163,15 @@ const AdminSettings: React.FC = () => {
         last_name: profileData.lastName,
         email: profileData.email,
         phone_number: profileData.phone,
+        bio: profileData.bio,
+        job_title: profileData.title,
       };
 
-      await apiClient.patch(`/auth/${userId}/`, updateData);
+      if (editUserId) {
+        await apiClient.patch(`/api/users/${editUserId}/`, updateData);
+      } else {
+        await apiClient.put(`/api/users/profile/`, updateData);
+      }
       showSuccess(editUserId ? 'User updated successfully' : 'Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -352,6 +373,17 @@ const AdminSettings: React.FC = () => {
                   label="Job Title"
                   value={profileData.title}
                   onChange={(e) => setProfileData({ ...profileData, title: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Bio"
+                  value={profileData.bio}
+                  onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                  placeholder="Tell us about your background and experience..."
                 />
               </Grid>
             </Grid>

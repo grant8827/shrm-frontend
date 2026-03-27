@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { apiClient } from '../../services/apiClient';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -57,9 +58,34 @@ const TherapistSettings: React.FC = () => {
     lastName: state.user?.lastName || '',
     email: state.user?.email || '',
     phone: '',
+    jobTitle: '',
     bio: '',
     specializations: '',
   });
+
+  // Load current profile from API on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const userId = state.user?.id;
+        if (!userId) return;
+        const response = await apiClient.get(`/api/users/current/`);
+        const data = response.data;
+        setProfileData(prev => ({
+          ...prev,
+          firstName: data.first_name || prev.firstName,
+          lastName: data.last_name || prev.lastName,
+          email: data.email || prev.email,
+          phone: data.phone_number || '',
+          jobTitle: data.job_title || '',
+          bio: data.bio || '',
+        }));
+      } catch (error) {
+        // silently fail – form still usable with defaults
+      }
+    };
+    loadProfile();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
@@ -69,9 +95,18 @@ const TherapistSettings: React.FC = () => {
     messageAlerts: true,
   });
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     try {
-      // TODO: Implement API call to save profile
+      const userId = state.user?.id;
+      if (!userId) { showError('User ID not found'); return; }
+      await apiClient.put(`/api/users/profile/`, {
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+        email: profileData.email,
+        phone_number: profileData.phone,
+        job_title: profileData.jobTitle,
+        bio: profileData.bio,
+      });
       showSuccess('Profile updated successfully');
     } catch (error) {
       showError('Failed to update profile');
@@ -167,8 +202,17 @@ const TherapistSettings: React.FC = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
+                  label="Job Title"
+                  value={profileData.jobTitle}
+                  onChange={(e) => setProfileData({ ...profileData, jobTitle: e.target.value })}
+                  placeholder="e.g., Licensed Therapist, Clinical Psychologist..."
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
                   multiline
-                  rows={3}
+                  rows={4}
                   label="Professional Bio"
                   value={profileData.bio}
                   onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}

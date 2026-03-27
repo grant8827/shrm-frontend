@@ -491,27 +491,34 @@ const VideoSession: React.FC = () => {
     }
   };
 
-  const toggleTranscription = async () => {
+  const openTranscriptDrawer = () => {
+    setShowTranscript(true);
+  };
+
+  const startTranscription = async () => {
     if (!sessionId) return;
     try {
-      if (!isTranscribing) {
-        if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
-          showError('Speech recognition not supported in this browser');
-          return;
-        }
-        const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
-        startLocalTranscription(speakerRole);
-        // Broadcast to all other session participants to start their own mic
-        webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
-        setShowTranscript(true);
-      } else {
-        // Broadcast stop so all participant browsers save and stop
-        webSocketService.sendMessage({ type: 'stop-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
-        await stopAndSaveTranscription();
+      if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+        showError('Speech recognition not supported in this browser');
+        return;
       }
+      const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
+      startLocalTranscription(speakerRole);
+      webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
     } catch (error) {
       console.error('Transcription error:', error);
-      showError('Failed to toggle transcription');
+      showError('Failed to start transcription');
+    }
+  };
+
+  const stopTranscription = async () => {
+    if (!sessionId) return;
+    try {
+      webSocketService.sendMessage({ type: 'stop-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
+      await stopAndSaveTranscription();
+    } catch (error) {
+      console.error('Transcription error:', error);
+      showError('Failed to stop transcription');
     }
   };
   
@@ -648,7 +655,7 @@ const VideoSession: React.FC = () => {
             <IconButton onClick={toggleRecording} sx={{ bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               {isRecording ? <StopCircle /> : <FiberManualRecord />}
             </IconButton>
-            <IconButton onClick={toggleTranscription} sx={{ bgcolor: isTranscribing ? 'primary.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
+            <IconButton onClick={openTranscriptDrawer} sx={{ bgcolor: isTranscribing ? 'primary.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Transcribe />
             </IconButton>
           </>
@@ -676,7 +683,7 @@ const VideoSession: React.FC = () => {
       </Dialog>
       
       {/* Transcript Drawer */}
-      <Drawer anchor="left" open={showTranscript} onClose={() => setShowTranscript(false)} sx={{ '& .MuiDrawer-paper': { width: 400, p: 2 } }}>
+      <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: 400, p: 2 } }}>
         <Typography variant="h6" sx={{ mb: 1 }}>Session Transcript</Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
@@ -724,7 +731,27 @@ const VideoSession: React.FC = () => {
             )}
           </List>
         </Box>
-        <Button fullWidth variant="outlined" onClick={() => setShowTranscript(false)}>Close</Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            onClick={startTranscription}
+            disabled={isTranscribing}
+          >
+            Start Transcription
+          </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            color="error"
+            onClick={stopTranscription}
+            disabled={!isTranscribing}
+          >
+            Stop Transcription
+          </Button>
+          <Button fullWidth variant="outlined" onClick={() => setShowTranscript(false)}>Close</Button>
+        </Box>
       </Drawer>
     </Box>
   );
