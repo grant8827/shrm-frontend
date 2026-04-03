@@ -40,6 +40,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useIdleTimer } from '../../hooks/useIdleTimer';
+import IdleTimeoutDialog from '../IdleTimeoutDialog';
 
 const drawerWidth = 240;
 
@@ -52,6 +54,9 @@ export const Layout: React.FC = () => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
   const { notifications, unreadCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
+
+  // Auto sign-out after 5 minutes of inactivity → 3-minute countdown
+  const { showWarning, secondsLeft, resetTimer } = useIdleTimer(logout);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -376,6 +381,14 @@ export const Layout: React.FC = () => {
           {drawer}
         </Drawer>
       </Box>
+
+      {/* Idle-timeout warning dialog */}
+      <IdleTimeoutDialog
+        open={showWarning}
+        secondsLeft={secondsLeft}
+        onStayLoggedIn={resetTimer}
+        onLogoutNow={logout}
+      />
 
       {/* Main Content */}
       <Box
