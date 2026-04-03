@@ -214,6 +214,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Update state
       dispatch({ type: 'LOGOUT' });
+      window.location.href = 'https://safehavenrestorationministries.com/';
     } catch (error) {
       console.error('Logout error:', error);
       // Force logout even if API call fails
@@ -224,6 +225,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
       dispatch({ type: 'LOGOUT' });
+      window.location.href = 'https://safehavenrestorationministries.com/';
     }
   };
 
