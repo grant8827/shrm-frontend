@@ -514,7 +514,7 @@ class ApiService {
 
   // Notification methods
   async getNotifications(): Promise<ApiResponse<Record<string, unknown>>> {
-    return this.get<Record<string, unknown>>('/notifications/notifications/');
+    return this.get<Record<string, unknown>>('/notifications/');
   }
 
   async getUnreadNotificationCount(): Promise<ApiResponse<Record<string, unknown>>> {
@@ -522,11 +522,11 @@ class ApiService {
   }
 
   async markNotificationAsRead(notificationId: string): Promise<ApiResponse<Record<string, unknown>>> {
-    return this.post<Record<string, unknown>>(`/notifications/notifications/${notificationId}/mark_read/`, {});
+    return this.patch<Record<string, unknown>>(`/notifications/${notificationId}/read/`, {});
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<Record<string, unknown>>> {
-    return this.post<Record<string, unknown>>('/notifications/notifications/mark_all_read/', {});
+    return this.patch<Record<string, unknown>>('/notifications/mark_all_read/', {});
   }
 
   // Set authentication token

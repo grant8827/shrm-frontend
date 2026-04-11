@@ -70,7 +70,7 @@ export const useNotifications = () => {
       if (response.success) {
         // Update local state
         setNotifications(prev => 
-          prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+          prev.map(n => n.id === notificationId ? { ...n, isRead: true, is_read: true } : n)
         );
         await fetchUnreadCount();
       }
@@ -84,7 +84,7 @@ export const useNotifications = () => {
     try {
       const response = await apiService.markAllNotificationsAsRead();
       if (response.success) {
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true, is_read: true })));
         setUnreadCount(0);
       }
     } catch (error) {
