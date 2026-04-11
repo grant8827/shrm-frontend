@@ -105,7 +105,8 @@ export const Layout: React.FC = () => {
 
   const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
-    if (!loading && notifications.length === 0) {
+    // Always re-fetch so new notifications appear immediately
+    if (!loading) {
       void fetchNotifications();
     }
   };
