@@ -67,6 +67,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { messageService } from '../../services/messageService';
 import { apiClient } from '../../services/apiClient';
+import { apiService } from '../../services/apiService';
 import { UserRole } from '../../types';
 
 // Message interfaces
@@ -472,7 +473,7 @@ const Messages: React.FC = () => {
   // Handle conversation selection — lazy-load messages for the clicked thread
   const handleConversationSelect = async (conversationId: string) => {
     setSelectedConversation(conversationId);
-    // Optimistically clear unread badge
+    // Optimistically clear unread badge in local state
     setConversations(prev => prev.map(c =>
       c.id === conversationId ? { ...c, unreadCount: 0 } : c
     ));
@@ -508,6 +509,11 @@ const Messages: React.FC = () => {
           };
         });
       setMessages(prev => [...prev.filter(m => m.threadId !== conversationId), ...converted]);
+
+      // Mark all messages in this thread as read in the DB, then notify the badge
+      void apiService.markThreadAsRead(conversationId).then(() => {
+        window.dispatchEvent(new CustomEvent('messages-thread-read'));
+      });
     } catch (err) {
       console.error('Failed to load thread messages:', err);
     }

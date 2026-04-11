@@ -8,22 +8,13 @@ export const useNotifications = () => {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const parseRecord = (value: unknown): Record<string, unknown> | null => {
-    if (value && typeof value === 'object') {
-      return value as Record<string, unknown>;
-    }
-    return null;
-  };
-
   // Fetch unread notification count
   const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await apiService.getUnreadNotificationCount();
-      if (response.success && response.data) {
-        const data = parseRecord(response.data);
-        const count = data?.count;
-        setUnreadCount(typeof count === 'number' ? count : 0);
-      }
+      // Backend returns { count: N } directly — no success wrapper
+      const raw = response as unknown as { count?: number };
+      setUnreadCount(typeof raw.count === 'number' ? raw.count : 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
@@ -33,11 +24,8 @@ export const useNotifications = () => {
   const fetchUnreadMessageCount = useCallback(async () => {
     try {
       const response = await apiService.getUnreadMessageCount();
-      if (response.success && response.data) {
-        const data = parseRecord(response.data);
-        const count = data?.count;
-        setUnreadMessageCount(typeof count === 'number' ? count : 0);
-      }
+      const raw = response as unknown as { count?: number };
+      setUnreadMessageCount(typeof raw.count === 'number' ? raw.count : 0);
     } catch (error) {
       console.error('Error fetching unread message count:', error);
     }
@@ -48,29 +36,12 @@ export const useNotifications = () => {
     setLoading(true);
     try {
       const response = await apiService.getNotifications();
-      if (response.success && response.data) {
-        const notificationData: Notification[] = [];
-
-        if (Array.isArray(response.data)) {
-          response.data.forEach((item) => {
-            if (item && typeof item === 'object') {
-              notificationData.push(item as Notification);
-            }
-          });
-        } else {
-          const data = parseRecord(response.data);
-          const results = data?.results;
-          if (Array.isArray(results)) {
-            results.forEach((item) => {
-              if (item && typeof item === 'object') {
-                notificationData.push(item as Notification);
-              }
-            });
-          }
-        }
-
-        setNotifications(notificationData);
-      }
+      // Backend returns { results: [...], count: N } directly — no success wrapper
+      const raw = response as unknown as { results?: unknown[] };
+      const items: Notification[] = Array.isArray(raw.results)
+        ? raw.results.filter((i): i is Notification => i !== null && typeof i === 'object')
+        : [];
+      setNotifications(items);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -81,14 +52,11 @@ export const useNotifications = () => {
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const response = await apiService.markNotificationAsRead(notificationId);
-      if (response.success) {
-        // Update local state
-        setNotifications(prev => 
-          prev.map(n => n.id === notificationId ? { ...n, isRead: true, is_read: true } : n)
-        );
-        await fetchUnreadCount();
-      }
+      await apiService.markNotificationAsRead(notificationId);
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, isRead: true, is_read: true } : n)
+      );
+      await fetchUnreadCount();
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -97,28 +65,32 @@ export const useNotifications = () => {
   // Mark all notifications as read
   const markAllAsRead = useCallback(async () => {
     try {
-      const response = await apiService.markAllNotificationsAsRead();
-      if (response.success) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true, is_read: true })));
-        setUnreadCount(0);
-      }
+      await apiService.markAllNotificationsAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true, is_read: true })));
+      setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
   }, []);
 
-  // Fetch both counts on mount and set up polling
+  // Fetch both counts on mount, poll every 30 s, and re-fetch on demand events
   useEffect(() => {
     void fetchUnreadCount();
     void fetchUnreadMessageCount();
 
-    // Poll every 30 seconds
     const interval = setInterval(() => {
       void fetchUnreadCount();
       void fetchUnreadMessageCount();
     }, 30000);
 
-    return () => clearInterval(interval);
+    // Custom event fired by Messages page after marking a thread as read
+    const onMessageRead = () => { void fetchUnreadMessageCount(); };
+    window.addEventListener('messages-thread-read', onMessageRead);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('messages-thread-read', onMessageRead);
+    };
   }, [fetchUnreadCount, fetchUnreadMessageCount]);
 
   return {

@@ -533,6 +533,10 @@ class ApiService {
     return this.get<Record<string, unknown>>('/messages/unread_count');
   }
 
+  async markThreadAsRead(threadId: string): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.patch<Record<string, unknown>>(`/messages/threads/${threadId}/read_all`, {});
+  }
+
   // Set authentication token
   setAuthToken(token: string): void {
     if (token) {
