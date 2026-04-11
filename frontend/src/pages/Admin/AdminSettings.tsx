@@ -23,6 +23,9 @@ import {
   CircularProgress,
   useTheme,
   useMediaQuery,
+  InputAdornment,
+  OutlinedInput,
+  FormHelperText,
 } from '@mui/material';
 import {
   Person,
@@ -31,6 +34,8 @@ import {
   AdminPanelSettings,
   Camera,
   Save,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -149,6 +154,9 @@ const AdminSettings: React.FC = () => {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
   const handleSaveProfile = async () => {
     try {
@@ -643,40 +651,67 @@ const AdminSettings: React.FC = () => {
 
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Current Password"
-                  placeholder="Enter current password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                  error={!!passwordErrors.currentPassword}
-                  helperText={passwordErrors.currentPassword}
-                />
+                <FormControl fullWidth variant="outlined" error={!!passwordErrors.currentPassword}>
+                  <InputLabel htmlFor="current-password">Current Password</InputLabel>
+                  <OutlinedInput
+                    id="current-password"
+                    type={showCurrentPwd ? 'text' : 'password'}
+                    placeholder="Enter current password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    label="Current Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowCurrentPwd(p => !p)} edge="end">
+                          {showCurrentPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                  {passwordErrors.currentPassword && <FormHelperText>{passwordErrors.currentPassword}</FormHelperText>}
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="New Password"
-                  placeholder="Enter new password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                  error={!!passwordErrors.newPassword}
-                  helperText={passwordErrors.newPassword}
-                />
+                <FormControl fullWidth variant="outlined" error={!!passwordErrors.newPassword}>
+                  <InputLabel htmlFor="new-password">New Password</InputLabel>
+                  <OutlinedInput
+                    id="new-password"
+                    type={showNewPwd ? 'text' : 'password'}
+                    placeholder="Enter new password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                    label="New Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowNewPwd(p => !p)} edge="end">
+                          {showNewPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                  {passwordErrors.newPassword && <FormHelperText>{passwordErrors.newPassword}</FormHelperText>}
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Confirm New Password"
-                  placeholder="Re-enter new password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  error={!!passwordErrors.confirmPassword}
-                  helperText={passwordErrors.confirmPassword}
-                />
+                <FormControl fullWidth variant="outlined" error={!!passwordErrors.confirmPassword}>
+                  <InputLabel htmlFor="confirm-password">Confirm New Password</InputLabel>
+                  <OutlinedInput
+                    id="confirm-password"
+                    type={showConfirmPwd ? 'text' : 'password'}
+                    placeholder="Re-enter new password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    label="Confirm New Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowConfirmPwd(p => !p)} edge="end">
+                          {showConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                  {passwordErrors.confirmPassword && <FormHelperText>{passwordErrors.confirmPassword}</FormHelperText>}
+                </FormControl>
               </Grid>
             </Grid>
 

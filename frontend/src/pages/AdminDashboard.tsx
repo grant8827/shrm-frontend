@@ -40,6 +40,9 @@ import {
   Menu,
   useTheme,
   useMediaQuery,
+  InputAdornment,
+  OutlinedInput,
+  FormHelperText,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -62,6 +65,8 @@ import {
   Group,
   Delete as DeleteIcon,
   Block as BlockIcon,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
 import { User, Patient, Appointment } from '../types';
 import ReportsSection from '../components/Reports/ReportsSection';
@@ -129,6 +134,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<UserUpdateData>({});
+  const [showEditPwd, setShowEditPwd] = useState(false);
+  const [showEditConfirmPwd, setShowEditConfirmPwd] = useState(false);
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
   const [userMenuPosition, setUserMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -1012,28 +1019,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
             {!_selectedUser && (
               <>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Password"
-                    type="password"
-                    variant="outlined"
-                    value={editUserData.password || ''}
-                    onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })}
-                    required
-                  />
+                  <FormControl fullWidth required variant="outlined">
+                    <InputLabel htmlFor="edit-password">Password</InputLabel>
+                    <OutlinedInput
+                      id="edit-password"
+                      type={showEditPwd ? 'text' : 'password'}
+                      value={editUserData.password || ''}
+                      onChange={(e) => setEditUserData({ ...editUserData, password: e.target.value })}
+                      label="Password"
+                      endAdornment={
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowEditPwd(p => !p)} edge="end">
+                            {showEditPwd ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      }
+                    />
+                  </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
+                  <FormControl
                     fullWidth
-                    label="Confirm Password"
-                    type="password"
-                    variant="outlined"
-                    value={editUserData.password_confirm || ''}
-                    onChange={(e) => setEditUserData({ ...editUserData, password_confirm: e.target.value })}
                     required
+                    variant="outlined"
                     error={editUserData.password !== editUserData.password_confirm && !!editUserData.password_confirm}
-                    helperText={editUserData.password !== editUserData.password_confirm && !!editUserData.password_confirm ? 'Passwords do not match' : ''}
-                  />
+                  >
+                    <InputLabel htmlFor="edit-confirm-password">Confirm Password</InputLabel>
+                    <OutlinedInput
+                      id="edit-confirm-password"
+                      type={showEditConfirmPwd ? 'text' : 'password'}
+                      value={editUserData.password_confirm || ''}
+                      onChange={(e) => setEditUserData({ ...editUserData, password_confirm: e.target.value })}
+                      label="Confirm Password"
+                      endAdornment={
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowEditConfirmPwd(p => !p)} edge="end">
+                            {showEditConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      }
+                    />
+                    {editUserData.password !== editUserData.password_confirm && !!editUserData.password_confirm && (
+                      <FormHelperText>Passwords do not match</FormHelperText>
+                    )}
+                  </FormControl>
                 </Grid>
               </>
             )}

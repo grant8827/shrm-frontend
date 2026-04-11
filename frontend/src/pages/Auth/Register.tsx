@@ -11,7 +11,13 @@ import {
   FormControl,
   InputLabel,
   Select,
+  InputAdornment,
+  IconButton,
+  OutlinedInput,
+  FormHelperText,
 } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { Link, useNavigate } from 'react-router-dom';
@@ -37,7 +43,7 @@ const validationSchema = Yup.object({
     .email('Invalid email format')
     .required('Email is required'),
   password: Yup.string()
-    .min(12, 'Password must be at least 12 characters')
+    .min(10, 'Password must be at least 10 characters')
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
@@ -60,6 +66,8 @@ const validationSchema = Yup.object({
 const Register: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
   const formik = useFormik<RegisterFormData>({
@@ -218,38 +226,75 @@ const Register: React.FC = () => {
               </Select>
             </FormControl>
 
-            <TextField
-              margin="normal"
-              required
+            <FormControl
               fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="new-password"
-              placeholder="Must include uppercase, lowercase, number, and special character"
-              value={formik.values.password}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
+              margin="normal"
+              variant="outlined"
+              required
               error={formik.touched.password && Boolean(formik.errors.password)}
-              helperText={formik.touched.password && formik.errors.password || 'At least 12 characters with uppercase, lowercase, number, and special character'}
-            />
+            >
+              <InputLabel htmlFor="password">Password</InputLabel>
+              <OutlinedInput
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="new-password"
+                label="Password"
+                placeholder="Must include uppercase, lowercase, number, and special character"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              <FormHelperText>
+                {(formik.touched.password && formik.errors.password) ||
+                  'At least 10 characters with uppercase, lowercase, number, and special character'}
+              </FormHelperText>
+            </FormControl>
 
-            <TextField
-              margin="normal"
-              required
+            <FormControl
               fullWidth
-              name="confirmPassword"
-              label="Confirm Password"
-              type="password"
-              id="confirmPassword"
-              autoComplete="new-password"
-              value={formik.values.confirmPassword}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
+              margin="normal"
+              variant="outlined"
+              required
               error={formik.touched.confirmPassword && Boolean(formik.errors.confirmPassword)}
-              helperText={formik.touched.confirmPassword && formik.errors.confirmPassword}
-            />
+            >
+              <InputLabel htmlFor="confirmPassword">Confirm Password</InputLabel>
+              <OutlinedInput
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={formik.values.confirmPassword}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="new-password"
+                label="Confirm Password"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle confirm password visibility"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+                <FormHelperText>{formik.errors.confirmPassword}</FormHelperText>
+              )}
+            </FormControl>
 
             <Button
               type="submit"

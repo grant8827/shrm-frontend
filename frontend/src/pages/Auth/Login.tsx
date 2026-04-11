@@ -16,7 +16,15 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  InputAdornment,
+  IconButton,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  FormHelperText,
 } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,13 +39,14 @@ const validationSchema = yup.object({
     .min(3, 'Username must be at least 3 characters'),
   password: yup
     .string()
-    .min(12, 'Password must be at least 12 characters')
+    .min(10, 'Password must be at least 10 characters')
     .required('Password is required'),
 });
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showPasswordChangeDialog, setShowPasswordChangeDialog] = useState(false);
   const [showForgotDialog, setShowForgotDialog] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -165,20 +174,38 @@ const Login: React.FC = () => {
               autoFocus
             />
             
-            <TextField
+            <FormControl
               fullWidth
-              id="password"
-              name="password"
-              label="Password"
-              type="password"
-              value={formik.values.password}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.password && Boolean(formik.errors.password)}
-              helperText={formik.touched.password && formik.errors.password}
               margin="normal"
-              autoComplete="current-password"
-            />
+              variant="outlined"
+              error={formik.touched.password && Boolean(formik.errors.password)}
+            >
+              <InputLabel htmlFor="password">Password</InputLabel>
+              <OutlinedInput
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                value={formik.values.password}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="current-password"
+                label="Password"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              {formik.touched.password && formik.errors.password && (
+                <FormHelperText>{formik.errors.password}</FormHelperText>
+              )}
+            </FormControl>
 
             <FormControlLabel
               control={
@@ -267,7 +294,7 @@ const Login: React.FC = () => {
           </Typography>
           <Box component="ul" sx={{ pl: 3, mb: 2 }}>
             <Typography component="li" variant="body2" color="text.secondary">
-              Be at least 12 characters long
+              Be at least 10 characters long
             </Typography>
             <Typography component="li" variant="body2" color="text.secondary">
               Contain uppercase and lowercase letters

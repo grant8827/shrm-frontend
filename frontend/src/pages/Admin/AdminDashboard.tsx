@@ -33,6 +33,9 @@ import {
   CircularProgress,
   Snackbar,
   Alert,
+  InputAdornment,
+  OutlinedInput,
+  FormHelperText,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -52,6 +55,7 @@ import {
   Message,
   AdminPanelSettings,
   Visibility,
+  VisibilityOff,
   Edit,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,6 +69,8 @@ const AdminDashboard: React.FC = () => {
   // Dialog state
   const [openDialog, setOpenDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAddPwd, setShowAddPwd] = useState(false);
+  const [showAddConfirmPwd, setShowAddConfirmPwd] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   
   // Form state
@@ -735,28 +741,44 @@ const AdminDashboard: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                  error={!!formErrors.password}
-                  helperText={formErrors.password}
-                  required
-                />
+                <FormControl fullWidth required variant="outlined" error={!!formErrors.password}>
+                  <InputLabel htmlFor="add-password">Password</InputLabel>
+                  <OutlinedInput
+                    id="add-password"
+                    type={showAddPwd ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    label="Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowAddPwd(p => !p)} edge="end">
+                          {showAddPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                  {formErrors.password && <FormHelperText>{formErrors.password}</FormHelperText>}
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Confirm Password"
-                  type="password"
-                  value={formData.password_confirm}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password_confirm: e.target.value }))}
-                  error={!!formErrors.password_confirm}
-                  helperText={formErrors.password_confirm}
-                  required
-                />
+                <FormControl fullWidth required variant="outlined" error={!!formErrors.password_confirm}>
+                  <InputLabel htmlFor="add-confirm-password">Confirm Password</InputLabel>
+                  <OutlinedInput
+                    id="add-confirm-password"
+                    type={showAddConfirmPwd ? 'text' : 'password'}
+                    value={formData.password_confirm}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password_confirm: e.target.value }))}
+                    label="Confirm Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowAddConfirmPwd(p => !p)} edge="end">
+                          {showAddConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                  {formErrors.password_confirm && <FormHelperText>{formErrors.password_confirm}</FormHelperText>}
+                </FormControl>
               </Grid>
             </Grid>
           </Box>

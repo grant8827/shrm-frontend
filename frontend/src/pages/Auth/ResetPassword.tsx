@@ -3,12 +3,19 @@ import {
   Container,
   Paper,
   Box,
-  TextField,
   Button,
   Typography,
   Alert,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  InputAdornment,
+  IconButton,
+  FormHelperText,
 } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 
@@ -22,6 +29,8 @@ const ResetPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +40,8 @@ const ResetPassword: React.FC = () => {
       setError('Invalid or missing reset token. Please request a new reset link.');
       return;
     }
-    if (newPassword.length < 12) {
-      setError('Password must be at least 12 characters.');
+    if (newPassword.length < 10) {
+      setError('Password must be at least 10 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -98,24 +107,42 @@ const ResetPassword: React.FC = () => {
                 <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
               )}
 
-              <TextField
-                fullWidth
-                label="New Password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                margin="normal"
-                helperText="Minimum 12 characters"
-                autoFocus
-              />
-              <TextField
-                fullWidth
-                label="Confirm New Password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                margin="normal"
-              />
+              <FormControl fullWidth margin="normal" variant="outlined">
+                <InputLabel htmlFor="reset-new-password">New Password</InputLabel>
+                <OutlinedInput
+                  id="reset-new-password"
+                  type={showNewPwd ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  label="New Password"
+                  autoFocus
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowNewPwd(p => !p)} edge="end">
+                        {showNewPwd ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  }
+                />
+                <FormHelperText>Minimum 10 characters</FormHelperText>
+              </FormControl>
+              <FormControl fullWidth margin="normal" variant="outlined">
+                <InputLabel htmlFor="reset-confirm-password">Confirm New Password</InputLabel>
+                <OutlinedInput
+                  id="reset-confirm-password"
+                  type={showConfirmPwd ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  label="Confirm New Password"
+                  endAdornment={
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowConfirmPwd(p => !p)} edge="end">
+                        {showConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  }
+                />
+              </FormControl>
 
               <Button
                 type="submit"

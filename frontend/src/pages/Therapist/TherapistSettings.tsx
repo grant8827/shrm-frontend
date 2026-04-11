@@ -15,6 +15,10 @@ import {
   Divider,
   Avatar,
   IconButton,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  InputAdornment,
 } from '@mui/material';
 import {
   Person,
@@ -22,6 +26,8 @@ import {
   Security,
   Camera,
   Save,
+  Visibility,
+  VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -53,6 +59,10 @@ const TherapistSettings: React.FC = () => {
   const { showSuccess, showError } = useNotification();
   
   const [activeTab, setActiveTab] = useState(0);
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [pwdValues, setPwdValues] = useState({ current: '', newPwd: '', confirm: '' });
   const [profileData, setProfileData] = useState({
     firstName: state.user?.firstName || '',
     lastName: state.user?.lastName || '',
@@ -370,28 +380,64 @@ const TherapistSettings: React.FC = () => {
 
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Current Password"
-                  placeholder="Enter current password"
-                />
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel htmlFor="thr-current-password">Current Password</InputLabel>
+                  <OutlinedInput
+                    id="thr-current-password"
+                    type={showCurrentPwd ? 'text' : 'password'}
+                    placeholder="Enter current password"
+                    value={pwdValues.current}
+                    onChange={(e) => setPwdValues(p => ({ ...p, current: e.target.value }))}
+                    label="Current Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowCurrentPwd(p => !p)} edge="end">
+                          {showCurrentPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="New Password"
-                  placeholder="Enter new password"
-                />
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel htmlFor="thr-new-password">New Password</InputLabel>
+                  <OutlinedInput
+                    id="thr-new-password"
+                    type={showNewPwd ? 'text' : 'password'}
+                    placeholder="Enter new password"
+                    value={pwdValues.newPwd}
+                    onChange={(e) => setPwdValues(p => ({ ...p, newPwd: e.target.value }))}
+                    label="New Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowNewPwd(p => !p)} edge="end">
+                          {showNewPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="Confirm New Password"
-                  placeholder="Re-enter new password"
-                />
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel htmlFor="thr-confirm-password">Confirm New Password</InputLabel>
+                  <OutlinedInput
+                    id="thr-confirm-password"
+                    type={showConfirmPwd ? 'text' : 'password'}
+                    placeholder="Re-enter new password"
+                    value={pwdValues.confirm}
+                    onChange={(e) => setPwdValues(p => ({ ...p, confirm: e.target.value }))}
+                    label="Confirm New Password"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <IconButton onClick={() => setShowConfirmPwd(p => !p)} edge="end">
+                          {showConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    }
+                  />
+                </FormControl>
               </Grid>
             </Grid>
 

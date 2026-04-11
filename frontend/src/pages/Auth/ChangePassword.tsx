@@ -3,12 +3,19 @@ import {
   Container,
   Paper,
   Box,
-  TextField,
   Button,
   Typography,
   Alert,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  OutlinedInput,
+  InputAdornment,
+  IconButton,
+  FormHelperText,
 } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { useNavigate } from 'react-router-dom';
@@ -22,7 +29,7 @@ const validationSchema = yup.object({
     .required('Current password is required'),
   newPassword: yup
     .string()
-    .min(12, 'Password must be at least 12 characters')
+    .min(10, 'Password must be at least 10 characters')
     .matches(
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
       'Password must contain at least one uppercase letter, one lowercase letter, and one number'
@@ -37,6 +44,9 @@ const validationSchema = yup.object({
 const ChangePassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isRequired, setIsRequired] = useState(false);
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const { showError, showSuccess } = useNotification();
   const { updateUser } = useAuth();
   const navigate = useNavigate();
@@ -136,7 +146,7 @@ const ChangePassword: React.FC = () => {
               Password Requirements:
             </Typography>
             <Typography variant="body2" component="ul" sx={{ pl: 2, mb: 0 }}>
-              <li>At least 12 characters long</li>
+              <li>At least 10 characters long</li>
               <li>Contains uppercase and lowercase letters</li>
               <li>Contains at least one number</li>
               <li>Different from your current password</li>
@@ -145,51 +155,93 @@ const ChangePassword: React.FC = () => {
 
           {/* Change Password Form */}
           <form onSubmit={formik.handleSubmit}>
-            <TextField
+            <FormControl
               fullWidth
-              id="currentPassword"
-              name="currentPassword"
-              label="Current Password"
-              type="password"
-              value={formik.values.currentPassword}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
+              margin="normal"
+              variant="outlined"
               error={formik.touched.currentPassword && Boolean(formik.errors.currentPassword)}
-              helperText={formik.touched.currentPassword && formik.errors.currentPassword}
-              margin="normal"
-              autoComplete="current-password"
-              autoFocus
-            />
-            
-            <TextField
-              fullWidth
-              id="newPassword"
-              name="newPassword"
-              label="New Password"
-              type="password"
-              value={formik.values.newPassword}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.newPassword && Boolean(formik.errors.newPassword)}
-              helperText={formik.touched.newPassword && formik.errors.newPassword}
-              margin="normal"
-              autoComplete="new-password"
-            />
+            >
+              <InputLabel htmlFor="currentPassword">Current Password</InputLabel>
+              <OutlinedInput
+                id="currentPassword"
+                name="currentPassword"
+                type={showCurrentPwd ? 'text' : 'password'}
+                value={formik.values.currentPassword}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="current-password"
+                autoFocus
+                label="Current Password"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => setShowCurrentPwd(p => !p)} edge="end">
+                      {showCurrentPwd ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              {formik.touched.currentPassword && formik.errors.currentPassword && (
+                <FormHelperText>{formik.errors.currentPassword}</FormHelperText>
+              )}
+            </FormControl>
 
-            <TextField
+            <FormControl
               fullWidth
-              id="newPasswordConfirm"
-              name="newPasswordConfirm"
-              label="Confirm New Password"
-              type="password"
-              value={formik.values.newPasswordConfirm}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.newPasswordConfirm && Boolean(formik.errors.newPasswordConfirm)}
-              helperText={formik.touched.newPasswordConfirm && formik.errors.newPasswordConfirm}
               margin="normal"
-              autoComplete="new-password"
-            />
+              variant="outlined"
+              error={formik.touched.newPassword && Boolean(formik.errors.newPassword)}
+            >
+              <InputLabel htmlFor="newPassword">New Password</InputLabel>
+              <OutlinedInput
+                id="newPassword"
+                name="newPassword"
+                type={showNewPwd ? 'text' : 'password'}
+                value={formik.values.newPassword}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="new-password"
+                label="New Password"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => setShowNewPwd(p => !p)} edge="end">
+                      {showNewPwd ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              {formik.touched.newPassword && formik.errors.newPassword && (
+                <FormHelperText>{formik.errors.newPassword}</FormHelperText>
+              )}
+            </FormControl>
+
+            <FormControl
+              fullWidth
+              margin="normal"
+              variant="outlined"
+              error={formik.touched.newPasswordConfirm && Boolean(formik.errors.newPasswordConfirm)}
+            >
+              <InputLabel htmlFor="newPasswordConfirm">Confirm New Password</InputLabel>
+              <OutlinedInput
+                id="newPasswordConfirm"
+                name="newPasswordConfirm"
+                type={showConfirmPwd ? 'text' : 'password'}
+                value={formik.values.newPasswordConfirm}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur}
+                autoComplete="new-password"
+                label="Confirm New Password"
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => setShowConfirmPwd(p => !p)} edge="end">
+                      {showConfirmPwd ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+              />
+              {formik.touched.newPasswordConfirm && formik.errors.newPasswordConfirm && (
+                <FormHelperText>{formik.errors.newPasswordConfirm}</FormHelperText>
+              )}
+            </FormControl>
 
             <Button
               type="submit"
