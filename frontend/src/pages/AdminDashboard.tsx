@@ -295,6 +295,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         await apiClient.patch(`/api/auth/${_selectedUser.id}/`, updateData);
       } else {
         // Create new user - validate passwords match
+        if (!editUserData.password) {
+          setError('Password is required');
+          return;
+        }
+        if (editUserData.password.length < 10) {
+          setError('Password must be at least 10 characters');
+          return;
+        }
         if (editUserData.password !== editUserData.password_confirm) {
           setError('Passwords do not match');
           return;

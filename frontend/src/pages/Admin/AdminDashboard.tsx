@@ -801,6 +801,7 @@ const AdminDashboard: React.FC = () => {
                 if (!formData.username.trim()) errors.username = 'Required';
                 if (!formData.email.trim()) errors.email = 'Required';
                 if (!formData.password) errors.password = 'Required';
+                else if (formData.password.length < 10) errors.password = 'Password must be at least 10 characters';
                 if (formData.password !== formData.password_confirm) errors.password_confirm = 'Passwords do not match';
                 
                 if (Object.keys(errors).length > 0) {

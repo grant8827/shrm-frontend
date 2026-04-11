@@ -327,7 +327,7 @@ const AdminPatientManagement: React.FC = () => {
     setEditFormData({
       phone: actionPatient.phone || '',
       dateOfBirth: actionPatient.date_of_birth ? actionPatient.date_of_birth.split('T')[0] : '',
-      gender: ['M','F','O','P'].includes(actionPatient.gender ?? '') ? (actionPatient.gender ?? '') : '',
+      gender: ['M','F'].includes(actionPatient.gender ?? '') ? (actionPatient.gender ?? '') : '',
     });
     setEditPatientOpen(true);
     handleCloseActionsMenu();
@@ -467,8 +467,6 @@ const AdminPatientManagement: React.FC = () => {
       const genderMap: Record<string, string> = {
         male: 'M',
         female: 'F',
-        other: 'O',
-        'prefer-not-to-say': 'P',
       };
 
       // Generate username from first + last name
@@ -485,7 +483,7 @@ const AdminPatientManagement: React.FC = () => {
 
         // Patient fields
         dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
-        gender: genderMap[formData.gender] || 'P',
+        gender: genderMap[formData.gender] || 'M',
 
         // Address
         street: formData.address.street,
@@ -809,7 +807,7 @@ const AdminPatientManagement: React.FC = () => {
                         {new Date(patient.date_of_birth).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : patient.gender === 'O' ? 'Other' : 'Not specified'}
+                        {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Not specified'}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -956,8 +954,6 @@ const AdminPatientManagement: React.FC = () => {
                     <MenuItem value=""><em>Not specified</em></MenuItem>
                     <MenuItem value="M">Male</MenuItem>
                     <MenuItem value="F">Female</MenuItem>
-                    <MenuItem value="O">Other</MenuItem>
-                    <MenuItem value="P">Prefer not to say</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
