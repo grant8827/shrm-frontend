@@ -5,6 +5,7 @@ import { Notification } from '../types';
 export const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const parseRecord = (value: unknown): Record<string, unknown> | null => {
@@ -14,7 +15,7 @@ export const useNotifications = () => {
     return null;
   };
 
-  // Fetch unread count
+  // Fetch unread notification count
   const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await apiService.getUnreadNotificationCount();
@@ -25,6 +26,20 @@ export const useNotifications = () => {
       }
     } catch (error) {
       console.error('Error fetching unread count:', error);
+    }
+  }, []);
+
+  // Fetch unread message count
+  const fetchUnreadMessageCount = useCallback(async () => {
+    try {
+      const response = await apiService.getUnreadMessageCount();
+      if (response.success && response.data) {
+        const data = parseRecord(response.data);
+        const count = data?.count;
+        setUnreadMessageCount(typeof count === 'number' ? count : 0);
+      }
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
     }
   }, []);
 
@@ -92,21 +107,24 @@ export const useNotifications = () => {
     }
   }, []);
 
-  // Fetch unread count on mount and set up polling
+  // Fetch both counts on mount and set up polling
   useEffect(() => {
     void fetchUnreadCount();
-    
-    // Poll for new notifications every 30 seconds
+    void fetchUnreadMessageCount();
+
+    // Poll every 30 seconds
     const interval = setInterval(() => {
       void fetchUnreadCount();
+      void fetchUnreadMessageCount();
     }, 30000);
-    
+
     return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, fetchUnreadMessageCount]);
 
   return {
     notifications,
     unreadCount,
+    unreadMessageCount,
     loading,
     fetchNotifications,
     fetchUnreadCount,

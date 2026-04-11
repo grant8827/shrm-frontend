@@ -529,6 +529,10 @@ class ApiService {
     return this.patch<Record<string, unknown>>('/notifications/mark_all_read/', {});
   }
 
+  async getUnreadMessageCount(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.get<Record<string, unknown>>('/messages/unread_count');
+  }
+
   // Set authentication token
   setAuthToken(token: string): void {
     if (token) {

@@ -53,7 +53,7 @@ export const Layout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
-  const { notifications, unreadCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, unreadMessageCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
 
   // Auto sign-out after 5 minutes of inactivity → 3-minute countdown
   const { showWarning, secondsLeft, resetTimer } = useIdleTimer(logout);
@@ -137,7 +137,7 @@ export const Layout: React.FC = () => {
       items.push(
         { text: 'My Dashboard', icon: <Dashboard />, path: '/client' },
         { text: 'My Appointments', icon: <Event />, path: '/appointments' },
-        { text: 'Messages', icon: <Message />, path: '/messages' },
+        { text: 'Messages', icon: <Badge badgeContent={unreadMessageCount} color="error"><Message /></Badge>, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },
         { text: 'My Documents', icon: <Receipt />, path: '/client/documents' },
         { text: 'Billing', icon: <AttachMoney />, path: '/client/billing' },
@@ -150,7 +150,7 @@ export const Layout: React.FC = () => {
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Settings />, path: '/therapist/soap-notes' },
-        { text: 'Messages', icon: <Message />, path: '/messages' },
+        { text: 'Messages', icon: <Badge badgeContent={unreadMessageCount} color="error"><Message /></Badge>, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },
       );
     } else {
@@ -161,7 +161,7 @@ export const Layout: React.FC = () => {
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },
-        { text: 'Messages', icon: <Message />, path: '/messages' },
+        { text: 'Messages', icon: <Badge badgeContent={unreadMessageCount} color="error"><Message /></Badge>, path: '/messages' },
         { text: 'Telehealth', icon: <VideoCall />, path: '/telehealth/dashboard' },
         { text: 'Billing', icon: <AttachMoney />, path: '/admin/billing' },
         { text: 'Reports', icon: <Settings />, path: '/admin/reports' },
@@ -300,21 +300,21 @@ export const Layout: React.FC = () => {
                       key={notification.id}
                       onClick={() => void handleNotificationItemClick(notification.id, notification.related_object_id)}
                       sx={{
-                        backgroundColor: notification.is_read ? 'transparent' : 'action.hover',
+                        backgroundColor: notification.isRead ? 'transparent' : 'action.hover',
                         '&:hover': {
                           backgroundColor: 'action.selected',
                         },
                       }}
                     >
                       <ListItemIcon>
-                        {!notification.is_read && (
+                        {!notification.isRead && (
                           <Circle sx={{ fontSize: 10, color: 'primary.main' }} />
                         )}
                       </ListItemIcon>
                       <ListItemText
                         primary={notification.title}
-                        secondary={notification.message}
-                        primaryTypographyProps={{ fontWeight: notification.is_read ? 'normal' : 'bold' }}
+                        secondary={notification.body}
+                        primaryTypographyProps={{ fontWeight: notification.isRead ? 'normal' : 'bold' }}
                       />
                     </ListItemButton>
                   ))

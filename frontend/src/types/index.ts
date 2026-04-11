@@ -1666,12 +1666,18 @@ export interface MotorSettings {
 // Notification Types
 export interface Notification {
   id: string;
-  notification_type: 'message' | 'appointment' | 'system';
+  userId: string;
+  type: string;
   title: string;
-  message: string;
-  is_read: boolean;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  // Legacy snake_case aliases (kept for compatibility)
+  notification_type?: string;
+  message?: string;
+  is_read?: boolean;
   related_object_id?: string;
-  created_at: string;
+  created_at?: string;
   read_at?: string;
 }
 
