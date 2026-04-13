@@ -153,9 +153,12 @@ const TelehealthDashboard: React.FC = () => {
     loadPatients();
   }, []);
 
-  // Load transcripts when the Transcripts tab becomes active
+  // Load transcripts when the Transcripts tab becomes active, then poll every 30 s
   useEffect(() => {
-    if (tabValue === 4) void loadTranscripts();
+    if (tabValue !== 4) return;
+    void loadTranscripts();
+    const interval = setInterval(() => { void loadTranscripts(); }, 30_000);
+    return () => clearInterval(interval);
   }, [tabValue]);
 
   const loadTranscripts = async () => {
@@ -839,7 +842,21 @@ const TelehealthDashboard: React.FC = () => {
 
       {/* Transcripts Tab */}
       <TabPanel value={tabValue} index={4}>
-        {loadingTranscripts ? (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Auto-refreshes every 30 seconds. New transcripts appear automatically after a session ends.
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={loadingTranscripts ? <CircularProgress size={14} /> : <Transcribe />}
+            onClick={() => void loadTranscripts()}
+            disabled={loadingTranscripts}
+          >
+            Refresh
+          </Button>
+        </Box>
+        {loadingTranscripts && transcripts.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress />
           </Box>

@@ -130,6 +130,7 @@ const VideoSession: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const transcriptRef = useRef<TranscriptEntry[]>([]);
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -247,32 +248,81 @@ const VideoSession: React.FC = () => {
     }
   }, [sessionStartTime]);
 
-  // Simulated transcript updates
+  // Keep transcriptRef in sync so endSession always has the latest entries
   useEffect(() => {
-    if (isTranscribing && autoTranscribe) {
-      const interval = setInterval(() => {
-        const speakers = ['Dr. Sarah Smith', 'John Doe'];
-        const sampleTexts = [
-          "How have you been feeling this week?",
-          "I've been feeling much better, thank you.",
-          "That's great to hear. Let's discuss your progress.",
-          "I've been practicing the techniques we talked about.",
-          "Excellent. Can you tell me more about that?",
-        ];
-        
-        const newEntry: TranscriptEntry = {
-          id: Math.random().toString(36).substr(2, 9),
-          speaker: speakers[Math.floor(Math.random() * speakers.length)],
-          text: sampleTexts[Math.floor(Math.random() * sampleTexts.length)],
-          timestamp: new Date(),
-          confidence: 0.85 + Math.random() * 0.15,
-        };
-        
-        setTranscript(prev => [...prev, newEntry]);
-      }, 8000);
-      return () => clearInterval(interval);
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  // Real-time transcription using Web Speech API
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!isTranscribing) {
+      // Stop recognition if running
+      if (recognitionRef.current) {
+        const r = recognitionRef.current;
+        recognitionRef.current = null;
+        try { r.stop(); } catch { /* ignore */ }
+      }
+      return;
     }
-  }, [isTranscribing, autoTranscribe]);
+
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) return;
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+
+    const speakerName = user?.firstName
+      ? `${user.firstName} ${user.lastName || ''}`.trim()
+      : (user?.role === 'therapist' ? 'Therapist' : 'Participant');
+
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const text: string = result[0].transcript;
+        const confidence: number = result[0].confidence ?? 1;
+        const isFinal: boolean = result.isFinal;
+        if (!isFinal) continue; // only store final results
+        const newEntry: TranscriptEntry = {
+          id: `${Date.now()}-${i}`,
+          speaker: speakerName,
+          text: text.trim(),
+          timestamp: new Date(),
+          confidence,
+        };
+        setTranscript(prev => [...prev, newEntry]);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech') return;
+      if (['audio-capture', 'network'].includes(event.error)) {
+        setTimeout(() => {
+          if (recognitionRef.current === recognition) {
+            try { recognition.start(); } catch { /* ignore */ }
+          }
+        }, 1000);
+      }
+    };
+
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) {
+        try { recognition.start(); } catch { /* ignore */ }
+      }
+    };
+
+    try { recognition.start(); } catch { /* ignore */ }
+
+    return () => {
+      recognitionRef.current = null;
+      try { recognition.stop(); } catch { /* ignore */ }
+    };
+  }, [isTranscribing]);
 
   const getMediaStreamWithFallback = async () => {
     const attempts: MediaStreamConstraints[] = [
@@ -909,7 +959,30 @@ const VideoSession: React.FC = () => {
     }
   };
 
-  const endSession = () => {
+  const saveTranscriptToBackend = async (entries: TranscriptEntry[]) => {
+    if (!sessionId || entries.length === 0) return;
+    try {
+      const payload = entries.map((e) => ({
+        speakerName: e.speaker,
+        speakerRole: 'participant' as const,
+        text: e.text,
+        timestamp: e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp),
+      }));
+      await apiClient.post('/api/telehealth/transcripts', { sessionId, entries: payload });
+    } catch (err) {
+      console.error('Failed to save transcript:', err);
+    }
+  };
+
+  const endSession = async () => {
+    // Stop live recognition before navigating
+    if (recognitionRef.current) {
+      const r = recognitionRef.current;
+      recognitionRef.current = null;
+      try { r.stop(); } catch { /* ignore */ }
+    }
+    // Save transcript to DB if there are entries
+    await saveTranscriptToBackend(transcriptRef.current);
     cleanupSession();
     showSuccess('Session ended');
     navigate('/telehealth/dashboard');
