@@ -212,8 +212,8 @@ class SystemService {
    * Update system settings (admin only)
    */
   async updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
-    // Mock implementation - replace with actual API call
-    console.log('Updating system settings:', settings);
+    // Mock implementation - replace with actual API call when backend endpoint is available
+    void settings;
     return this.getSystemSettings();
   }
 

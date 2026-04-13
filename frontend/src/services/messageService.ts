@@ -24,12 +24,6 @@ export interface Message {
 }
 
 export const messageService = {
-  // Get available users for messaging
-  getUsers: async (): Promise<any[]> => {
-    const response = await apiClient.get('/api/auth/');
-    return response.data.results || response.data;
-  },
-
   // Get all message threads for current user
   getThreads: async (): Promise<MessageThread[]> => {
     const response = await apiClient.get('/api/messages/threads');

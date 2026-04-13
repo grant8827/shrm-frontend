@@ -145,7 +145,6 @@ const AppointmentScheduling: React.FC = () => {
       try {
         setIsLoadingPatients(true);
         const response = await apiClient.get('/auth/');
-        console.log('Users API Response:', response.data);
         
         const allUsers = Array.isArray(response.data.results) 
           ? response.data.results 
@@ -158,7 +157,6 @@ const AppointmentScheduling: React.FC = () => {
           user.role === 'client' && user.is_active === true
         );
         
-        console.log('Filtered clients:', clientUsers);
         setPatients(clientUsers);
       } catch (error) {
         console.error('Failed to load patients:', error);
@@ -177,7 +175,6 @@ const AppointmentScheduling: React.FC = () => {
       try {
         setIsLoadingTherapists(true);
         const response = await apiClient.get('/auth/');
-        console.log('Users API Response:', response.data);
         
         const allUsers = Array.isArray(response.data.results) 
           ? response.data.results 
@@ -190,7 +187,6 @@ const AppointmentScheduling: React.FC = () => {
           (user.role === 'therapist' || user.role === 'admin') && user.is_active === true
         );
         
-        console.log('Filtered therapists:', therapistUsers);
         setTherapists(therapistUsers);
       } catch (error) {
         console.error('Failed to load therapists:', error);
@@ -207,15 +203,12 @@ const AppointmentScheduling: React.FC = () => {
   React.useEffect(() => {
     const loadAppointmentTypes = async () => {
       try {
-        console.log('Fetching appointment types from /appointments/types/...');
         const response = await apiClient.get('/appointments/types/');
-        console.log('Appointment types response:', response.data);
         const types = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
-        console.log('Loaded appointment types:', types);
         setAppointmentTypes(types);
       } catch (error: any) {
         console.error('Failed to load appointment types:', error);
@@ -325,7 +318,6 @@ const AppointmentScheduling: React.FC = () => {
         appointmentTypeId = appointmentTypes[0].id;
       } else {
         // Try to load appointment types one more time
-        console.log('Attempting to reload appointment types...');
         try {
           const response = await apiClient.get('/appointments/types/');
           const types = Array.isArray(response.data.results) 
@@ -346,7 +338,6 @@ const AppointmentScheduling: React.FC = () => {
         if (!appointmentTypeId) {
           // Use the Follow-up Session type ID from the database
           appointmentTypeId = '2d666946-ed73-4981-9fef-946a7c9c1a0e';
-          console.log('Using fallback appointment type ID:', appointmentTypeId);
         }
       }
 
@@ -369,8 +360,6 @@ const AppointmentScheduling: React.FC = () => {
         priority: 'normal',
         is_telehealth: formData.format === 'telehealth',
       };
-
-      console.log('Appointment payload:', appointmentPayload);
 
       if (editingAppointment) {
         // Update existing appointment
@@ -437,9 +426,7 @@ const AppointmentScheduling: React.FC = () => {
   // Load appointments from API
   const loadAppointments = async () => {
     try {
-      console.log('Loading appointments from API...');
       const response = await apiClient.get('/appointments/');
-      console.log('Appointments API response:', response.data);
       
       const appointmentsData = Array.isArray(response.data.results) 
         ? response.data.results 
@@ -447,12 +434,8 @@ const AppointmentScheduling: React.FC = () => {
         ? response.data 
         : [];
       
-      console.log('Raw appointments data:', appointmentsData);
-      
       // Map backend data to frontend format
-      const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => {
-        console.log('Mapping appointment:', apt);
-        return {
+      const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => ({
           id: apt.id,
           patientId: apt.patient,
           patientName: apt.patient_name || 'Unknown Patient',
@@ -461,7 +444,7 @@ const AppointmentScheduling: React.FC = () => {
           date: apt.start_datetime.split('T')[0],
           time: new Date(apt.start_datetime).toTimeString().substring(0, 5),
           duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
-          type: 'follow-up' as const, // Map from appointment_type if needed
+          type: 'follow-up' as const,
           format: apt.is_telehealth ? 'telehealth' as const : 'in-person' as const,
           status: apt.status,
           notes: apt.notes || '',
@@ -470,15 +453,11 @@ const AppointmentScheduling: React.FC = () => {
           createdBy: apt.created_by || '',
           createdAt: apt.created_at,
           updatedAt: apt.updated_at,
-        };
-      });
+        }));
       
-      console.log('Mapped appointments:', mappedAppointments);
       setAppointments(mappedAppointments);
     } catch (error: any) {
       console.error('Failed to load appointments:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
       setAppointments([]);
     }
   };

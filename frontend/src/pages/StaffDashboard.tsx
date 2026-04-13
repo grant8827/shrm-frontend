@@ -36,6 +36,7 @@ import {
   AccessTime,
   Today
 } from '@mui/icons-material';
+import { apiClient } from '../services/apiClient';
 
 interface Patient {
   id: string;
@@ -99,19 +100,39 @@ const StaffDashboard: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // TODO: Load from actual API
-        // const patientsResponse = await apiClient.get('/patients/');
-        // const appointmentsResponse = await apiClient.get('/appointments/');
-        // const soapNotesResponse = await apiClient.get('/soap-notes/?status=pending');
-        // const messagesResponse = await apiClient.get('/messages/?unread=true');
-        
-        setPatients([]);
-        setAppointments([]);
+        const [patientsRes, appointmentsRes, messagesRes] = await Promise.allSettled([
+          apiClient.get('/api/patients/'),
+          apiClient.get('/api/appointments/'),
+          apiClient.get('/api/messages/threads'),
+        ]);
+
+        const patientsData = patientsRes.status === 'fulfilled'
+          ? (Array.isArray(patientsRes.value.data) ? patientsRes.value.data : (patientsRes.value.data?.results || []))
+          : [];
+        const appointmentsData = appointmentsRes.status === 'fulfilled'
+          ? (Array.isArray(appointmentsRes.value.data) ? appointmentsRes.value.data : (appointmentsRes.value.data?.results || []))
+          : [];
+        const unreadMessages = messagesRes.status === 'fulfilled'
+          ? (Array.isArray(messagesRes.value.data) ? messagesRes.value.data : (messagesRes.value.data?.results || [])).filter((t: any) => t.unread_count > 0).length
+          : 0;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const todayAppts = appointmentsData.filter((apt: any) => {
+          const d = new Date(apt.start_datetime || apt.date);
+          return d >= today && d < tomorrow;
+        }).length;
+
+        setPatients(patientsData);
+        setAppointments(appointmentsData);
         setStats({
-          todayAppointments: 0,
-          activePatients: 0,
+          todayAppointments: todayAppts,
+          activePatients: patientsData.filter((p: any) => p.status === 'active').length,
           pendingNotes: 0,
-          newMessages: 0
+          newMessages: unreadMessages,
         });
       } catch (error) {
         console.error('Failed to load data:', error);

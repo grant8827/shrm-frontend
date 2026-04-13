@@ -289,7 +289,7 @@ class TelehealthService {
       const channel = event.channel;
       channel.onmessage = (event) => {
         // Handle data channel message
-        console.log('Data channel message:', event.data);
+        void event.data;
       };
     };
 
@@ -742,23 +742,23 @@ class TelehealthService {
 
     webSocketService.on('chat-message', (data: Record<string, unknown>) => {
       // Chat messages will be handled by the UI component
-      console.log('Chat message received:', data);
+      void data;
     });
 
     webSocketService.on('participant-joined', (data: Record<string, unknown>) => {
-      console.log('Participant joined:', data);
+      void data;
     });
 
     webSocketService.on('participant-left', (data: Record<string, unknown>) => {
-      console.log('Participant left:', data);
+      void data;
     });
 
     webSocketService.on('recording-started', (data: Record<string, unknown>) => {
-      console.log('Recording started:', data);
+      void data;
     });
 
     webSocketService.on('recording-stopped', (data: Record<string, unknown>) => {
-      console.log('Recording stopped:', data);
+      void data;
     });
 
     webSocketService.on('transcription', (message: Record<string, unknown>) => {

@@ -123,11 +123,11 @@ const TherapistSettings: React.FC = () => {
     }
   };
 
-  const handleSaveNotifications = () => {
+  const handleSaveNotifications = async () => {
     try {
-      // TODO: Implement API call to save notification settings
+      await apiClient.patch('/api/users/profile/', { notification_settings: notificationSettings });
       showSuccess('Notification settings updated successfully');
-    } catch (error) {
+    } catch {
       showError('Failed to update notification settings');
     }
   };

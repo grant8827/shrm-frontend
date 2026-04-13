@@ -24,6 +24,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": "src",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["*"],
       "@/components/*": ["components/*"],

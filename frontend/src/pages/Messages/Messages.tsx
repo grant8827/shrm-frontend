@@ -429,22 +429,6 @@ const Messages: React.FC = () => {
     // All data now comes from backend API calls
   }, [state.user?.id, state.user?.role]);
 
-  // Filter messages based on active tab
-  const getFilteredMessages = () => {
-    switch (tabValue) {
-      case 1: // Unread
-        return messages.filter(m => !m.isRead);
-      case 2: // Starred
-        return messages.filter(m => m.isStarred);
-      case 3: // Archived
-        return messages.filter(m => m.isArchived);
-      default: // All
-        return messages.filter(m => !m.isArchived); // Don't show archived in "All"
-    }
-  };
-
-  getFilteredMessages();
-  
   // Dialog states
   const [composeDialogOpen, setComposeDialogOpen] = useState(false);
   const [messageMenuAnchor, setMessageMenuAnchor] = useState<null | HTMLElement>(null);
@@ -638,6 +622,7 @@ const Messages: React.FC = () => {
       // Send message
       await messageService.sendMessage({
         recipient_ids: [recipient.id],
+        subject: conversation.title || 'Re: ' + (conversation.lastMessage?.content.substring(0, 30) || 'Message'),
         content: quickReply,
         priority: 'normal',
       });
@@ -684,7 +669,6 @@ const Messages: React.FC = () => {
       
       // Select the conversation that was just created/updated
       if (apiResponse.thread?.id) {
-        console.log('Selecting conversation:', apiResponse.thread.id);
         setSelectedConversation(apiResponse.thread.id);
       }
       
@@ -746,10 +730,15 @@ const Messages: React.FC = () => {
   };
 
   // Message actions
-  const toggleStar = (messageId: string) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, isStarred: !msg.isStarred } : msg
-    ));
+  const toggleStar = async (messageId: string) => {
+    try {
+      const result = await messageService.toggleStar(messageId);
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId ? { ...msg, isStarred: result.is_starred } : msg
+      ));
+    } catch (err) {
+      console.error('Failed to toggle star:', err);
+    }
     handleMenuClose();
   };
 

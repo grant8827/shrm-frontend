@@ -48,8 +48,8 @@ const getSpeakerStyle = (
 ): { label: string; color: 'primary' | 'success' | 'default'; bg: string; borderColor: string } => {
   if (role === 'therapist')
     return { label: 'Therapist', color: 'primary', bg: '#e3f2fd', borderColor: '#1976d2' };
-  if (role === 'patient')
-    return { label: 'Patient', color: 'success', bg: '#e8f5e9', borderColor: '#388e3c' };
+  if (role === 'client')
+    return { label: 'Client', color: 'success', bg: '#e8f5e9', borderColor: '#388e3c' };
   return { label: 'Participant', color: 'default', bg: '#f5f5f5', borderColor: '#9e9e9e' };
 };
 

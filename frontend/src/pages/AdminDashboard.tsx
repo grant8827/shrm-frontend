@@ -71,7 +71,6 @@ import {
 import { User, Patient, Appointment } from '../types';
 import ReportsSection from '../components/Reports/ReportsSection';
 import { apiClient } from '../services/apiClient';
-// import { authService } from '../../services/authService_new';
 
 interface DashboardStats {
   totalUsers: number;
@@ -159,21 +158,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       const allUsers = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data?.results || []);
       const allPatients = Array.isArray(patientsRes.data) ? patientsRes.data : (patientsRes.data?.results || []);
       
-      console.log('Users from API:', allUsers);
-      console.log('Patients from API:', allPatients);
-      
       // Calculate stats from real data
       const activeUsers = allUsers.filter((u: any) => u.is_active === true).length;
       const activePatients = allPatients.filter((p: any) => p.status === 'active').length;
       const activeStaff = allUsers.filter((u: any) => 
         u.is_active === true && (u.role === 'therapist' || u.role === 'staff')
       ).length;
-      
-      console.log('Active staff count:', activeStaff);
-      console.log('Staff breakdown:', {
-        therapists: allUsers.filter((u: any) => u.is_active && u.role === 'therapist').length,
-        staff: allUsers.filter((u: any) => u.is_active && u.role === 'staff').length,
-      });
       
       // Get today's date for filtering appointments
       const today = new Date();
@@ -189,8 +179,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         const allAppointments = Array.isArray(appointmentsRes.data) 
           ? appointmentsRes.data 
           : (appointmentsRes.data?.results || []);
-        
-        console.log('Appointments from API:', allAppointments);
         
         todayAppointments = allAppointments.filter((apt: any) => {
           const aptDate = new Date(apt.start_datetime);
@@ -217,8 +205,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         failedLogins: 0, // No failed logins tracked yet
         activeStaff: activeStaff,
       };
-
-      console.log('Dashboard stats calculated:', dashboardStats);
 
       setStats(dashboardStats);
       setSystemAlerts([]);
@@ -274,9 +260,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
 
   const handleSaveUser = async () => {
     try {
-      console.log('Current logged in user:', _user);
-      console.log('User being edited:', _selectedUser);
-      
       if (_selectedUser) {
         // Update existing user - include all editable fields
         const updateData: any = {};
@@ -288,8 +271,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         if (editUserData.role !== undefined) updateData.role = editUserData.role;
         if (editUserData.is_active !== undefined) updateData.is_active = editUserData.is_active;
         if (editUserData.phone_number !== undefined) updateData.phone_number = editUserData.phone_number;
-        
-        console.log('Updating user with data:', updateData);
         
         // Use PATCH for partial update
         await apiClient.patch(`/api/auth/${_selectedUser.id}/`, updateData);
@@ -320,7 +301,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
           phone: editUserData.phone_number || '',
         };
         
-        console.log('Creating user with data:', createData);
         await apiClient.post('/api/auth/register/', createData);
       }
       setUserDialogOpen(false);
@@ -328,10 +308,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
       setEditUserData({});
       await loadDashboardData();
     } catch (err: any) {
-      console.error('Save user error:', err);
-      console.error('Error response:', err.response);
-      console.error('Error data:', err.response?.data);
-      
       // Show specific error message to user
       if (err.response?.status === 403) {
         setError('Permission denied: You do not have permission to edit this user.');
@@ -611,10 +587,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
                           onClick={() => {
                             if (activity.type === 'user') {
                               setActiveTab(1);
-                            } else if (activity.type === 'patient') {
-                              console.log('View patient:', activity);
-                            } else if (activity.type === 'appointment') {
-                              console.log('View appointment:', activity);
                             }
                           }}
                         >

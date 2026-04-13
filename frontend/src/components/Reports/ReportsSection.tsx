@@ -101,38 +101,7 @@ const ReportsSection: React.FC = () => {
   const loadReports = async () => {
     try {
       setLoading(true);
-      // Mock data - replace with actual API call
-      const mockReports: ReportData[] = [
-        {
-          id: '1',
-          type: 'users',
-          title: 'Monthly User Activity Report',
-          description: 'October 2025 user activity summary',
-          generated_at: new Date().toISOString(),
-          status: 'ready',
-          download_url: '/api/reports/users_202510.pdf',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '2',
-          type: 'revenue',
-          title: 'Q3 2025 Financial Report',
-          description: 'Quarterly revenue and billing analysis',
-          generated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          status: 'ready',
-          download_url: '/api/reports/revenue_q3_2025.pdf',
-          expires_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: '3',
-          type: 'audit',
-          title: 'HIPAA Compliance Audit',
-          description: 'Monthly HIPAA audit trail report',
-          generated_at: new Date().toISOString(),
-          status: 'generating',
-        },
-      ];
-      setReports(mockReports);
+      setReports([]);
     } catch (err: any) {
       setError(err.message);
     } finally {

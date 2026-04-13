@@ -215,16 +215,10 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
   };
 
   const handleSubmit = () => {
-    console.log('Form submitted, validating step:', activeStep);
-    console.log('Form data:', formData);
-    
     if (validateStep(activeStep)) {
-      console.log('Validation passed, calling onSubmit');
       onSubmit(formData);
       handleReset();
       onClose();
-    } else {
-      console.log('Validation failed, errors:', errors);
     }
   };
 

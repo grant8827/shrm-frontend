@@ -195,11 +195,9 @@ const AdminPatientManagement: React.FC = () => {
   const loadTherapists = async () => {
     try {
       const response = await apiService.get('/users/therapists/');
-      console.log('🟢 therapists raw response:', response);
       type TherapistItem = { id: string; first_name?: string; last_name?: string; firstName?: string; lastName?: string; username?: string };
       const raw = response as unknown as { results?: TherapistItem[] } | TherapistItem[];
       const list: TherapistItem[] = Array.isArray(raw) ? raw : (raw.results ?? []);
-      console.log('🟢 therapists list:', list);
       setTherapists(
         list.map((u) => ({
           id: u.id,
@@ -217,24 +215,17 @@ const AdminPatientManagement: React.FC = () => {
   // Load patients from API
   const loadPatients = async () => {
     try {
-      console.log('🔵 loadPatients called - starting...');
       setLoading(true);
       
-      console.log('🔵 Making API call to /patients/...');
       const response = await apiService.get('/patients/');
-      console.log('🔵 Raw API response:', response);
-      
       const data = (response.data || response) as BackendPatient[] | PaginatedResponse<BackendPatient>;
-      console.log('🔵 Extracted data:', data);
       
       // Handle paginated response - check if it has a 'results' field
       let patientsData: BackendPatient[] = [];
       
       if (Array.isArray(data)) {
-        console.log('✅ Response is a plain array');
         patientsData = data;
       } else if (data && 'results' in data && Array.isArray(data.results)) {
-        console.log('✅ Response is paginated - extracting results');
         patientsData = data.results;
       } else {
         console.error('❌ Unexpected API response format:', data);
@@ -245,11 +236,8 @@ const AdminPatientManagement: React.FC = () => {
         return;
       }
       
-      console.log('✅ Setting patients state with', patientsData.length, 'patients');
-      console.log('✅ First patient:', patientsData[0]);
       setPatients(patientsData);
       setFilteredPatients(patientsData);
-      console.log('✅ State updated');
       
     } catch (error: unknown) {
       console.error('❌ Error loading patients:', error);
@@ -259,7 +247,6 @@ const AdminPatientManagement: React.FC = () => {
       setFilteredPatients([]);
     } finally {
       setLoading(false);
-      console.log('🔵 loadPatients completed');
     }
   };
 
@@ -429,23 +416,15 @@ const AdminPatientManagement: React.FC = () => {
 
   // Filter patients when search or status changes
   useEffect(() => {
-    console.log('🔍 FILTER EFFECT running');
-    console.log('🔍 patients array:', patients);
-    console.log('🔍 statusFilter:', statusFilter);
-    console.log('🔍 searchTerm:', searchTerm);
-    
     let filtered = [...patients];
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      console.log('🔍 Applying status filter:', statusFilter);
       filtered = filtered.filter(p => p.status === statusFilter);
-      console.log('🔍 After status filter:', filtered.length);
     }
 
     // Apply search filter
     if (searchTerm) {
-      console.log('🔍 Applying search filter:', searchTerm);
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(p =>
         p.first_name.toLowerCase().includes(search) ||
@@ -454,10 +433,8 @@ const AdminPatientManagement: React.FC = () => {
         p.phone.includes(search) ||
         p.patient_number.toLowerCase().includes(search)
       );
-      console.log('🔍 After search filter:', filtered.length);
     }
 
-    console.log('✅ FILTER RESULT - Setting filteredPatients to:', filtered.length, 'patients');
     setFilteredPatients(filtered);
   }, [searchTerm, statusFilter, patients]);
 
@@ -512,8 +489,7 @@ const AdminPatientManagement: React.FC = () => {
       console.log('📤 Sending patient data to API:', patientData);
 
       const response = await apiService.post('/patients/', patientData);
-      
-      console.log('✅ Patient created successfully:', response.data);
+      void response;
 
       setSuccessMessage('Patient created successfully! Registration email has been sent.');
       setShowSuccess(true);
@@ -535,12 +511,6 @@ const AdminPatientManagement: React.FC = () => {
   const activePatients = patients.filter(p => p.status === 'active').length;
   const inactivePatients = patients.filter(p => p.status === 'inactive').length;
   const dischargedPatients = patients.filter(p => p.status === 'discharged').length;
-
-  console.log('🔍 RENDER - patients.length:', patients.length);
-  console.log('🔍 RENDER - filteredPatients.length:', filteredPatients.length);
-  console.log('🔍 RENDER - loading:', loading);
-  console.log('🔍 RENDER - statusFilter:', statusFilter);
-  console.log('🔍 RENDER - searchTerm:', searchTerm);
 
   // Helper function to calculate age
   const calculateAge = (dateOfBirth: string): number => {
