@@ -854,17 +854,22 @@ const AdminDashboard: React.FC = () => {
                 if (error.response?.data) {
                   const backendErrors = error.response.data;
                   const formattedErrors: Record<string, string> = {};
-                  
-                  // Format backend errors for display
-                  Object.keys(backendErrors).forEach(key => {
-                    const errorValue = backendErrors[key];
-                    if (Array.isArray(errorValue)) {
-                      formattedErrors[key] = errorValue[0];
-                    } else if (typeof errorValue === 'string') {
-                      formattedErrors[key] = errorValue;
-                    }
-                  });
-                  
+
+                  // Uniqueness conflict: { error: 'message', field: 'username' | 'email' }
+                  if (error.response.status === 409 && backendErrors.field && backendErrors.error) {
+                    formattedErrors[backendErrors.field] = backendErrors.error;
+                  } else {
+                    // Generic field-level errors (arrays or strings keyed by field name)
+                    Object.keys(backendErrors).forEach(key => {
+                      const errorValue = backendErrors[key];
+                      if (Array.isArray(errorValue)) {
+                        formattedErrors[key] = errorValue[0];
+                      } else if (typeof errorValue === 'string' && key !== 'error') {
+                        formattedErrors[key] = errorValue;
+                      }
+                    });
+                  }
+
                   setFormErrors(formattedErrors);
                 }
                 
