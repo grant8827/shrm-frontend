@@ -95,7 +95,7 @@ const VideoSession: React.FC = () => {
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
   const [mediaInitFailed, setMediaInitFailed] = useState(false);
   const [isRetryingMedia, setIsRetryingMedia] = useState(false);
-  const [, setSessionData] = useState<SessionDetails | null>(null);
+  const [sessionData, setSessionData] = useState<SessionDetails | null>(null);
 
   // Media controls
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -110,23 +110,25 @@ const VideoSession: React.FC = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [autoTranscribe, setAutoTranscribe] = useState(true);
 
-  // Data
-  const [participants] = useState<Participant[]>([
-    {
-      id: '1',
-      name: 'Dr. Sarah Smith',
-      role: 'therapist',
-      isMuted: false,
-      isVideoOff: false,
-    },
-    {
-      id: '2',
-      name: 'John Doe',
-      role: 'patient',
-      isMuted: false,
-      isVideoOff: false,
-    },
-  ]);
+  // Data — derived from real session data once fetched
+  const participants: Participant[] = sessionData
+    ? [
+        sessionData.therapist_details && {
+          id: String(sessionData.therapist_details.id),
+          name: `${sessionData.therapist_details.first_name} ${sessionData.therapist_details.last_name}`.trim(),
+          role: 'therapist' as const,
+          isMuted: false,
+          isVideoOff: false,
+        },
+        sessionData.patient_details && {
+          id: String(sessionData.patient_details.id),
+          name: `${sessionData.patient_details.first_name} ${sessionData.patient_details.last_name}`.trim(),
+          role: 'patient' as const,
+          isMuted: false,
+          isVideoOff: false,
+        },
+      ].filter(Boolean) as Participant[]
+    : [];
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
@@ -279,7 +281,7 @@ const VideoSession: React.FC = () => {
 
     const speakerName = user?.firstName
       ? `${user.firstName} ${user.lastName || ''}`.trim()
-      : (user?.role === 'therapist' ? 'Therapist' : 'Participant');
+      : (user?.role === 'therapist' ? 'Therapist' : user?.role === 'client' ? 'Patient' : 'Participant');
 
     recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -962,9 +964,23 @@ const VideoSession: React.FC = () => {
   const saveTranscriptToBackend = async (entries: TranscriptEntry[]) => {
     if (!sessionId || entries.length === 0) return;
     try {
+      const therapistId = sessionData?.therapist_details ? String(sessionData.therapist_details.id) : null;
+      const patientId = sessionData?.patient_details ? String(sessionData.patient_details.id) : null;
+      const therapistName = sessionData?.therapist_details
+        ? `${sessionData.therapist_details.first_name} ${sessionData.therapist_details.last_name}`.trim()
+        : null;
+      const patientName = sessionData?.patient_details
+        ? `${sessionData.patient_details.first_name} ${sessionData.patient_details.last_name}`.trim()
+        : null;
       const payload = entries.map((e) => ({
         speakerName: e.speaker,
-        speakerRole: 'participant' as const,
+        speakerRole: (
+          e.speaker === therapistName || String(user?.id) === therapistId
+            ? 'therapist'
+            : e.speaker === patientName || String(user?.id) === patientId
+            ? 'patient'
+            : 'participant'
+        ) as 'therapist' | 'patient' | 'participant',
         text: e.text,
         timestamp: e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp),
       }));
