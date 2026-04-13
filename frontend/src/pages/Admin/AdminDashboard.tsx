@@ -799,7 +799,9 @@ const AdminDashboard: React.FC = () => {
                 if (!formData.first_name.trim()) errors.first_name = 'Required';
                 if (!formData.last_name.trim()) errors.last_name = 'Required';
                 if (!formData.username.trim()) errors.username = 'Required';
+                else if (/\s/.test(formData.username)) errors.username = 'Username cannot contain spaces';
                 if (!formData.email.trim()) errors.email = 'Required';
+                else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) errors.email = 'Enter a valid email address';
                 if (!formData.password) errors.password = 'Required';
                 else if (formData.password.length < 10) errors.password = 'Password must be at least 10 characters';
                 if (formData.password !== formData.password_confirm) errors.password_confirm = 'Passwords do not match';
