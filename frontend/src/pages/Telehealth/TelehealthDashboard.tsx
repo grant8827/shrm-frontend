@@ -147,10 +147,12 @@ const TelehealthDashboard: React.FC = () => {
     notes: '',
   });
 
-  // Mock data - replace with actual API calls
+  // Load sessions and patients on mount, then poll sessions every 30 s for real-time card updates
   useEffect(() => {
-    loadSessions();
-    loadPatients();
+    void loadSessions();
+    void loadPatients();
+    const interval = setInterval(() => { void loadSessions(); }, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   // Load transcripts when the Transcripts tab becomes active, then poll every 30 s
