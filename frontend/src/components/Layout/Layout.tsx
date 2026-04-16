@@ -20,6 +20,7 @@ import {
   Popover,
   Paper,
   ListItemButton,
+  Tooltip,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -37,6 +38,8 @@ import {
   AttachMoney,
   Circle,
   CalendarMonth,
+  ChevronLeft,
+  ChevronRight,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -44,6 +47,7 @@ import { useIdleTimer } from '../../hooks/useIdleTimer';
 import IdleTimeoutDialog from '../IdleTimeoutDialog';
 
 const drawerWidth = 240;
+const miniDrawerWidth = 64;
 
 export const Layout: React.FC = () => {
   const { state, logout } = useAuth();
@@ -52,6 +56,8 @@ export const Layout: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const currentDrawerWidth = sidebarCollapsed ? miniDrawerWidth : drawerWidth;
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
   const { notifications, unreadCount, unreadMessageCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
@@ -208,31 +214,50 @@ export const Layout: React.FC = () => {
   };
 
   const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div" color="primary">
-          SafeHaven EHR
-        </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Header with title and collapse toggle */}
+      <Toolbar sx={{ justifyContent: sidebarCollapsed ? 'center' : 'space-between', px: sidebarCollapsed ? 0 : 2, minHeight: 64 }}>
+        {!sidebarCollapsed && (
+          <Typography variant="h6" noWrap component="div" color="primary" sx={{ fontSize: '1rem' }}>
+            SafeHaven EHR
+          </Typography>
+        )}
+        <Tooltip title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
+          <IconButton
+            onClick={() => setSidebarCollapsed(prev => !prev)}
+            size="small"
+            sx={{ color: 'primary.main' }}
+          >
+            {sidebarCollapsed ? <ChevronRight /> : <ChevronLeft />}
+          </IconButton>
+        </Tooltip>
       </Toolbar>
       <Divider />
-      <List>
+      <List sx={{ pt: 1 }}>
         {getNavigationItems().map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  setMobileOpen(false);
-                }
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
+          <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+            <Tooltip title={sidebarCollapsed ? item.text : ''} placement="right">
+              <ListItemButton
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) setMobileOpen(false);
+                }}
+                sx={{
+                  justifyContent: sidebarCollapsed ? 'center' : 'initial',
+                  px: sidebarCollapsed ? 0 : 2,
+                  minHeight: 48,
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, mr: sidebarCollapsed ? 0 : 2, justifyContent: 'center' }}>
+                  {item.icon}
+                </ListItemIcon>
+                {!sidebarCollapsed && <ListItemText primary={item.text} />}
+              </ListItemButton>
+            </Tooltip>
           </ListItem>
         ))}
       </List>
-    </div>
+    </Box>
   );
 
   return (
@@ -241,8 +266,12 @@ export const Layout: React.FC = () => {
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
+          ml: { sm: `${currentDrawerWidth}px` },
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar>
@@ -361,7 +390,14 @@ export const Layout: React.FC = () => {
       {/* Drawer */}
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{
+          width: { sm: currentDrawerWidth },
+          flexShrink: { sm: 0 },
+          transition: theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+        }}
       >
         <Drawer
           variant="temporary"
@@ -379,7 +415,15 @@ export const Layout: React.FC = () => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: currentDrawerWidth,
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
+            },
           }}
           open
         >
@@ -401,10 +445,14 @@ export const Layout: React.FC = () => {
         sx={{
           flexGrow: 1,
           p: { xs: 1.5, sm: 3 },
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
           height: '100vh',
           overflowY: 'auto',
           boxSizing: 'border-box',
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar />
