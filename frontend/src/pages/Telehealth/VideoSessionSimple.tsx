@@ -25,6 +25,9 @@ import {
   FiberManualRecord,
   Transcribe,
   StopCircle,
+  Close as CloseIcon,
+  ChevronLeft,
+  ChevronRight,
 } from '@mui/icons-material';
 import PeopleIcon from '@mui/icons-material/People';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -491,10 +494,6 @@ const VideoSession: React.FC = () => {
     }
   };
 
-  const openTranscriptDrawer = () => {
-    setShowTranscript(true);
-  };
-
   const startTranscription = async () => {
     if (!sessionId) return;
     try {
@@ -578,25 +577,27 @@ const VideoSession: React.FC = () => {
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#1a1a1a' }}>
       {/* Header */}
-      <Paper elevation={0} sx={{ p: 2, bgcolor: 'rgba(0, 0, 0, 0.8)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box>
-            <Typography variant="h6">{sessionData?.title || 'Telehealth Session'}</Typography>
+      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.8)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, overflow: 'hidden', flex: 1 }}>
+          <Box sx={{ flexShrink: 0 }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', sm: '1.25rem' } }}>{sessionData?.title || 'Telehealth Session'}</Typography>
             {user && ['admin', 'therapist', 'staff'].includes(user.role) && sessionData?.patient_details && (
               <Typography variant="caption" sx={{ opacity: 0.8 }}>
                 Patient: {sessionData.patient_details.first_name} {sessionData.patient_details.last_name}
               </Typography>
             )}
           </Box>
-          <Chip label={formatDuration(sessionDuration)} color="error" size="small" icon={<FiberManualRecord />} />
-          <Chip 
-            label={`${participantCount} Participant${participantCount !== 1 ? 's' : ''}`} 
-            color={participantCount > 1 ? "success" : "default"} 
-            size="small" 
-            icon={<PeopleIcon />} 
-          />
-          {isRemoteVideoReady && <Chip label="Connected" color="success" size="small" />}
-          {participantName && <Chip label={participantName} size="small" variant="outlined" sx={{ color: 'white', borderColor: 'white' }} />}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Chip label={formatDuration(sessionDuration)} color="error" size="small" icon={<FiberManualRecord />} />
+            <Chip
+              label={`${participantCount} ${participantCount !== 1 ? 'Participants' : 'Participant'}`}
+              color={participantCount > 1 ? "success" : "default"}
+              size="small"
+              icon={<PeopleIcon />}
+            />
+            {isRemoteVideoReady && <Chip label="Connected" color="success" size="small" />}
+            {participantName && <Chip label={participantName} size="small" variant="outlined" sx={{ color: 'white', borderColor: 'white', display: { xs: 'none', sm: 'flex' } }} />}
+          </Box>
         </Box>
       </Paper>
 
@@ -630,10 +631,10 @@ const VideoSession: React.FC = () => {
           )}
 
           {/* Local Video */}
-          <Paper elevation={4} sx={{ position: 'absolute', bottom: 20, right: 20, width: 240, height: 180, overflow: 'hidden', bgcolor: '#000' }}>
+          <Paper elevation={4} sx={{ position: 'absolute', bottom: { xs: 10, sm: 20 }, right: { xs: 10, sm: 20 }, width: { xs: 100, sm: 240 }, height: { xs: 75, sm: 180 }, overflow: 'hidden', bgcolor: '#000' }}>
             <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
             {!isCameraOn && (
-              <Box sx={{ position: 'absolute', insert: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.8)', color: 'white', width: '100%', height: '100%' }}>
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.8)', color: 'white', width: '100%', height: '100%' }}>
                 <VideocamOff />
               </Box>
             )}
@@ -642,7 +643,7 @@ const VideoSession: React.FC = () => {
       </Box>
 
       {/* Controls */}
-      <Paper elevation={0} sx={{ p: 2, bgcolor: 'rgba(0, 0, 0, 0.9)', display: 'flex', justifyContent: 'center', gap: 2 }}>
+      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.9)', display: 'flex', justifyContent: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
         <IconButton onClick={toggleMicrophone} sx={{ bgcolor: isMicOn ? 'rgba(255,255,255,0.1)' : 'error.main', color: 'white' }}>
           {isMicOn ? <Mic /> : <MicOff />}
         </IconButton>
@@ -655,7 +656,7 @@ const VideoSession: React.FC = () => {
             <IconButton onClick={toggleRecording} sx={{ bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               {isRecording ? <StopCircle /> : <FiberManualRecord />}
             </IconButton>
-            <IconButton onClick={openTranscriptDrawer} sx={{ bgcolor: isTranscribing ? 'primary.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
+            <IconButton onClick={() => setShowTranscript(prev => !prev)} sx={{ bgcolor: showTranscript ? 'primary.main' : isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Transcribe />
             </IconButton>
           </>
@@ -682,9 +683,40 @@ const VideoSession: React.FC = () => {
         </DialogActions>
       </Dialog>
       
+      {/* Floating sidebar toggle tab — always visible on the right edge */}
+      <Box
+        onClick={() => setShowTranscript(prev => !prev)}
+        sx={{
+          position: 'fixed',
+          right: showTranscript ? { xs: '85vw', sm: '400px' } : 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 1300,
+          bgcolor: 'primary.main',
+          color: 'white',
+          borderRadius: '8px 0 0 8px',
+          width: 28,
+          height: 64,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: 3,
+          transition: 'right 225ms cubic-bezier(0,0,0.2,1)',
+          '&:hover': { bgcolor: 'primary.dark' },
+        }}
+      >
+        {showTranscript ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
+      </Box>
+
       {/* Transcript Drawer */}
-      <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: 400, p: 2 } }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Session Transcript</Typography>
+      <Drawer anchor="right" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="h6">Session Transcript</Typography>
+          <IconButton size="small" onClick={() => setShowTranscript(false)} aria-label="Close panel">
+            <CloseIcon />
+          </IconButton>
+        </Box>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
           <Chip size="small" label="Patient" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />

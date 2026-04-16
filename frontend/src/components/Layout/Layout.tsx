@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   AppBar,
@@ -48,6 +48,7 @@ const drawerWidth = 240;
 export const Layout: React.FC = () => {
   const { state, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -55,8 +56,11 @@ export const Layout: React.FC = () => {
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
   const { notifications, unreadCount, unreadMessageCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
 
+  // Suppress idle auto-logout while the user is in an active telehealth video session
+  const isInTelehealthSession = /^\/telehealth\/(session|join)\//.test(location.pathname);
+
   // Auto sign-out after 5 minutes of inactivity → 3-minute countdown
-  const { showWarning, secondsLeft, resetTimer } = useIdleTimer(logout);
+  const { showWarning, secondsLeft, resetTimer } = useIdleTimer(isInTelehealthSession ? () => {} : logout);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -383,9 +387,9 @@ export const Layout: React.FC = () => {
         </Drawer>
       </Box>
 
-      {/* Idle-timeout warning dialog */}
+      {/* Idle-timeout warning dialog — suppressed during active telehealth sessions */}
       <IdleTimeoutDialog
-        open={showWarning}
+        open={showWarning && !isInTelehealthSession}
         secondsLeft={secondsLeft}
         onStayLoggedIn={resetTimer}
         onLogoutNow={logout}
