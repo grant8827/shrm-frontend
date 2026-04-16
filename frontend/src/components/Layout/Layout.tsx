@@ -236,7 +236,7 @@ export const Layout: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {/* App Bar */}
       <AppBar
         position="fixed"
@@ -402,6 +402,9 @@ export const Layout: React.FC = () => {
           flexGrow: 1,
           p: { xs: 1.5, sm: 3 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          height: '100vh',
+          overflowY: 'auto',
+          boxSizing: 'border-box',
         }}
       >
         <Toolbar />

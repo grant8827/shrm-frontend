@@ -683,8 +683,8 @@ const VideoSession: React.FC = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Floating sidebar toggle tab — always visible on the right edge */}
-      <Box
+      {/* Floating sidebar toggle tab — visible to staff/therapist/admin only */}
+      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Box
         onClick={() => setShowTranscript(prev => !prev)}
         sx={{
           position: 'fixed',
@@ -707,10 +707,10 @@ const VideoSession: React.FC = () => {
         }}
       >
         {showTranscript ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
-      </Box>
+      </Box>}
 
-      {/* Transcript Drawer */}
-      <Drawer anchor="right" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
+      {/* Transcript Drawer — visible to staff/therapist/admin only */}
+      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Drawer anchor="right" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="h6">Session Transcript</Typography>
           <IconButton size="small" onClick={() => setShowTranscript(false)} aria-label="Close panel">
@@ -784,7 +784,7 @@ const VideoSession: React.FC = () => {
           </Button>
           <Button fullWidth variant="outlined" onClick={() => setShowTranscript(false)}>Close</Button>
         </Box>
-      </Drawer>
+      </Drawer>}
     </Box>
   );
 };
