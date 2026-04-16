@@ -37,7 +37,7 @@ export const DashboardRedirect: React.FC = () => {
     case 'client':
       return <Navigate to="/client" replace />;
     case 'staff':
-      return <Navigate to="/staff" replace />;
+      return <Navigate to="/admin" replace />;
     default:
       // Default to client dashboard for unknown roles
       return <Navigate to="/client" replace />;

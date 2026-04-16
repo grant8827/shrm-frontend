@@ -97,7 +97,7 @@ function App() {
                   <Route
                     path="/admin/*"
                     element={
-                      <ProtectedRoute requiredRole="admin">
+                      <ProtectedRoute requiredRole={["admin", "staff"]}>
                         <AdminRoutes />
                       </ProtectedRoute>
                     }
@@ -171,7 +171,7 @@ function App() {
                   <Route
                     path="/telehealth/transcripts"
                     element={
-                      <ProtectedRoute requiredRole={["admin", "therapist"]}>
+                      <ProtectedRoute requiredRole={["admin", "staff", "therapist"]}>
                         <TelehealthTranscripts />
                       </ProtectedRoute>
                     }
