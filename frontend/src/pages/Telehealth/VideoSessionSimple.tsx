@@ -631,7 +631,7 @@ const VideoSession: React.FC = () => {
           )}
 
           {/* Local Video */}
-          <Paper elevation={4} sx={{ position: 'absolute', bottom: { xs: 10, sm: 20 }, right: { xs: 10, sm: 20 }, width: { xs: 100, sm: 240 }, height: { xs: 75, sm: 180 }, overflow: 'hidden', bgcolor: '#000' }}>
+          <Paper elevation={4} sx={{ position: 'absolute', bottom: { xs: 8, sm: 20 }, right: { xs: 40, sm: 20 }, width: { xs: 80, sm: 240 }, height: { xs: 60, sm: 180 }, overflow: 'hidden', bgcolor: '#000' }}>
             <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
             {!isCameraOn && (
               <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.8)', color: 'white', width: '100%', height: '100%' }}>
@@ -691,7 +691,7 @@ const VideoSession: React.FC = () => {
           right: showTranscript ? { xs: '85vw', sm: '400px' } : 0,
           top: '50%',
           transform: 'translateY(-50%)',
-          zIndex: 1300,
+          zIndex: 1400,
           bgcolor: 'primary.main',
           color: 'white',
           borderRadius: '8px 0 0 8px',
@@ -706,7 +706,7 @@ const VideoSession: React.FC = () => {
           '&:hover': { bgcolor: 'primary.dark' },
         }}
       >
-        {showTranscript ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
+        {showTranscript ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
       </Box>
 
       {/* Transcript Drawer */}
