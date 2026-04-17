@@ -75,6 +75,7 @@ const VideoSession: React.FC = () => {
   const participantCountRef = useRef(0);
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
+  const isTranscribingRef = useRef(false); // mirrors isTranscribing for use inside WS callbacks
   // Ref keeps the stream alive in closures registered BEFORE re-renders propagate
   const localStreamRef = useRef<MediaStream | null>(null);
   
@@ -82,11 +83,8 @@ const VideoSession: React.FC = () => {
   const [participantCount, setParticipantCount] = useState(1); // Start at 1 for self
   const [participantName, setParticipantName] = useState<string>('');
 
-  // Remote video orientation normalisation
+  // Remote video container ref (keeps overflow:hidden behaviour)
   const remoteContainerRef = useRef<HTMLDivElement>(null);
-  const [remoteVideoStyle, setRemoteVideoStyle] = useState<React.CSSProperties>({
-    width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000',
-  });
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -178,6 +176,7 @@ const VideoSession: React.FC = () => {
   // Keep refs current on every render
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
+  useEffect(() => { isTranscribingRef.current = isTranscribing; }, [isTranscribing]);
 
   // Stops recognition, saves accumulated entries, clears state
   const stopAndSaveTranscription = useCallback(async () => {
@@ -329,6 +328,10 @@ const VideoSession: React.FC = () => {
       // Call immediately — PC is guaranteed initialized before joinRoom now,
       // so there is no need for an artificial delay.
       void createOffer();
+      // If therapist was already transcribing when the participant joined, re-signal them to start
+      if (isTranscribingRef.current && userRef.current && ['admin', 'therapist', 'staff'].includes(userRef.current.role)) {
+        webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
+      }
     });
 
     // offer: we are the responder. Use localStreamRef so the closure always
@@ -543,33 +546,6 @@ const VideoSession: React.FC = () => {
     }
   };
   
-  const handleRemoteVideoMetadata = useCallback(() => {
-    const video = remoteVideoRef.current;
-    const container = remoteContainerRef.current;
-    if (!video) return;
-    const vW = video.videoWidth;
-    const vH = video.videoHeight;
-    if (vH > vW) {
-      // Portrait stream — rotate 90° and scale to cover the container
-      const cW = container ? container.clientWidth : window.innerWidth;
-      const cH = container ? container.clientHeight : window.innerHeight;
-      const scale = Math.max(cW / vH, cH / vW);
-      setRemoteVideoStyle({
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        width: `${vW}px`,
-        height: `${vH}px`,
-        objectFit: 'cover',
-        backgroundColor: '#000',
-        transform: `translate(-50%, -50%) rotate(90deg) scale(${scale})`,
-        transformOrigin: 'center center',
-      });
-    } else {
-      setRemoteVideoStyle({ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' });
-    }
-  }, [remoteVideoRef]);
-
   const formatDuration = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -657,8 +633,7 @@ const VideoSession: React.FC = () => {
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            onLoadedMetadata={handleRemoteVideoMetadata}
-            style={remoteVideoStyle}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
           />
           {!isRemoteVideoReady && (
             <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'white' }}>
