@@ -176,8 +176,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="/telehealth/session/:sessionId" element={<VideoSession />} />
-                  <Route path="/telehealth/join/:roomId" element={<JoinSession />} />
+
                   <Route
                     path="/schedule"
                     element={
@@ -191,6 +190,24 @@ function App() {
                   <Route index element={<DashboardRedirect />} />
                   <Route path="/dashboard" element={<DashboardRedirect />} />
                 </Route>
+
+                {/* Telehealth session — standalone, no Layout/AppBar */}
+                <Route
+                  path="/telehealth/session/:sessionId"
+                  element={
+                    <ProtectedRoute>
+                      <VideoSession />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/telehealth/join/:roomId"
+                  element={
+                    <ProtectedRoute>
+                      <JoinSession />
+                    </ProtectedRoute>
+                  }
+                />
 
                 {/* Unauthorized Access */}
                 <Route path="/unauthorized" element={<Unauthorized />} />

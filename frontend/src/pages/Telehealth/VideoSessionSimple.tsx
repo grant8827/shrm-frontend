@@ -693,7 +693,7 @@ const VideoSession: React.FC = () => {
       </Box>
 
       {/* Controls */}
-      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.9)', display: 'flex', justifyContent: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
+      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'nowrap', overflowX: 'auto', flexShrink: 0 }}>
         <IconButton onClick={toggleMicrophone} sx={{ bgcolor: isMicOn ? 'rgba(255,255,255,0.1)' : 'error.main', color: 'white' }}>
           {isMicOn ? <Mic /> : <MicOff />}
         </IconButton>
