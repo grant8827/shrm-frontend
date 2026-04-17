@@ -367,8 +367,9 @@ const VideoSession: React.FC = () => {
       // Call immediately — PC is guaranteed initialized before joinRoom now,
       // so there is no need for an artificial delay.
       void createOffer();
-      // If therapist was already transcribing when the participant joined, re-signal them to start
-      if (isTranscribingRef.current && userRef.current && ['admin', 'therapist', 'staff'].includes(userRef.current.role)) {
+      // If therapist was already transcribing when the participant joined, re-signal them to start.
+      // Use keepTranscribingRef (set synchronously) not isTranscribingRef (set via React effect, async)
+      if (keepTranscribingRef.current && userRef.current && ['admin', 'therapist', 'staff'].includes(userRef.current.role)) {
         webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
       }
     });
@@ -752,13 +753,13 @@ const VideoSession: React.FC = () => {
         onClick={() => setShowTranscript(prev => !prev)}
         sx={{
           position: 'fixed',
-          right: showTranscript ? { xs: '85vw', sm: '400px' } : 0,
+          left: showTranscript ? { xs: '85vw', sm: '400px' } : 0,
           top: '50%',
           transform: 'translateY(-50%)',
           zIndex: 1400,
           bgcolor: 'primary.main',
           color: 'white',
-          borderRadius: '8px 0 0 8px',
+          borderRadius: '0 8px 8px 0',
           width: 28,
           height: 64,
           display: 'flex',
@@ -766,7 +767,7 @@ const VideoSession: React.FC = () => {
           justifyContent: 'center',
           cursor: 'pointer',
           boxShadow: 3,
-          transition: 'right 225ms cubic-bezier(0,0,0.2,1)',
+          transition: 'left 225ms cubic-bezier(0,0,0.2,1)',
           '&:hover': { bgcolor: 'primary.dark' },
         }}
       >
@@ -774,7 +775,7 @@ const VideoSession: React.FC = () => {
       </Box>}
 
       {/* Transcript Drawer — visible to staff/therapist/admin only */}
-      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Drawer anchor="right" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
+      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="h6">Session Transcript</Typography>
           <IconButton size="small" onClick={() => setShowTranscript(false)} aria-label="Close panel">
