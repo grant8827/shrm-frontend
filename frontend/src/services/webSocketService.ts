@@ -85,6 +85,9 @@ class WebSocketService {
         'answer',
         'ice-candidate',
         'buffered-candidates',
+        'start-transcription',
+        'stop-transcription',
+        'transcript-entry',
       ];
 
       for (const event of serverEvents) {

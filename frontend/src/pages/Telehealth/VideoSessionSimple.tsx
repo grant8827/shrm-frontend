@@ -82,6 +82,12 @@ const VideoSession: React.FC = () => {
   const [participantCount, setParticipantCount] = useState(1); // Start at 1 for self
   const [participantName, setParticipantName] = useState<string>('');
 
+  // Remote video orientation normalisation
+  const remoteContainerRef = useRef<HTMLDivElement>(null);
+  const [remoteVideoStyle, setRemoteVideoStyle] = useState<React.CSSProperties>({
+    width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000',
+  });
+
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
   // Auto-transcription: patient side tracks whether therapist triggered transcription
@@ -236,6 +242,13 @@ const VideoSession: React.FC = () => {
         transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
         setTranscriptEntries(prev => [...prev, entry]);
         setInterimTranscript('');
+        // Broadcast to the other participant so their live view stays in sync
+        webSocketService.sendMessage({
+          type: 'transcript-entry',
+          sessionId: sessionIdRef.current ?? '',
+          timestamp: new Date(),
+          entry: entry as unknown as Record<string, unknown>,
+        });
       }
     };
     recognition.onspeechstart = () => setIsSpeechDetected(true);
@@ -375,6 +388,15 @@ const VideoSession: React.FC = () => {
     // stop-transcription: therapist stopped → patients save and stop
     webSocketService.on('stop-transcription', () => {
       setAutoTranscribeRequested(false);
+    });
+
+    // transcript-entry: remote participant's final speech result → append to local view
+    webSocketService.on('transcript-entry', (data) => {
+      const entry = data.entry as TranscriptEntry | undefined;
+      if (entry) {
+        transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+        setTranscriptEntries(prev => [...prev, entry]);
+      }
     });
 
     // Join the room AFTER handlers are registered
@@ -521,6 +543,33 @@ const VideoSession: React.FC = () => {
     }
   };
   
+  const handleRemoteVideoMetadata = useCallback(() => {
+    const video = remoteVideoRef.current;
+    const container = remoteContainerRef.current;
+    if (!video) return;
+    const vW = video.videoWidth;
+    const vH = video.videoHeight;
+    if (vH > vW) {
+      // Portrait stream — rotate 90° and scale to cover the container
+      const cW = container ? container.clientWidth : window.innerWidth;
+      const cH = container ? container.clientHeight : window.innerHeight;
+      const scale = Math.max(cW / vH, cH / vW);
+      setRemoteVideoStyle({
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: `${vW}px`,
+        height: `${vH}px`,
+        objectFit: 'cover',
+        backgroundColor: '#000',
+        transform: `translate(-50%, -50%) rotate(90deg) scale(${scale})`,
+        transformOrigin: 'center center',
+      });
+    } else {
+      setRemoteVideoStyle({ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' });
+    }
+  }, [remoteVideoRef]);
+
   const formatDuration = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -603,12 +652,13 @@ const VideoSession: React.FC = () => {
 
       {/* Main Video Area */}
       <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', display: 'flex' }}>
-        <Box sx={{ flex: 1, position: 'relative' }}>
+        <Box ref={remoteContainerRef} sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' }}
+            onLoadedMetadata={handleRemoteVideoMetadata}
+            style={remoteVideoStyle}
           />
           {!isRemoteVideoReady && (
             <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'white' }}>
