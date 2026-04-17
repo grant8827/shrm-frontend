@@ -37,8 +37,8 @@ export const useTelehealthMedia = (
       {
         video: {
           facingMode: 'user',
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
+          width: { ideal: 720, max: 1080 },
+          height: { ideal: 1280, max: 1920 },
         },
         audio: {
           echoCancellation: true,
