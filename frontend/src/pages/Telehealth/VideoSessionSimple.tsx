@@ -76,6 +76,7 @@ const VideoSession: React.FC = () => {
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
   const isTranscribingRef = useRef(false); // mirrors isTranscribing for use inside WS callbacks
+  const keepTranscribingRef = useRef(false); // true = recognition should auto-restart after onend
   // Ref keeps the stream alive in closures registered BEFORE re-renders propagate
   const localStreamRef = useRef<MediaStream | null>(null);
   
@@ -180,6 +181,8 @@ const VideoSession: React.FC = () => {
 
   // Stops recognition, saves accumulated entries, clears state
   const stopAndSaveTranscription = useCallback(async () => {
+    // Cancel any pending auto-restart BEFORE stopping recognition
+    keepTranscribingRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
@@ -207,61 +210,96 @@ const VideoSession: React.FC = () => {
     setTranscriptEntries([]);
   }, [showSuccess, showError]);
 
-  // Starts Web Speech API on the local mic, labeling entries by role
+  // Starts Web Speech API on the local mic, labeling entries by role.
+  // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
   const startLocalTranscription = useCallback((speakerRole: 'therapist' | 'patient') => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI || recognitionRef.current) return;
+    if (!SpeechRecognitionAPI) return;
+    // Already running — nothing to do
+    if (keepTranscribingRef.current && recognitionRef.current) return;
+
     const u = userRef.current;
     const speakerName = `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || u?.username || speakerRole;
 
-    const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    keepTranscribingRef.current = true;
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interimText = '';
-      let finalText = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalText += text + ' ';
-        } else {
-          interimText += text;
+    const createAndStartRecognition = () => {
+      if (!keepTranscribingRef.current) return;
+
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimText = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const text = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += text + ' ';
+          } else {
+            interimText += text;
+          }
+        }
+        setInterimTranscript(interimText);
+        if (finalText) {
+          const entry: TranscriptEntry = {
+            speakerName,
+            speakerRole,
+            text: finalText.trim(),
+            timestamp: Date.now(),
+          };
+          transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+          setTranscriptEntries(prev => [...prev, entry]);
+          setInterimTranscript('');
+          webSocketService.sendMessage({
+            type: 'transcript-entry',
+            sessionId: sessionIdRef.current ?? '',
+            timestamp: new Date(),
+            entry: entry as unknown as Record<string, unknown>,
+          });
+        }
+      };
+
+      recognition.onspeechstart = () => setIsSpeechDetected(true);
+      recognition.onspeechend = () => setIsSpeechDetected(false);
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('[TRANSCRIBE] Error:', event.error);
+        // Permanent permission errors — stop the restart loop
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          keepTranscribingRef.current = false;
+          setIsTranscribing(false);
+          recognitionRef.current = null;
+        }
+        // All other errors fall through to onend which handles the restart
+      };
+
+      // onend fires on every session end: silence timeout, no-speech, network blip, manual stop.
+      // If keepTranscribingRef is still true, schedule a fresh session.
+      recognition.onend = () => {
+        recognitionRef.current = null;
+        setIsSpeechDetected(false);
+        if (keepTranscribingRef.current) {
+          setTimeout(createAndStartRecognition, 500);
+        }
+      };
+
+      try {
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsTranscribing(true);
+      } catch (err) {
+        console.error('[TRANSCRIBE] Failed to start recognition:', err);
+        recognitionRef.current = null;
+        if (keepTranscribingRef.current) {
+          setTimeout(createAndStartRecognition, 1000);
         }
       }
-      setInterimTranscript(interimText);
-      if (finalText) {
-        const entry: TranscriptEntry = {
-          speakerName,
-          speakerRole,
-          text: finalText.trim(),
-          timestamp: Date.now(),
-        };
-        transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
-        setTranscriptEntries(prev => [...prev, entry]);
-        setInterimTranscript('');
-        // Broadcast to the other participant so their live view stays in sync
-        webSocketService.sendMessage({
-          type: 'transcript-entry',
-          sessionId: sessionIdRef.current ?? '',
-          timestamp: new Date(),
-          entry: entry as unknown as Record<string, unknown>,
-        });
-      }
     };
-    recognition.onspeechstart = () => setIsSpeechDetected(true);
-    recognition.onspeechend = () => setIsSpeechDetected(false);
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('[TRANSCRIBE] Error:', event.error);
-      if (event.error === 'not-allowed') {
-        setIsTranscribing(false);
-        recognitionRef.current = null;
-      }
-    };
-    recognition.start();
-    recognitionRef.current = recognition;
-    setIsTranscribing(true);
+
+    createAndStartRecognition();
   }, []);
 
   // Patient side: auto-start/stop recognition when therapist broadcasts
@@ -270,7 +308,8 @@ const VideoSession: React.FC = () => {
     if (!u || ['admin', 'therapist', 'staff'].includes(u.role)) return;
     if (autoTranscribeRequested) {
       startLocalTranscription('patient');
-    } else if (recognitionRef.current) {
+    } else {
+      // Always call stop — keepTranscribingRef=false inside guards against double-stop
       void stopAndSaveTranscription();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
