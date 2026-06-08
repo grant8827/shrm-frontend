@@ -88,18 +88,22 @@ interface Appointment {
 
 interface Patient {
   id: string;
-  username: string;
+  username?: string;
   email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  is_active?: boolean;
 }
 
 interface Therapist {
   id: string;
   username: string;
   email: string;
-  full_name: string;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
   role: string;
   is_active: boolean;
 }
@@ -123,6 +127,20 @@ interface AppointmentFormData {
   reminderEnabled: boolean;
 }
 
+const getPersonName = (person: Patient | Therapist) =>
+  person.full_name || `${person.first_name || ''} ${person.last_name || ''}`.trim() || person.email;
+
+const appointmentTypeMap: Record<Appointment['type'], string> = {
+  initial: 'initial_consultation',
+  'follow-up': 'follow_up',
+  group: 'group_therapy',
+  assessment: 'assessment',
+  emergency: 'therapy_session',
+};
+
+const normalizeAppointmentStatus = (status: string): Appointment['status'] =>
+  status === 'no_show' ? 'no-show' : status as Appointment['status'];
+
 const AppointmentScheduling: React.FC = () => {
   const { state } = useAuth();
   const isPatient = state.user?.role === 'client';
@@ -139,25 +157,20 @@ const AppointmentScheduling: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [tabValue, setTabValue] = useState(0);
   
-  // Load all patients from API (Users with role='client')
+  // Load all patient profiles. Appointments require Patient.id, not User.id.
   React.useEffect(() => {
     const loadPatients = async () => {
       try {
         setIsLoadingPatients(true);
-        const response = await apiClient.get('/auth/');
+        const response = await apiClient.get('/api/patients/?isActive=true');
         
-        const allUsers = Array.isArray(response.data.results) 
+        const patientProfiles = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
-        
-        // Filter to get only active clients
-        const clientUsers = allUsers.filter((user: any) => 
-          user.role === 'client' && user.is_active === true
-        );
-        
-        setPatients(clientUsers);
+
+        setPatients(patientProfiles);
       } catch (error) {
         console.error('Failed to load patients:', error);
         setPatients([]);
@@ -174,19 +187,14 @@ const AppointmentScheduling: React.FC = () => {
     const loadTherapists = async () => {
       try {
         setIsLoadingTherapists(true);
-        const response = await apiClient.get('/auth/');
+        const response = await apiClient.get('/api/users/therapists/');
         
-        const allUsers = Array.isArray(response.data.results) 
+        const therapistUsers = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
           ? response.data 
           : [];
-        
-        // Filter to get only active therapists and admins
-        const therapistUsers = allUsers.filter((user: any) => 
-          (user.role === 'therapist' || user.role === 'admin') && user.is_active === true
-        );
-        
+
         setTherapists(therapistUsers);
       } catch (error) {
         console.error('Failed to load therapists:', error);
@@ -203,7 +211,7 @@ const AppointmentScheduling: React.FC = () => {
   React.useEffect(() => {
     const loadAppointmentTypes = async () => {
       try {
-        const response = await apiClient.get('/appointments/types/');
+        const response = await apiClient.get('/api/appointments/types');
         const types = Array.isArray(response.data.results) 
           ? response.data.results 
           : Array.isArray(response.data) 
@@ -312,14 +320,14 @@ const AppointmentScheduling: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      // Use a default appointment type if none are loaded
-      let appointmentTypeId = null;
-      if (appointmentTypes.length > 0) {
-        appointmentTypeId = appointmentTypes[0].id;
-      } else {
+      let appointmentType = formData.format === 'telehealth'
+        ? 'telehealth'
+        : appointmentTypeMap[formData.type];
+
+      if (!appointmentType && appointmentTypes.length === 0) {
         // Try to load appointment types one more time
         try {
-          const response = await apiClient.get('/appointments/types/');
+          const response = await apiClient.get('/api/appointments/types');
           const types = Array.isArray(response.data.results) 
             ? response.data.results 
             : Array.isArray(response.data) 
@@ -328,16 +336,10 @@ const AppointmentScheduling: React.FC = () => {
           
           if (types.length > 0) {
             setAppointmentTypes(types);
-            appointmentTypeId = types[0].id;
+            appointmentType = types[0].value || types[0].id;
           }
         } catch (reloadError) {
           console.error('Failed to reload appointment types:', reloadError);
-        }
-        
-        // If still no appointment types, use a known ID from database
-        if (!appointmentTypeId) {
-          // Use the Follow-up Session type ID from the database
-          appointmentTypeId = '2d666946-ed73-4981-9fef-946a7c9c1a0e';
         }
       }
 
@@ -350,24 +352,23 @@ const AppointmentScheduling: React.FC = () => {
       endDateTime.setMinutes(endDateTime.getMinutes() + formData.duration);
 
       const appointmentPayload = {
-        patient: formData.patientId,
-        therapist: formData.therapistId,
-        appointment_type: appointmentTypeId,
-        start_datetime: startDateTime.toISOString(),
-        end_datetime: endDateTime.toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        patientId: formData.patientId,
+        therapistId: formData.therapistId,
+        type: appointmentType || 'therapy_session',
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
         status: 'scheduled',
-        priority: 'normal',
-        is_telehealth: formData.format === 'telehealth',
+        notes: formData.notes,
+        location: formData.location,
       };
 
       if (editingAppointment) {
         // Update existing appointment
-        await apiClient.put(`/appointments/${editingAppointment.id}/`, appointmentPayload);
+        await apiClient.put(`/api/appointments/${editingAppointment.id}`, appointmentPayload);
         alert('Appointment updated successfully!');
       } else {
         // Create new appointment
-        await apiClient.post('/appointments/', appointmentPayload);
+        await apiClient.post('/api/appointments/', appointmentPayload);
         alert('Appointment scheduled successfully!');
       }
 
@@ -410,7 +411,7 @@ const AppointmentScheduling: React.FC = () => {
   // Confirm appointment (patient confirms their appointment)
   const confirmAppointment = async (appointmentId: string) => {
     try {
-      await apiClient.post(`/appointments/${appointmentId}/confirm/`);
+      await apiClient.post(`/api/appointments/${appointmentId}/confirm`);
       alert('Appointment confirmed successfully!');
       await loadAppointments(); // Reload to show updated status
     } catch (error: any) {
@@ -426,7 +427,7 @@ const AppointmentScheduling: React.FC = () => {
   // Load appointments from API
   const loadAppointments = async () => {
     try {
-      const response = await apiClient.get('/appointments/');
+      const response = await apiClient.get('/api/appointments/');
       
       const appointmentsData = Array.isArray(response.data.results) 
         ? response.data.results 
@@ -446,7 +447,7 @@ const AppointmentScheduling: React.FC = () => {
           duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
           type: 'follow-up' as const,
           format: apt.is_telehealth ? 'telehealth' as const : 'in-person' as const,
-          status: apt.status,
+          status: normalizeAppointmentStatus(apt.status),
           notes: apt.notes || '',
           location: apt.location || '',
           reminderSent: false,
@@ -522,11 +523,13 @@ const AppointmentScheduling: React.FC = () => {
   const updateAppointmentStatus = async (appointmentId: string, status: Appointment['status']) => {
     try {
       if (status === 'confirmed') {
-        await apiClient.post(`/appointments/${appointmentId}/confirm/`);
+        await apiClient.post(`/api/appointments/${appointmentId}/confirm`);
       } else if (status === 'cancelled') {
-        await apiClient.post(`/appointments/${appointmentId}/cancel/`);
+        await apiClient.post(`/api/appointments/${appointmentId}/cancel`);
       } else if (status === 'completed') {
-        await apiClient.post(`/appointments/${appointmentId}/complete/`);
+        await apiClient.put(`/api/appointments/${appointmentId}`, { status: 'completed' });
+      } else if (status === 'no-show') {
+        await apiClient.post(`/api/appointments/${appointmentId}/no-show`);
       }
       
       // Update local state
@@ -1242,7 +1245,7 @@ const AppointmentScheduling: React.FC = () => {
                   ) : (
                     patients.map((patient) => (
                       <MenuItem key={patient.id} value={patient.id}>
-                        {patient.full_name} - {patient.email}
+                        {getPersonName(patient)} - {patient.email}
                       </MenuItem>
                     ))
                   )}
@@ -1266,7 +1269,7 @@ const AppointmentScheduling: React.FC = () => {
                   ) : (
                     therapists.map((therapist) => (
                       <MenuItem key={therapist.id} value={therapist.id}>
-                        {therapist.full_name} - {therapist.email}
+                        {getPersonName(therapist)} - {therapist.email}
                       </MenuItem>
                     ))
                   )}

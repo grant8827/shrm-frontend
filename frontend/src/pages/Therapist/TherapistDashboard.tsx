@@ -251,7 +251,7 @@ const TherapistDashboard: React.FC = () => {
                     startIcon={<People />}
                     onClick={() => navigate('/therapist/patients')}
                   >
-                    Manage Patients
+                    Manage Clients
                   </Button>
                 </Grid>
                 <Grid item xs={12}>

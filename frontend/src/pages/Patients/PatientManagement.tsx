@@ -53,6 +53,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PatientItem {
   id: string;
@@ -71,6 +72,8 @@ interface PatientItem {
 const PatientManagement: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { state } = useAuth();
+  const isTherapist = state.user?.role === 'therapist';
   const [patients, setPatients] = useState<PatientItem[]>([]);
   const [, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -579,16 +582,18 @@ const PatientManagement: React.FC = () => {
     <Box>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
-          Patient Management
+          {isTherapist ? 'My Clients' : 'Patient Management'}
         </Typography>
-        <Button 
-          variant="contained" 
-          startIcon={<Add />}
-          onClick={() => setAddPatientOpen(true)}
-          fullWidth={isMobile}
-        >
-          Add New Patient
-        </Button>
+        {!isTherapist && (
+          <Button 
+            variant="contained" 
+            startIcon={<Add />}
+            onClick={() => setAddPatientOpen(true)}
+            fullWidth={isMobile}
+          >
+            Add New Patient
+          </Button>
+        )}
       </Box>
 
       {/* Search Bar */}

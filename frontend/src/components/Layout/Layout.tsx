@@ -157,7 +157,7 @@ export const Layout: React.FC = () => {
       // Therapist navigation
       items.push(
         { text: 'Dashboard', icon: <Dashboard />, path: '/therapist' },
-        { text: 'My Patients', icon: <People />, path: '/therapist/patients' },
+        { text: 'My Clients', icon: <People />, path: '/therapist/patients' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Settings />, path: '/therapist/soap-notes' },
