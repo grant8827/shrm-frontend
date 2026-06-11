@@ -45,6 +45,23 @@ export interface Patient {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+
+  // Agreements & Consent
+  consentFormSigned?: boolean;
+  consentFormSignature?: string;
+  consentFormDate?: string; // string or Date depending on how it's mapped, usually string from API
+  
+  treatmentAgreementSigned?: boolean;
+  treatmentAgreementSignature?: string;
+  treatmentAgreementDate?: string;
+  
+  hipaaAuthorized?: boolean;
+  hipaaSignature?: string;
+  hipaaDate?: string;
+  
+  privacyPolicyAcknowledged?: boolean;
+  privacyPolicySignature?: string;
+  privacyPolicyDate?: string;
 }
 
 export interface Address {

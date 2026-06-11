@@ -54,6 +54,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { documentsService } from '../../services/documentsService';
+import PatientAgreementsView from '../../components/Agreements/PatientAgreementsView';
 import {
   Document,
   DocumentCategory,
@@ -450,7 +451,8 @@ const Documents: React.FC = () => {
         >
           <Tab icon={<Description />} label="All Documents" />
           <Tab icon={<FolderOpen />} label="Folders" />
-          <Tab icon={<Assignment />} label="Pending Signatures" />
+          <Tab icon={<Assignment />} label="To Sign" />
+          <Tab icon={<CheckCircle />} label="Agreements" />
         </Tabs>
       </Paper>
 
@@ -613,6 +615,11 @@ const Documents: React.FC = () => {
             </Alert>
           )}
         </List>
+      </TabPanel>
+
+      {/* Agreements Tab */}
+      <TabPanel value={activeTab} index={3}>
+        <PatientAgreementsView />
       </TabPanel>
 
       {/* Upload Dialog */}

@@ -38,22 +38,23 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import {
+import { 
+  Person, 
+  Phone, 
+  MedicalServices, 
+  PersonAdd,
   Add,
   Search,
   MoreVert,
   EmailOutlined,
   Edit,
   DeleteOutline,
-  CheckCircleOutline,
-  Person,
-  Phone,
-  MedicalServices,
-  PersonAdd,
+  CheckCircleOutline
 } from '@mui/icons-material';
 import axios from 'axios';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
+import AgreementStatusPanel from '../../components/Agreements/AgreementStatusPanel';
 
 interface PatientItem {
   id: string;
@@ -67,6 +68,20 @@ interface PatientItem {
   nextAppointment?: string;
   assignedTherapist?: string;
   assignedTherapistId?: string;
+
+  // Agreements & Consent
+  consentFormSigned?: boolean;
+  consentFormSignature?: string;
+  consentFormDate?: string;
+  treatmentAgreementSigned?: boolean;
+  treatmentAgreementSignature?: string;
+  treatmentAgreementDate?: string;
+  hipaaAuthorized?: boolean;
+  hipaaSignature?: string;
+  hipaaDate?: string;
+  privacyPolicyAcknowledged?: boolean;
+  privacyPolicySignature?: string;
+  privacyPolicyDate?: string;
 }
 
 const PatientManagement: React.FC = () => {
@@ -122,6 +137,18 @@ const PatientManagement: React.FC = () => {
         nextAppointment: '',
         assignedTherapist: patient.assigned_therapist_name || '',
         assignedTherapistId: patient.assigned_therapist_id || '',
+        consentFormSigned: patient.consent_form_signed || false,
+        consentFormSignature: patient.consent_form_signature || '',
+        consentFormDate: patient.consent_form_date || '',
+        treatmentAgreementSigned: patient.treatment_agreement_signed || false,
+        treatmentAgreementSignature: patient.treatment_agreement_signature || '',
+        treatmentAgreementDate: patient.treatment_agreement_date || '',
+        hipaaAuthorized: patient.hipaa_authorized || false,
+        hipaaSignature: patient.hipaa_signature || '',
+        hipaaDate: patient.hipaa_date || '',
+        privacyPolicyAcknowledged: patient.privacy_policy_acknowledged || false,
+        privacyPolicySignature: patient.privacy_policy_signature || '',
+        privacyPolicyDate: patient.privacy_policy_date || '',
       }));
       
       setPatients(transformedPatients);
@@ -816,11 +843,12 @@ const PatientManagement: React.FC = () => {
           Patient Details - {selectedPatient?.name}
         </DialogTitle>
         <DialogContent>
-          <Tabs value={tabValue} onChange={(_event: React.SyntheticEvent, newValue: number) => setTabValue(newValue)}>
+          <Tabs value={tabValue} onChange={(_event: React.SyntheticEvent, newValue: number) => setTabValue(newValue)} variant="scrollable" scrollButtons="auto">
             <Tab label="Overview" />
             <Tab label="Medical History" />
             <Tab label="Treatment Plan" />
             <Tab label="Notes" />
+            <Tab label="Agreements" />
           </Tabs>
 
           {tabValue === 0 && selectedPatient && (
@@ -884,6 +912,10 @@ const PatientManagement: React.FC = () => {
             <Box sx={{ mt: 3 }}>
               <Typography>Clinical notes would be displayed here...</Typography>
             </Box>
+          )}
+
+          {tabValue === 4 && selectedPatient && (
+            <AgreementStatusPanel patient={selectedPatient as any} />
           )}
         </DialogContent>
       </Dialog>
