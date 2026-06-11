@@ -722,7 +722,7 @@ const Telehealth: React.FC<TelehealthProps> = () => {
                 onClick={() => setShowPatientSelector(true)}
                 size="small"
               >
-                Select Patient
+                Select Client
               </Button>
             )}
 

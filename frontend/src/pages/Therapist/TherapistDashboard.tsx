@@ -102,7 +102,7 @@ const TherapistDashboard: React.FC = () => {
             Welcome, Dr. {state.user?.lastName || (state.user as any)?.last_name || 'Therapist'}
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Manage your patients, appointments, and clinical notes efficiently.
+            Manage your clients, appointments, and clinical notes efficiently.
           </Typography>
         </Box>
       </Box>
@@ -130,7 +130,7 @@ const TherapistDashboard: React.FC = () => {
                 {stats.activePatients}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Active Patients
+                Active Clients
               </Typography>
             </CardContent>
           </Card>
@@ -179,7 +179,7 @@ const TherapistDashboard: React.FC = () => {
                   <TableHead>
                     <TableRow>
                       <TableCell>Time</TableCell>
-                      <TableCell>Patient</TableCell>
+                      <TableCell>Client</TableCell>
                       <TableCell>Type</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell align="center">Actions</TableCell>
@@ -359,7 +359,7 @@ const TherapistDashboard: React.FC = () => {
                   Treatment Plans Review
                 </Typography>
                 <Typography variant="body2">
-                  2 patients due for plan updates this week
+                  2 clients due for plan updates this week
                 </Typography>
               </CardContent>
             </Card>

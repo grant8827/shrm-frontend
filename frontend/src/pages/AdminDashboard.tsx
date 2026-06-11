@@ -222,8 +222,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         {
           id: '2',
           type: 'patient',
-          action: 'Patient record updated',
-          description: 'Medical history updated for patient',
+          action: 'Client record updated',
+          description: 'Medical history updated for client',
           timestamp: new Date(Date.now() - 3600000).toISOString(),
           user: 'Dr. Grant'
         },
@@ -432,7 +432,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user: _user }) => {
         </Grid>
         <Grid item xs={6} sm={6} md={3}>
           <StatsCard
-            title="Active Patients"
+            title="Active Clients"
             value={stats?.activePatients || 0}
             color="success"
             icon={<Group />}

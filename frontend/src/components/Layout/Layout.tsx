@@ -144,7 +144,7 @@ export const Layout: React.FC = () => {
     const userRole = state.user?.role as string;
 
     if (userRole === 'patient' || userRole === 'client') {
-      // Patient/Client navigation - core features they need
+      // Client navigation - core features they need
       items.push(
         { text: 'My Dashboard', icon: <Dashboard />, path: '/client' },
         { text: 'My Appointments', icon: <Event />, path: '/appointments' },
@@ -168,7 +168,7 @@ export const Layout: React.FC = () => {
       // Admin/default navigation (shows all features)
       items.push(
         { text: 'Admin Dashboard', icon: <Dashboard />, path: '/admin' },
-        { text: 'Patient Management', icon: <People />, path: '/admin/patients' },
+        { text: 'Client Management', icon: <People />, path: '/admin/patients' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },
@@ -193,7 +193,7 @@ export const Layout: React.FC = () => {
     if (hasRole([UserRole.THERAPIST, UserRole.STAFF])) {
       items.push(
         { text: 'Dashboard', icon: <Dashboard />, path: '/therapist' },
-        { text: 'Patients', icon: <People />, path: '/therapist/patients' },
+        { text: 'Clients', icon: <People />, path: '/therapist/patients' },
         { text: 'Appointments', icon: <Event />, path: '/therapist/appointments' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/therapist/soap-notes' },
         { text: 'Messages', icon: <Message />, path: '/therapist/messages' },

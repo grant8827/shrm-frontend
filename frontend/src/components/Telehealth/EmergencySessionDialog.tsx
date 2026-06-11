@@ -57,17 +57,17 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
       const list: User[] = response.data?.results || response.data || [];
       setPatients(list);
       if (list.length === 0) {
-        console.warn('No patients found in the system');
+        console.warn('No clients found in the system');
       }
     } catch (error: any) {
       console.error('Error fetching patients:', error);
-      setError(`Failed to load patients: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
+      setError(`Failed to load clients: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
     }
   };
 
   const validateForm = () => {
     if (!selectedPatientId) {
-      setError('Please select a patient');
+      setError('Please select a client');
       return false;
     }
     return true;
@@ -147,21 +147,21 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
 
         {success && (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Emergency session created! Email sent to patient successfully.
+            Emergency session created! Email sent to client successfully.
           </Alert>
         )}
 
         <Alert severity="warning" sx={{ mb: 3 }}>
-          This will create an emergency session and send an email with a join link to the selected patient.
+          This will create an emergency session and send an email with a join link to the selected client.
         </Alert>
 
         <FormControl fullWidth>
-          <InputLabel id="patient-select-label">Select Patient *</InputLabel>
+          <InputLabel id="patient-select-label">Select Client *</InputLabel>
           <Select
             labelId="patient-select-label"
             value={selectedPatientId}
             onChange={(e) => setSelectedPatientId(e.target.value as string)}
-            label="Select Patient *"
+            label="Select Client *"
             disabled={loading || success}
           >
             {patients.map((patient) => (
@@ -175,7 +175,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
         {selectedPatient && (
           <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              <strong>Patient Details:</strong>
+              <strong>Client Details:</strong>
             </Typography>
             <Typography variant="body2">
               Name: {selectedPatient.first_name} {selectedPatient.last_name}
@@ -196,7 +196,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
               ✅ Emergency Session Created!
             </Typography>
             <Typography variant="body2" gutterBottom>
-              Email sent to patient. You can also copy and share this link:
+              Email sent to client. You can also copy and share this link:
             </Typography>
             <Box sx={{ mt: 1, p: 1, bgcolor: 'white', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2" sx={{ flex: 1, fontFamily: 'monospace', wordBreak: 'break-all' }}>
@@ -207,7 +207,7 @@ const EmergencySessionDialog: React.FC<EmergencySessionDialogProps> = ({
               </Button>
             </Box>
             <Typography variant="caption" sx={{ mt: 1, display: 'block', color: 'text.secondary' }}>
-              💡 Both you and the patient should use this same link to join the session
+              💡 Both you and the client should use this same link to join the session
             </Typography>
           </Box>
         )}

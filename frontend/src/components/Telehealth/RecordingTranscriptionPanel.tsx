@@ -69,8 +69,8 @@ const getSpeakerStyle = (
   if (therapistName && speakerName === therapistName)
     return { label: 'Therapist', color: 'primary', bg: '#e3f2fd' };
   if (patientName && speakerName === patientName)
-    return { label: 'Patient', color: 'success', bg: '#e8f5e9' };
-  // Fallback: guess from the name itself or call them Therapist/Patient
+    return { label: 'Client', color: 'success', bg: '#e8f5e9' };
+  // Fallback: guess from the name itself or call them Therapist/Client
   return { label: 'Participant', color: 'default', bg: '#f5f5f5' };
 };
 

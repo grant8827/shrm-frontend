@@ -648,7 +648,7 @@ const VideoSession: React.FC = () => {
             <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', sm: '1.25rem' } }}>{sessionData?.title || 'Telehealth Session'}</Typography>
             {user && ['admin', 'therapist', 'staff'].includes(user.role) && sessionData?.patient_details && (
               <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                Patient: {sessionData.patient_details.first_name} {sessionData.patient_details.last_name}
+                Client: {sessionData.patient_details.first_name} {sessionData.patient_details.last_name}
               </Typography>
             )}
           </Box>
@@ -784,7 +784,7 @@ const VideoSession: React.FC = () => {
         </Box>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
-          <Chip size="small" label="Patient" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
+          <Chip size="small" label="Client" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
         </Box>
         <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
           {isTranscribing && isSpeechDetected && <Typography variant="caption" color="success.main">Listening...</Typography>}

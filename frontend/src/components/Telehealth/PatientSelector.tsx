@@ -230,7 +230,7 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
           <Box>
             <TextField
               fullWidth
-              placeholder="Search patients by name or email..."
+              placeholder="Search clients by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -252,8 +252,8 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
                 {filteredPatients.length === 0 ? (
                   <ListItem>
                     <ListItemText 
-                      primary="No patients found"
-                      secondary={searchTerm ? "Try adjusting your search terms" : "No patients assigned"}
+                      primary="No clients found"
+                      secondary={searchTerm ? "Try adjusting your search terms" : "No clients assigned"}
                     />
                   </ListItem>
                 ) : (
@@ -323,7 +323,7 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
           </Box>
         ) : (
           <Box>
-            {/* Selected Patient Info */}
+            {/* Selected Client Info */}
             <Box display="flex" alignItems="center" gap={2} mb={3}>
               <Avatar sx={{ width: 56, height: 56 }}>
                 <Person />
@@ -344,7 +344,7 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
                 size="small"
                 onClick={() => setSelectedPatient(null)}
               >
-                Change Patient
+                Change Client
               </Button>
             </Box>
 
@@ -387,7 +387,7 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({
               {selectedPatient.activeInvitation && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   <Typography variant="body2">
-                    This patient has a pending invitation. Starting a new session will cancel the previous invitation.
+                    This client has a pending invitation. Starting a new session will cancel the previous invitation.
                   </Typography>
                 </Alert>
               )}

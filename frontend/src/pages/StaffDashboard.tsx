@@ -177,7 +177,7 @@ const StaffDashboard: React.FC = () => {
                   <Box sx={{ ml: 2 }}>
                     <Typography variant="h6">{stats.activePatients}</Typography>
                     <Typography variant="body2" color="textSecondary">
-                      Active Patients
+                      Active Clients
                     </Typography>
                   </Box>
                 </Box>
@@ -278,7 +278,7 @@ const StaffDashboard: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Patient</TableCell>
+              <TableCell>Client</TableCell>
               <TableCell>Date & Time</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Session</TableCell>
@@ -364,14 +364,14 @@ const StaffDashboard: React.FC = () => {
   const PatientsTab = () => (
     <Box>
       <Typography variant="h6" sx={{ mb: 3 }}>
-        Patient Management
+        Client Management
       </Typography>
       
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Patient</TableCell>
+              <TableCell>Client</TableCell>
               <TableCell>Contact</TableCell>
               <TableCell>Diagnosis</TableCell>
               <TableCell>Last Session</TableCell>
@@ -467,7 +467,7 @@ const StaffDashboard: React.FC = () => {
   const tabPanels = [
     { label: 'Dashboard', icon: <ScheduleIcon />, component: <DashboardOverview /> },
     { label: 'Schedule', icon: <AccessTime />, component: <ScheduleTab /> },
-    { label: 'Patients', icon: <PatientIcon />, component: <PatientsTab /> },
+    { label: 'Clients', icon: <PatientIcon />, component: <PatientsTab /> },
     { label: 'Notes', icon: <NotesIcon />, component: <NotesTab /> },
     { label: 'Messages', icon: <MessageIcon />, component: <div>Messages Coming Soon</div> },
   ];

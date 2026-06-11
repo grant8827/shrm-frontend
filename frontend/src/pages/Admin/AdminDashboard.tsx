@@ -102,7 +102,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const recentActivity = [
-    { id: 1, type: 'patient_registered', message: 'New patient registration: Sarah Johnson', time: '2 hours ago', icon: <PersonAdd color="success" /> },
+    { id: 1, type: 'patient_registered', message: 'New client registration: Sarah Johnson', time: '2 hours ago', icon: <PersonAdd color="success" /> },
     { id: 2, type: 'appointment_scheduled', message: 'Appointment scheduled with Dr. Smith', time: '3 hours ago', icon: <Schedule color="primary" /> },
     { id: 3, type: 'claim_processed', message: 'Insurance claim #12345 processed', time: '5 hours ago', icon: <Receipt color="info" /> },
     { id: 4, type: 'billing_alert', message: 'Payment overdue: Invoice #INV-001', time: '1 day ago', icon: <Warning color="warning" /> },
@@ -132,7 +132,7 @@ const AdminDashboard: React.FC = () => {
         const users = (response.data.results || response.data).map((user: any) => ({
           id: user.id,
           name: user.full_name || user.username || 'Unknown User',
-          role: user.role === 'admin' ? 'Admin' : user.role === 'therapist' ? 'Therapist' : user.role === 'client' ? 'Patient' : 'Staff',
+          role: user.role === 'admin' ? 'Admin' : user.role === 'therapist' ? 'Therapist' : user.role === 'client' ? 'Client' : 'Staff',
           status: user.is_online ? 'Online' : 'Offline',
           avatar: (user.full_name || user.username || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
           lastActive: user.last_login ? new Date(user.last_login).toLocaleString() : 'Never',
@@ -176,7 +176,7 @@ const AdminDashboard: React.FC = () => {
               <Box display="flex" alignItems="center" mb={2}>
                 <People color="primary" sx={{ mr: 1 }} />
                 <Typography color="text.secondary" gutterBottom>
-                  Total Patients
+                  Total Clients
                 </Typography>
               </Box>
               <Typography variant="h4" component="div">
@@ -734,7 +734,7 @@ const AdminDashboard: React.FC = () => {
                     label="Role"
                     onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as any }))}
                   >
-                    <MenuItem value="client">Patient</MenuItem>
+                    <MenuItem value="client">Client</MenuItem>
                     <MenuItem value="therapist">Therapist</MenuItem>
                     <MenuItem value="staff">Staff</MenuItem>
                   </Select>
@@ -829,7 +829,7 @@ const AdminDashboard: React.FC = () => {
                 const users = (usersResponse.data.results || usersResponse.data).map((user: any) => ({
                   id: user.id,
                   name: user.full_name || user.username || 'Unknown User',
-                  role: user.role === 'admin' ? 'Admin' : user.role === 'therapist' ? 'Therapist' : user.role === 'client' ? 'Patient' : 'Staff',
+                  role: user.role === 'admin' ? 'Admin' : user.role === 'therapist' ? 'Therapist' : user.role === 'client' ? 'Client' : 'Staff',
                   status: user.is_online ? 'Online' : 'Offline',
                   avatar: (user.full_name || user.username || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
                   lastActive: user.last_login ? new Date(user.last_login).toLocaleString() : 'Never',

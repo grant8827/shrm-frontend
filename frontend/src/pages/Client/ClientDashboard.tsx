@@ -106,7 +106,7 @@ const ClientDashboard: React.FC = () => {
         </Avatar>
         <Box>
           <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0.5 }}>
-            Welcome, {state.user ? `${state.user.firstName || (state.user as any)?.first_name || ''} ${state.user.lastName || (state.user as any)?.last_name || ''}`.trim() || 'Patient' : 'Patient'}!
+            Welcome, {state.user ? `${state.user.firstName || (state.user as any)?.first_name || ''} ${state.user.lastName || (state.user as any)?.last_name || ''}`.trim() || 'Client' : 'Client'}!
           </Typography>
           <Typography variant="body1" color="text.secondary">
             Your personal health portal - manage appointments, messages, and access care.

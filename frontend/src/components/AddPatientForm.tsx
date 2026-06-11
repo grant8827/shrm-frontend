@@ -638,7 +638,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
             <Grid item xs={12}>
               <Alert severity="info" sx={{ mb: 2 }}>
                 <AlertTitle>Note: Primary Therapist Assignment</AlertTitle>
-                The primary therapist will be assigned when you schedule the patient's first appointment.
+                The primary therapist will be assigned when you schedule the client's first appointment.
               </Alert>
             </Grid>
 
@@ -724,7 +724,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
               </Box>
               <Alert severity="info" sx={{ mb: 3 }}>
                 <AlertTitle>Required Documentation</AlertTitle>
-                All compliance documents must be completed before the patient can be registered.
+                All compliance documents must be completed before the client can be registered.
               </Alert>
             </Grid>
 
@@ -745,7 +745,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                     <Box>
                       <Typography variant="body1">Consent Forms</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Patient has completed and signed all required consent forms
+                        Client has completed and signed all required consent forms
                       </Typography>
                     </Box>
                   }
@@ -775,7 +775,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                     <Box>
                       <Typography variant="body1">Privacy Policy Acknowledgment</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Patient has read and acknowledged the privacy policy
+                        Client has read and acknowledged the privacy policy
                       </Typography>
                     </Box>
                   }
@@ -805,7 +805,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                     <Box>
                       <Typography variant="body1">Treatment Agreement</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Patient has signed the treatment agreement and understands terms
+                        Client has signed the treatment agreement and understands terms
                       </Typography>
                     </Box>
                   }
@@ -835,7 +835,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
                     <Box>
                       <Typography variant="body1">HIPAA Authorization</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        Patient has completed HIPAA authorization forms
+                        Client has completed HIPAA authorization forms
                       </Typography>
                     </Box>
                   }
@@ -859,10 +859,10 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Typography variant="h5" component="div">
-          Add New Patient
+          Add New Client
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Complete all required information to register a new patient
+          Complete all required information to register a new client
         </Typography>
       </DialogTitle>
 
@@ -895,7 +895,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
             onClick={handleSubmit}
             color="primary"
           >
-            Add Patient
+            Add Client
           </Button>
         ) : (
           <Button

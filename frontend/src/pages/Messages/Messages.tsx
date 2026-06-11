@@ -823,17 +823,17 @@ const Messages: React.FC = () => {
         <Typography variant="body2">
           {state.user?.role === UserRole.ADMIN && (
             <>
-              <strong>Admin Messaging:</strong> You can send secure messages to all therapists, patients, and staff members.
+              <strong>Admin Messaging:</strong> You can send secure messages to all therapists, clients, and staff members.
             </>
           )}
           {state.user?.role === UserRole.THERAPIST && (
             <>
-              <strong>Therapist Messaging:</strong> You can send secure messages to your assigned patients, administrators, and staff members.
+              <strong>Therapist Messaging:</strong> You can send secure messages to your assigned clients, administrators, and staff members.
             </>
           )}
           {state.user?.role === UserRole.CLIENT && (
             <>
-              <strong>Patient Messaging:</strong> You can send secure messages to your assigned therapist and administrators.
+              <strong>Client Messaging:</strong> You can send secure messages to your assigned therapist and administrators.
             </>
           )}
           {state.user?.role === UserRole.STAFF && (
@@ -1298,7 +1298,7 @@ const Messages: React.FC = () => {
                 <Typography variant="caption" display="block">
                   <strong>Available Recipients ({availableRecipients.length}):</strong>{' '}
                   {state.user?.role === UserRole.ADMIN && 'All users in the system'}
-                  {state.user?.role === UserRole.THERAPIST && 'Your assigned patients, admins, and staff'}
+                  {state.user?.role === UserRole.THERAPIST && 'Your assigned clients, admins, and staff'}
                   {state.user?.role === UserRole.CLIENT && 'Your therapist and admins'}
                   {state.user?.role === UserRole.STAFF && 'Admins and therapists'}
                 </Typography>

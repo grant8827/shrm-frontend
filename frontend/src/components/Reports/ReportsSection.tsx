@@ -66,8 +66,8 @@ const ReportsSection: React.FC = () => {
     },
     {
       id: 'patients',
-      title: 'Patient Demographics Report',
-      description: 'Statistical analysis of patient demographics, appointments, and treatment outcomes',
+      title: 'Client Demographics Report',
+      description: 'Statistical analysis of client demographics, appointments, and treatment outcomes',
       icon: <PersonAdd />,
       color: 'success',
     },

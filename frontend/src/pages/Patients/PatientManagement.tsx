@@ -381,10 +381,10 @@ const PatientManagement: React.FC = () => {
           : p
       ));
 
-      setSnackbar({ open: true, message: 'Patient updated successfully', severity: 'success' });
+      setSnackbar({ open: true, message: 'Client updated successfully', severity: 'success' });
       setEditPatientOpen(false);
     } catch {
-      setSnackbar({ open: true, message: 'Failed to update patient', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to update client', severity: 'error' });
     }
   };
 
@@ -399,9 +399,9 @@ const PatientManagement: React.FC = () => {
     try {
       await apiClient.delete(`/api/patients/${actionPatient.id}/`);
       setPatients(prev => prev.filter(patient => patient.id !== actionPatient.id));
-      setSnackbar({ open: true, message: 'Patient removed successfully', severity: 'success' });
+      setSnackbar({ open: true, message: 'Client removed successfully', severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Failed to remove patient', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to remove client', severity: 'error' });
     } finally {
       setRemovePatientOpen(false);
       setActionPatient(null);
@@ -428,9 +428,9 @@ const PatientManagement: React.FC = () => {
           : patient
       )));
 
-      setSnackbar({ open: true, message: 'Patient marked complete (sessions complete)', severity: 'success' });
+      setSnackbar({ open: true, message: 'Client marked complete (sessions complete)', severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'Failed to mark patient complete', severity: 'error' });
+      setSnackbar({ open: true, message: 'Failed to mark client complete', severity: 'error' });
     } finally {
       setCompletePatientOpen(false);
       setActionPatient(null);
@@ -544,7 +544,7 @@ const PatientManagement: React.FC = () => {
       const response = await apiClient.post('/api/patients/', patientData);
       console.log('Patient created:', response.data);
 
-      setSnackbar({ open: true, message: 'Patient added successfully. Registration email sent.', severity: 'success' });
+      setSnackbar({ open: true, message: 'Client added successfully. Registration email sent.', severity: 'success' });
       setAddPatientOpen(false);
       setNewPatientData({
         first_name: '',
@@ -559,7 +559,7 @@ const PatientManagement: React.FC = () => {
       // Refresh the patient list to show the new patient
       await loadPatients();
     } catch (error: unknown) {
-      console.error('Failed to add patient:', error);
+      console.error('Failed to add client:', error);
 
       if (axios.isAxiosError(error) && error.response?.data && typeof error.response.data === 'object') {
         const backendErrors = error.response.data as Record<string, unknown>;
@@ -577,7 +577,7 @@ const PatientManagement: React.FC = () => {
         setFormErrors(formattedErrors);
         
         // Extract error message from backend
-        let errorMessage = 'Failed to add patient';
+        let errorMessage = 'Failed to add client';
         if (typeof backendErrors.error === 'string') {
           errorMessage = backendErrors.error;
         } else if (typeof backendErrors.detail === 'string') {
@@ -595,8 +595,8 @@ const PatientManagement: React.FC = () => {
         setSnackbar({ 
           open: true, 
           message: axios.isAxiosError(error) && error.message 
-            ? `Failed to add patient: ${error.message}` 
-            : 'Failed to add patient', 
+            ? `Failed to add client: ${error.message}` 
+            : 'Failed to add client', 
           severity: 'error' 
         });
       }
@@ -609,7 +609,7 @@ const PatientManagement: React.FC = () => {
     <Box>
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
-          {isTherapist ? 'My Clients' : 'Patient Management'}
+          {isTherapist ? 'My Clients' : 'Client Management'}
         </Typography>
         {!isTherapist && (
           <Button 
@@ -618,7 +618,7 @@ const PatientManagement: React.FC = () => {
             onClick={() => setAddPatientOpen(true)}
             fullWidth={isMobile}
           >
-            Add New Patient
+            Add New Client
           </Button>
         )}
       </Box>
@@ -627,7 +627,7 @@ const PatientManagement: React.FC = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <TextField
           fullWidth
-          placeholder="Search patients by name or diagnosis..."
+          placeholder="Search clients by name or diagnosis..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
@@ -646,7 +646,7 @@ const PatientManagement: React.FC = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center' }}>
               <Typography variant="h4" color="primary">{stats.totalPatients}</Typography>
-              <Typography variant="body2">Total Patients</Typography>
+              <Typography variant="body2">Total Clients</Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -681,7 +681,7 @@ const PatientManagement: React.FC = () => {
         <Box sx={{ display: 'grid', gap: 1.5 }}>
           {filteredPatients.length === 0 ? (
             <Paper sx={{ p: 2.5, textAlign: 'center' }}>
-              <Typography color="text.secondary">No patients found.</Typography>
+              <Typography color="text.secondary">No clients found.</Typography>
             </Paper>
           ) : (
             filteredPatients.map((patient) => (
@@ -725,7 +725,7 @@ const PatientManagement: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Patient</TableCell>
+                  <TableCell>Client</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Last Visit</TableCell>
                   <TableCell>Status</TableCell>
@@ -810,7 +810,7 @@ const PatientManagement: React.FC = () => {
           <ListItemIcon>
             <Edit fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Edit Patient</ListItemText>
+          <ListItemText>Edit Client</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleOpenAssignTherapist}>
           <ListItemIcon>
@@ -828,7 +828,7 @@ const PatientManagement: React.FC = () => {
           <ListItemIcon>
             <DeleteOutline fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText>Remove Patient</ListItemText>
+          <ListItemText>Remove Client</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -840,7 +840,7 @@ const PatientManagement: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Patient Details - {selectedPatient?.name}
+          Client Details - {selectedPatient?.name}
         </DialogTitle>
         <DialogContent>
           <Tabs value={tabValue} onChange={(_event: React.SyntheticEvent, newValue: number) => setTabValue(newValue)} variant="scrollable" scrollButtons="auto">
@@ -927,7 +927,7 @@ const PatientManagement: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Edit Patient
+          Edit Client
           {actionPatient && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {actionPatient.name}
@@ -1127,10 +1127,10 @@ const PatientManagement: React.FC = () => {
         open={removePatientOpen}
         onClose={() => setRemovePatientOpen(false)}
       >
-        <DialogTitle>Remove Patient</DialogTitle>
+        <DialogTitle>Remove Client</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to remove {actionPatient?.name || 'this patient'}?
+            Are you sure you want to remove {actionPatient?.name || 'this client'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -1145,10 +1145,10 @@ const PatientManagement: React.FC = () => {
         open={completePatientOpen}
         onClose={() => setCompletePatientOpen(false)}
       >
-        <DialogTitle>Complete Patient</DialogTitle>
+        <DialogTitle>Complete Client</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Mark {actionPatient?.name || 'this patient'} as complete? This will set status to discharged.
+            Mark {actionPatient?.name || 'this client'} as complete? This will set status to discharged.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -1170,7 +1170,7 @@ const PatientManagement: React.FC = () => {
           Assign Therapist
           {actionPatient && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Patient: {actionPatient.name}
+              Client: {actionPatient.name}
             </Typography>
           )}
         </DialogTitle>
@@ -1207,14 +1207,14 @@ const PatientManagement: React.FC = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Add New Patient Dialog */}
+      {/* Add New Client Dialog */}
       <Dialog 
         open={addPatientOpen} 
         onClose={() => setAddPatientOpen(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Add New Patient</DialogTitle>
+        <DialogTitle>Add New Client</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2}>
@@ -1306,7 +1306,7 @@ const PatientManagement: React.FC = () => {
 
             <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
               <Typography variant="body2">
-                <strong>Note:</strong> A registration link will be emailed to the patient so they can create their own username and password.
+                <strong>Note:</strong> A registration link will be emailed to the client so they can create their own username and password.
               </Typography>
             </Box>
           </Box>
@@ -1335,7 +1335,7 @@ const PatientManagement: React.FC = () => {
             disabled={isLoading}
             startIcon={isLoading ? <CircularProgress size={20} /> : <Add />}
           >
-            {isLoading ? 'Adding...' : 'Add Patient'}
+            {isLoading ? 'Adding...' : 'Add Client'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -71,8 +71,8 @@ const transformNote = (note: any): SOAPNote => ({
   id: note.id,
   patient: note.patientId,
   patient_name: note.patient?.user
-    ? `${note.patient.user.firstName || ''} ${note.patient.user.lastName || ''}`.trim() || 'Unknown Patient'
-    : 'Unknown Patient',
+    ? `${note.patient.user.firstName || ''} ${note.patient.user.lastName || ''}`.trim() || 'Unknown Client'
+    : 'Unknown Client',
   therapist: note.therapistId,
   therapist_name: note.therapist
     ? `${note.therapist.firstName || ''} ${note.therapist.lastName || ''}`.trim() || 'Unknown Therapist'
@@ -224,7 +224,7 @@ const SOAPNotes: React.FC = () => {
 
   const handleSave = async () => {
     if (!selectedNote && !soapData.patientId) {
-      setError('Please select a patient');
+      setError('Please select a client');
       return;
     }
     setLoading(true);
@@ -411,7 +411,7 @@ const SOAPNotes: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Date</TableCell>
-                <TableCell>Patient</TableCell>
+                <TableCell>Client</TableCell>
                 <TableCell>Therapist</TableCell>
                   <TableCell>Chief Complaint / Subjective</TableCell>
                 <TableCell>Status</TableCell>
@@ -506,12 +506,12 @@ const SOAPNotes: React.FC = () => {
                     <TextField
                       select
                       fullWidth
-                      label="Patient"
+                      label="Client"
                       value={soapData.patientId}
                       onChange={(e) => setSoapData({ ...soapData, patientId: e.target.value })}
                       required
                     >
-                      <MenuItem value="">Select a patient</MenuItem>
+                      <MenuItem value="">Select a client</MenuItem>
                       {patients.map((patient) => (
                         <MenuItem key={patient.id} value={patient.id}>
                           {patient.first_name} {patient.last_name}
@@ -541,7 +541,7 @@ const SOAPNotes: React.FC = () => {
                   fullWidth
                   multiline
                   rows={4}
-                  placeholder="Chief complaint, patient's reported symptoms and subjective experience..."
+                  placeholder="Chief complaint, client's reported symptoms and subjective experience..."
                   value={soapData.subjective}
                   onChange={(e) => setSoapData({ ...soapData, subjective: e.target.value })}
                 />

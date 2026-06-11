@@ -241,7 +241,7 @@ const AdminPatientManagement: React.FC = () => {
       
     } catch (error: unknown) {
       console.error('❌ Error loading patients:', error);
-      setErrorMessage(`Failed to load patients: ${getErrorMessage(error, 'Unknown error')}`);
+      setErrorMessage(`Failed to load clients: ${getErrorMessage(error, 'Unknown error')}`);
       setShowError(true);
       setPatients([]);
       setFilteredPatients([]);
@@ -266,13 +266,13 @@ const AdminPatientManagement: React.FC = () => {
           ? { ...p, phone: formData.phone, date_of_birth: formData.dateOfBirth, gender: formData.gender }
           : p
       ));
-      setSuccessMessage('Patient updated successfully');
+      setSuccessMessage('Client updated successfully');
       setShowSuccess(true);
       setEditPatientOpen(false);
       setSelectedPatient(null);
     } catch (error: unknown) {
       console.error('❌ Error updating patient:', error);
-      setErrorMessage('Failed to update patient');
+      setErrorMessage('Failed to update client');
       setShowError(true);
     }
   };
@@ -369,12 +369,12 @@ const AdminPatientManagement: React.FC = () => {
 
     try {
       await apiService.delete(`/patients/${actionPatient.id}/`);
-      setSuccessMessage('Patient removed successfully');
+      setSuccessMessage('Client removed successfully');
       setShowSuccess(true);
       await loadPatients();
     } catch (error: unknown) {
       console.error('❌ Error removing patient:', error);
-      setErrorMessage(getErrorMessage(error, 'Failed to remove patient'));
+      setErrorMessage(getErrorMessage(error, 'Failed to remove client'));
       setShowError(true);
     } finally {
       setRemovePatientOpen(false);
@@ -395,12 +395,12 @@ const AdminPatientManagement: React.FC = () => {
         status: 'discharged',
         discharge_date: new Date().toISOString().split('T')[0],
       });
-      setSuccessMessage('Patient marked complete successfully');
+      setSuccessMessage('Client marked complete successfully');
       setShowSuccess(true);
       await loadPatients();
     } catch (error: unknown) {
       console.error('❌ Error completing patient:', error);
-      setErrorMessage(getErrorMessage(error, 'Failed to mark patient complete'));
+      setErrorMessage(getErrorMessage(error, 'Failed to mark client complete'));
       setShowError(true);
     } finally {
       setCompletePatientOpen(false);
@@ -491,7 +491,7 @@ const AdminPatientManagement: React.FC = () => {
       const response = await apiService.post('/patients/', patientData);
       void response;
 
-      setSuccessMessage('Patient created successfully! Registration email has been sent.');
+      setSuccessMessage('Client created successfully! Registration email has been sent.');
       setShowSuccess(true);
       setAddPatientOpen(false);
       
@@ -500,7 +500,7 @@ const AdminPatientManagement: React.FC = () => {
       
     } catch (error: unknown) {
       console.error('❌ Error creating patient:', error);
-      const errorMsg = getErrorMessage(error, 'Failed to create patient');
+      const errorMsg = getErrorMessage(error, 'Failed to create client');
       setErrorMessage(errorMsg);
       setShowError(true);
     }
@@ -546,7 +546,7 @@ const AdminPatientManagement: React.FC = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5, mb: 3 }}>
         <Typography variant="h4" component="h1">
-          Patient Management
+          Client Management
         </Typography>
         <Box sx={{ display: 'flex', gap: 1.5, flexDirection: { xs: 'column', sm: 'row' } }}>
           <Button
@@ -564,7 +564,7 @@ const AdminPatientManagement: React.FC = () => {
             onClick={() => setAddPatientOpen(true)}
             fullWidth={isMobile}
           >
-            Add Patient
+            Add Client
           </Button>
         </Box>
       </Box>
@@ -575,7 +575,7 @@ const AdminPatientManagement: React.FC = () => {
           <Card>
             <CardContent>
               <Typography color="text.secondary" gutterBottom variant="body2">
-                Total Patients
+                Total Clients
               </Typography>
               <Typography variant="h3" component="div">
                 {totalPatients}
@@ -627,7 +627,7 @@ const AdminPatientManagement: React.FC = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              placeholder="Search by name, email, phone, or patient number..."
+              placeholder="Search by name, email, phone, or client number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -657,7 +657,7 @@ const AdminPatientManagement: React.FC = () => {
           </Grid>
           <Grid item xs={12} md={3}>
             <Typography variant="body2" color="text.secondary">
-              Showing {filteredPatients.length} of {totalPatients} patients
+              Showing {filteredPatients.length} of {totalPatients} clients
             </Typography>
           </Grid>
         </Grid>
@@ -668,12 +668,12 @@ const AdminPatientManagement: React.FC = () => {
         <Box sx={{ display: 'grid', gap: 1.5 }}>
           {loading ? (
             <Paper sx={{ p: 2.5, textAlign: 'center' }}>
-              <Typography>Loading patients...</Typography>
+              <Typography>Loading clients...</Typography>
             </Paper>
           ) : filteredPatients.length === 0 ? (
             <Paper sx={{ p: 2.5, textAlign: 'center' }}>
               <Typography color="text.secondary">
-                {patients.length === 0 ? 'No patients found. Click "Add Patient" to create one.' : 'No patients match your search criteria.'}
+                {patients.length === 0 ? 'No clients found. Click "Add Client" to create one.' : 'No clients match your search criteria.'}
               </Typography>
             </Paper>
           ) : (
@@ -718,8 +718,8 @@ const AdminPatientManagement: React.FC = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Patient</TableCell>
-                  <TableCell>Patient #</TableCell>
+                  <TableCell>Client</TableCell>
+                  <TableCell>Client #</TableCell>
                   <TableCell>Contact</TableCell>
                   <TableCell>Date of Birth</TableCell>
                   <TableCell>Gender</TableCell>
@@ -733,14 +733,14 @@ const AdminPatientManagement: React.FC = () => {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center">
-                      <Typography>Loading patients...</Typography>
+                      <Typography>Loading clients...</Typography>
                     </TableCell>
                   </TableRow>
                 ) : filteredPatients.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center">
                       <Typography color="text.secondary">
-                        {patients.length === 0 ? 'No patients found. Click "Add Patient" to create one.' : 'No patients match your search criteria.'}
+                        {patients.length === 0 ? 'No clients found. Click "Add Client" to create one.' : 'No clients match your search criteria.'}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -826,7 +826,7 @@ const AdminPatientManagement: React.FC = () => {
           <ListItemIcon>
             <Edit fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Edit Patient</ListItemText>
+          <ListItemText>Edit Client</ListItemText>
         </MenuItem>
         <MenuItem onClick={handleMenuAssignTherapist}>
           <ListItemIcon>
@@ -844,11 +844,11 @@ const AdminPatientManagement: React.FC = () => {
           <ListItemIcon>
             <DeleteOutline fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText>Remove Patient</ListItemText>
+          <ListItemText>Remove Client</ListItemText>
         </MenuItem>
       </Menu>
 
-      {/* Add Patient Dialog */}
+      {/* Add Client Dialog */}
       <Dialog
         open={addPatientOpen}
         onClose={() => setAddPatientOpen(false)}
@@ -862,7 +862,7 @@ const AdminPatientManagement: React.FC = () => {
         />
       </Dialog>
 
-      {/* Edit Patient Dialog */}
+      {/* Edit Client Dialog */}
       <Dialog
         open={editPatientOpen}
         onClose={() => {
@@ -873,7 +873,7 @@ const AdminPatientManagement: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          Edit Patient Profile
+          Edit Client Profile
           {selectedPatient && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {selectedPatient.first_name} {selectedPatient.last_name}
@@ -971,10 +971,10 @@ const AdminPatientManagement: React.FC = () => {
         open={removePatientOpen}
         onClose={() => setRemovePatientOpen(false)}
       >
-        <DialogTitle>Remove Patient</DialogTitle>
+        <DialogTitle>Remove Client</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to remove {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this patient'}?
+            Are you sure you want to remove {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this client'}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -989,10 +989,10 @@ const AdminPatientManagement: React.FC = () => {
         open={completePatientOpen}
         onClose={() => setCompletePatientOpen(false)}
       >
-        <DialogTitle>Complete Patient</DialogTitle>
+        <DialogTitle>Complete Client</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Mark {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this patient'} as complete? This will set status to discharged.
+            Mark {actionPatient ? `${actionPatient.first_name} ${actionPatient.last_name}` : 'this client'} as complete? This will set status to discharged.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

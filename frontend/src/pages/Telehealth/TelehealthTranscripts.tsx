@@ -197,7 +197,7 @@ const TelehealthTranscripts: React.FC = () => {
             <Box display="flex" gap={1} mt={0.5}>
               <Chip label="Therapist" color="primary" size="small" />
               <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Therapist speech</Typography>
-              <Chip label="Patient" color="success" size="small" sx={{ ml: 1 }} />
+              <Chip label="Client" color="success" size="small" sx={{ ml: 1 }} />
               <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Patient speech</Typography>
             </Box>
           </Box>

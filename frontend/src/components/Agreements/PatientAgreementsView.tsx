@@ -80,7 +80,7 @@ const PatientAgreementsView: React.FC = () => {
   };
 
   if (loading) return <CircularProgress />;
-  if (!patient) return <Typography>No patient record found.</Typography>;
+  if (!patient) return <Typography>No client record found.</Typography>;
 
   return (
     <Box>

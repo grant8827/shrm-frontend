@@ -281,7 +281,7 @@ const VideoSession: React.FC = () => {
 
     const speakerName = user?.firstName
       ? `${user.firstName} ${user.lastName || ''}`.trim()
-      : (user?.role === 'therapist' ? 'Therapist' : user?.role === 'client' ? 'Patient' : 'Participant');
+      : (user?.role === 'therapist' ? 'Therapist' : user?.role === 'client' ? 'Client' : 'Participant');
 
     recognition.onresult = (event: any) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {

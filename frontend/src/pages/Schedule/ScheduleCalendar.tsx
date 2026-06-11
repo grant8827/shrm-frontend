@@ -575,17 +575,17 @@ export default function ScheduleCalendar() {
 
         <DialogContent dividers>
           <Box display="flex" flexDirection="column" gap={2.5} pt={1}>
-            {/* Patient */}
+            {/* Client */}
             <FormControl fullWidth required>
-              <InputLabel>Patient</InputLabel>
+              <InputLabel>Client</InputLabel>
               <Select
                 value={bookingForm.patientId}
-                label="Patient"
+                label="Client"
                 onChange={(e) => setBookingForm((f) => ({ ...f, patientId: e.target.value }))}
               >
                 {patients.length === 0 && (
                   <MenuItem value="" disabled>
-                    No active patients found
+                    No active clients found
                   </MenuItem>
                 )}
                 {patients.map((p) => (

@@ -334,7 +334,7 @@ const TherapistSettings: React.FC = () => {
                       })}
                     />
                   }
-                  label="New Patient Assignments"
+                  label="New Client Assignments"
                 />
               </Grid>
 

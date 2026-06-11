@@ -166,7 +166,7 @@ const reportTemplates: ReportTemplate[] = [
           { value: 'admin', label: 'Administrators' },
           { value: 'therapist', label: 'Therapists' },
           { value: 'staff', label: 'Staff Members' },
-          { value: 'patient', label: 'Patients' },
+          { value: 'patient', label: 'Clients' },
         ],
       },
       {
@@ -204,12 +204,12 @@ const reportTemplates: ReportTemplate[] = [
     ],
   },
 
-  // Patient Analytics Reports
+  // Client Analytics Reports
   {
     id: 'patient-demographics',
-    name: 'Patient Demographics Report',
-    category: 'Patient Analytics',
-    description: 'Statistical breakdown of patient demographics, insurance coverage, and treatment patterns',
+    name: 'Client Demographics Report',
+    category: 'Client Analytics',
+    description: 'Statistical breakdown of client demographics, insurance coverage, and treatment patterns',
     icon: <LocalHospital />,
     estimatedTime: '3-7 minutes',
     complexity: 'moderate',
@@ -217,7 +217,7 @@ const reportTemplates: ReportTemplate[] = [
     parameters: [
       {
         id: 'includeInactive',
-        name: 'Include Inactive Patients',
+        name: 'Include Inactive Clients',
         type: 'boolean',
         required: false,
         defaultValue: false,
@@ -239,8 +239,8 @@ const reportTemplates: ReportTemplate[] = [
   {
     id: 'patient-outcomes',
     name: 'Treatment Outcomes Report',
-    category: 'Patient Analytics',
-    description: 'Analysis of patient treatment progress, outcome measures, and success rates',
+    category: 'Client Analytics',
+    description: 'Analysis of client treatment progress, outcome measures, and success rates',
     icon: <HealthAndSafety />,
     estimatedTime: '5-10 minutes',
     complexity: 'complex',
@@ -521,8 +521,8 @@ const mockGeneratedReports: GeneratedReport[] = [
   {
     id: 'report-4',
     templateId: 'patient-demographics',
-    templateName: 'Patient Demographics Report',
-    category: 'Patient Analytics',
+    templateName: 'Client Demographics Report',
+    category: 'Client Analytics',
     status: 'failed',
     createdAt: '2025-11-05T08:45:00Z',
     parameters: { includeInactive: false },
@@ -540,7 +540,7 @@ const reportAnalytics: ReportAnalytics = {
   successRate: 94.2,
   popularCategories: [
     { category: 'Financial', count: 45 },
-    { category: 'Patient Analytics', count: 38 },
+    { category: 'Client Analytics', count: 38 },
     { category: 'User Analytics', count: 32 },
     { category: 'Compliance', count: 25 },
     { category: 'Scheduling', count: 16 },

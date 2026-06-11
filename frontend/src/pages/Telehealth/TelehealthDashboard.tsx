@@ -224,7 +224,7 @@ const TelehealthDashboard: React.FC = () => {
           id: session.patient,
           name: session.patient_details 
             ? `${session.patient_details.first_name || ''} ${session.patient_details.last_name || ''}`.trim()
-            : 'Unknown Patient',
+            : 'Unknown Client',
           avatar: undefined
         },
         therapist: {
@@ -258,7 +258,7 @@ const TelehealthDashboard: React.FC = () => {
     try {
       // Validate form
       if (!newSession.patientId) {
-        showError('Please select a patient');
+        showError('Please select a client');
         return;
       }
 
@@ -930,8 +930,8 @@ const TelehealthDashboard: React.FC = () => {
             <Box display="flex" gap={1} mt={0.5}>
               <Chip label="Therapist" color="primary" size="small" />
               <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Therapist speech</Typography>
-              <Chip label="Patient" color="success" size="small" sx={{ ml: 1 }} />
-              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Patient speech</Typography>
+              <Chip label="Client" color="success" size="small" sx={{ ml: 1 }} />
+              <Typography variant="caption" sx={{ lineHeight: '22px' }}>= Client speech</Typography>
             </Box>
           </Box>
         </DialogTitle>
@@ -996,11 +996,11 @@ const TelehealthDashboard: React.FC = () => {
             />
 
             <FormControl fullWidth required>
-              <InputLabel>Patient</InputLabel>
+              <InputLabel>Client</InputLabel>
               <Select
                 value={newSession.patientId}
                 onChange={(e) => setNewSession({ ...newSession, patientId: e.target.value })}
-                label="Patient"
+                label="Client"
               >
                 {patients.map((patient) => (
                   <MenuItem key={patient.id} value={patient.id}>
@@ -1059,7 +1059,7 @@ const TelehealthDashboard: React.FC = () => {
         onClose={() => setOpenEmergencyDialog(false)}
         onSessionCreated={() => {
           loadSessions();
-          showSuccess('Emergency session created and email sent to patient!');
+          showSuccess('Emergency session created and email sent to client!');
         }}
       />
     </Box>

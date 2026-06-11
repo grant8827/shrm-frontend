@@ -304,7 +304,7 @@ const AppointmentScheduling: React.FC = () => {
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!formData.patientId) errors.patientId = 'Patient is required';
+    if (!formData.patientId) errors.patientId = 'Client is required';
     if (!formData.therapistId) errors.therapistId = 'Therapist is required';
     if (!formData.date) errors.date = 'Date is required';
     if (!formData.time) errors.time = 'Time is required';
@@ -408,7 +408,7 @@ const AppointmentScheduling: React.FC = () => {
     }
   };
 
-  // Confirm appointment (patient confirms their appointment)
+  // Confirm appointment (client confirms their appointment)
   const confirmAppointment = async (appointmentId: string) => {
     try {
       await apiClient.post(`/api/appointments/${appointmentId}/confirm`);
@@ -439,7 +439,7 @@ const AppointmentScheduling: React.FC = () => {
       const mappedAppointments: Appointment[] = appointmentsData.map((apt: any) => ({
           id: apt.id,
           patientId: apt.patient,
-          patientName: apt.patient_name || 'Unknown Patient',
+          patientName: apt.patient_name || 'Unknown Client',
           therapistId: apt.therapist,
           therapistName: apt.therapist_name || 'Unknown Therapist',
           date: apt.start_datetime.split('T')[0],
@@ -598,7 +598,7 @@ const AppointmentScheduling: React.FC = () => {
         )}
       </Box>
 
-      {/* Patient Info Banner */}
+      {/* Client Info Banner */}
       {isPatient && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: 'info.light' }}>
           <Typography variant="body2">
@@ -630,7 +630,7 @@ const AppointmentScheduling: React.FC = () => {
             </CardContent>
           </Card>
         </Grid>
-        {/* Hide company-wide stats from patients */}
+        {/* Hide company-wide stats from clients */}
         {!isPatient && (
           <>
             <Grid item xs={6} sm={6} md={3}>
@@ -662,7 +662,7 @@ const AppointmentScheduling: React.FC = () => {
       {/* Date Navigation & View Tabs */}
       <Paper sx={{ mb: 3 }}>
         <Box sx={{ p: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
-          {/* Hide date navigation from patients */}
+          {/* Hide date navigation from clients */}
           {!isPatient && (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'space-between', sm: 'flex-start' }, gap: 1 }}>
               <IconButton onClick={() => navigateDate('prev')}>
@@ -699,7 +699,7 @@ const AppointmentScheduling: React.FC = () => {
           >
             <Tab label="All Appointments" />
             <Tab label="Upcoming" />
-            {/* Hide Daily View from patients - they don't need the scheduling grid */}
+            {/* Hide Daily View from clients - they don't need the scheduling grid */}
             {!isPatient && <Tab label="Daily View" />}
           </Tabs>
         </Box>
@@ -766,7 +766,7 @@ const AppointmentScheduling: React.FC = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell>Time</TableCell>
-                          <TableCell>Patient</TableCell>
+                          <TableCell>Client</TableCell>
                           <TableCell>Therapist</TableCell>
                           <TableCell>Type</TableCell>
                           <TableCell>Status</TableCell>
@@ -944,7 +944,7 @@ const AppointmentScheduling: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Date & Time</TableCell>
-                    <TableCell>Patient</TableCell>
+                    <TableCell>Client</TableCell>
                     <TableCell>Therapist</TableCell>
                     <TableCell>Type</TableCell>
                     <TableCell>Format</TableCell>
@@ -1077,7 +1077,7 @@ const AppointmentScheduling: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Date & Time</TableCell>
-                    <TableCell>Patient</TableCell>
+                    <TableCell>Client</TableCell>
                     <TableCell>Therapist</TableCell>
                     <TableCell>Type</TableCell>
                     <TableCell>Format</TableCell>
@@ -1231,17 +1231,17 @@ const AppointmentScheduling: React.FC = () => {
           <Grid container spacing={3} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth error={!!formErrors.patientId}>
-                <InputLabel>Patient</InputLabel>
+                <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.patientId}
-                  label="Patient"
+                  label="Client"
                   onChange={(e) => setFormData(prev => ({ ...prev, patientId: e.target.value }))}
                   disabled={isLoadingPatients}
                 >
                   {isLoadingPatients ? (
-                    <MenuItem disabled>Loading patients...</MenuItem>
+                    <MenuItem disabled>Loading clients...</MenuItem>
                   ) : !Array.isArray(patients) || patients.length === 0 ? (
-                    <MenuItem disabled>No patients available</MenuItem>
+                    <MenuItem disabled>No clients available</MenuItem>
                   ) : (
                     patients.map((patient) => (
                       <MenuItem key={patient.id} value={patient.id}>

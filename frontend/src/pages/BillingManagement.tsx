@@ -78,7 +78,7 @@ const transformInvoice = (inv: any): Bill => {
   const patientUser = inv.patient?.user;
   const patientName = patientUser
     ? `${patientUser.firstName ?? ''} ${patientUser.lastName ?? ''}`.trim()
-    : (inv.patient?.first_name ? `${inv.patient.first_name} ${inv.patient.last_name}`.trim() : 'Unknown Patient');
+    : (inv.patient?.first_name ? `${inv.patient.first_name} ${inv.patient.last_name}`.trim() : 'Unknown Client');
 
   const total = parseFloat(inv.total ?? inv.amount ?? '0');
   const isPaid = inv.status === 'paid';
@@ -181,7 +181,7 @@ const BillingManagement: React.FC = () => {
       setPatients(active);
     } catch (error) {
       console.error('Error fetching patients:', error);
-      showError('Failed to load patients');
+      showError('Failed to load clients');
     }
   };
 
@@ -419,7 +419,7 @@ const BillingManagement: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Patient</TableCell>
+                    <TableCell>Client</TableCell>
                     <TableCell>Invoice #</TableCell>
                     <TableCell>Amount</TableCell>
                     <TableCell>Paid</TableCell>
@@ -508,15 +508,15 @@ const BillingManagement: React.FC = () => {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <FormControl fullWidth>
-                  <InputLabel>Patient</InputLabel>
+                  <InputLabel>Client</InputLabel>
                   <Select
                     value={formData.patient}
                     onChange={(e) => setFormData({ ...formData, patient: e.target.value as string })}
-                    label="Patient"
+                    label="Client"
                   >
-                    <MenuItem value="">Select a patient</MenuItem>
+                    <MenuItem value="">Select a client</MenuItem>
                     {patients.length === 0 ? (
-                      <MenuItem disabled>No active patients found</MenuItem>
+                      <MenuItem disabled>No active clients found</MenuItem>
                     ) : (
                       patients.map((patient) => (
                         <MenuItem key={patient.id} value={patient.id}>

@@ -142,7 +142,7 @@ const cptCodes = [
   { code: '90834', description: 'Psychotherapy 45 minutes', price: 150 },
   { code: '90837', description: 'Psychotherapy 60 minutes', price: 200 },
   { code: '90791', description: 'Initial psychiatric evaluation', price: 250 },
-  { code: '90834', description: 'Family psychotherapy with patient', price: 175 },
+  { code: '90834', description: 'Family psychotherapy with client', price: 175 },
   { code: '96116', description: 'Neurobehavioral status exam', price: 300 },
 ];
 
@@ -534,7 +534,7 @@ const Billing: React.FC = () => {
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              placeholder="Search invoices, patients..."
+              placeholder="Search invoices, clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               InputProps={{
@@ -635,7 +635,7 @@ const Billing: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Invoice ID</TableCell>
-                    <TableCell>Patient</TableCell>
+                    <TableCell>Client</TableCell>
                     <TableCell>Service Date</TableCell>
                     <TableCell>Amount</TableCell>
                     <TableCell>Paid</TableCell>
@@ -981,15 +981,15 @@ const Billing: React.FC = () => {
           <Grid container spacing={3} sx={{ mt: 1 }}>
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel>Patient</InputLabel>
+                <InputLabel>Client</InputLabel>
                 <Select
                   value={formData.patientId}
-                  label="Patient"
+                  label="Client"
                   onChange={(e) => setFormData(prev => ({ ...prev, patientId: e.target.value }))}
                 >
-                  {/* TODO: Load patients from API */}
+                  {/* TODO: Load clients from API */}
                   <MenuItem value="">
-                    <em>Select a patient</em>
+                    <em>Select a client</em>
                   </MenuItem>
                 </Select>
               </FormControl>
