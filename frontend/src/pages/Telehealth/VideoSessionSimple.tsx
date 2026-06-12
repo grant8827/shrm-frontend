@@ -118,6 +118,7 @@ const VideoSession: React.FC = () => {
     remoteVideoRef,
     isRemoteVideoReady,
     isRemotePlaybackBlocked,
+    connectionState,
     initializePeerConnection,
     createOffer,
     handleOffer,
@@ -363,8 +364,24 @@ const VideoSession: React.FC = () => {
       setParticipantCount(participantCountRef.current + 1);
       setParticipantName(name);
       isInitiatorRef.current = true;
-      // Call immediately — PC is guaranteed initialized before joinRoom now,
-      // so there is no need for an artificial delay.
+      // Recreate the PC if the previous one was torn down during a leave/rejoin
+      // race. createOffer() cannot run without an active RTCPeerConnection.
+      const localStream = localStreamRef.current;
+      if (!localStream) {
+        console.warn('[VIDEO] Participant joined but local stream is not ready yet');
+        return;
+      }
+
+      const needsPeerConnection = connectionState === 'closed' || connectionState === 'failed';
+      if (needsPeerConnection) {
+        void initializePeerConnection(localStream, true)
+          .then(() => createOffer())
+          .catch((err) => {
+            console.error('[VIDEO] Failed to rebuild peer connection before offer:', err);
+          });
+        return;
+      }
+
       void createOffer();
       // If therapist was already transcribing when the participant joined, re-signal them to start.
       // Use keepTranscribingRef (set synchronously) not isTranscribingRef (set via React effect, async)
@@ -447,7 +464,7 @@ const VideoSession: React.FC = () => {
     showSuccess('Connected to session server');
   // localStream intentionally omitted — we use localStreamRef instead to avoid stale closures
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, sessionId, user, showSuccess, showError, createOffer, handleOffer, handleAnswer, addIceCandidate, closePeerConnection]);
+  }, [roomId, sessionId, user, showSuccess, showError, createOffer, handleOffer, handleAnswer, addIceCandidate, closePeerConnection, connectionState, initializePeerConnection]);
 
   // Start Session Effect
   useEffect(() => {

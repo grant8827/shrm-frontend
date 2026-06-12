@@ -173,7 +173,10 @@ export const useWebRTC = ({
       }
     };
 
-    // Handle Remote Track
+    // Handle Remote Track - Defer play() to avoid interruption errors
+    let lastRemoteStream: MediaStream | null = null;
+    let playAttemptTimeout: NodeJS.Timeout | null = null;
+
     pc.ontrack = (event) => {
       console.log('[useWebRTC] Received remote track:', event.track.kind);
       
@@ -182,20 +185,34 @@ export const useWebRTC = ({
         stream.addTrack(event.track);
       }
 
+      lastRemoteStream = stream;
       setRemoteStream(stream);
+      setIsRemoteVideoReady(true);
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = stream;
-        
-        const playPromise = remoteVideoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            console.warn('[useWebRTC] Remote autoplay blocked:', err);
-            setIsRemotePlaybackBlocked(true);
-          });
-        }
       }
-      setIsRemoteVideoReady(true);
+
+      // Debounce play() to allow both audio and video tracks to arrive
+      if (playAttemptTimeout) {
+        clearTimeout(playAttemptTimeout);
+      }
+      playAttemptTimeout = setTimeout(() => {
+        if (remoteVideoRef.current && lastRemoteStream) {
+          const playPromise = remoteVideoRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('[useWebRTC] Remote stream playing');
+              })
+              .catch((err) => {
+                // Don't treat play errors as fatal
+                console.warn('[useWebRTC] Autoplay issue:', err.message);
+                setIsRemotePlaybackBlocked(true);
+              });
+          }
+        }
+      }, 100);
     };
 
     // Process any pending candidates
