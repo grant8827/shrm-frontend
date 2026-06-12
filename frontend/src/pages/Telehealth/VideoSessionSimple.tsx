@@ -61,6 +61,7 @@ const VideoSession: React.FC = () => {
   const [sessionData, setSessionData] = useState<SessionDetails | null>(null);
   const [sessionError, setSessionError] = useState<'not_found' | 'forbidden' | 'not_started' | null>(null);
   const [videoFitMode, setVideoFitMode] = useState<'cover' | 'contain'>('cover');
+  const [remoteVideoPlayable, setRemoteVideoPlayable] = useState(false);
 
   // Recording and Transcription
   const [isRecording, setIsRecording] = useState(false);
@@ -133,7 +134,8 @@ const VideoSession: React.FC = () => {
     onError: showError,
   });
 
-  const hasRemoteVideo = isRemoteVideoReady;
+  const remoteHasVideoTrack = Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === 'live'));
+  const hasRemoteVideo = remoteHasVideoTrack && remoteVideoPlayable;
 
   // Fetch session details
   useEffect(() => {
@@ -208,7 +210,13 @@ const VideoSession: React.FC = () => {
         });
       }
     }
-  }, [remoteStream, remoteVideoRef, hasRemoteVideo]);
+  }, [remoteStream, remoteVideoRef]);
+
+  useEffect(() => {
+    if (!remoteHasVideoTrack) {
+      setRemoteVideoPlayable(false);
+    }
+  }, [remoteHasVideoTrack]);
 
   // Stops recognition, saves accumulated entries, clears state
   const stopAndSaveTranscription = useCallback(async () => {
@@ -751,16 +759,37 @@ const VideoSession: React.FC = () => {
             : {}),
         }}
       >
-        {hasRemoteVideo && (
-          <Box ref={remoteContainerRef} sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
-            <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: videoFitMode, backgroundColor: '#000' }} />
-            {isRemotePlaybackBlocked && (
-              <Box sx={{ position: 'absolute', bottom: { xs: 92, sm: 104 }, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
-                <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
-              </Box>
-            )}
-          </Box>
-        )}
+        <Box
+          ref={remoteContainerRef}
+          sx={hasRemoteVideo
+            ? { position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }
+            : { position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', overflow: 'hidden' }}
+        >
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            onLoadedMetadata={() => {
+              if (remoteVideoRef.current && remoteVideoRef.current.videoWidth > 0 && remoteVideoRef.current.videoHeight > 0) {
+                setRemoteVideoPlayable(true);
+              }
+              remoteVideoRef.current?.play().catch((error) => {
+                console.warn('[VIDEO] Remote playback blocked after metadata:', error);
+              });
+            }}
+            onPlaying={() => {
+              if (remoteVideoRef.current && remoteVideoRef.current.videoWidth > 0 && remoteVideoRef.current.videoHeight > 0) {
+                setRemoteVideoPlayable(true);
+              }
+            }}
+            style={{ width: '100%', height: '100%', objectFit: videoFitMode, backgroundColor: '#000' }}
+          />
+          {hasRemoteVideo && isRemotePlaybackBlocked && (
+            <Box sx={{ position: 'absolute', bottom: { xs: 92, sm: 104 }, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
+              <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
+            </Box>
+          )}
+        </Box>
 
         <Box sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
           <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: videoFitMode, transform: 'scaleX(-1)', backgroundColor: '#000' }} />
