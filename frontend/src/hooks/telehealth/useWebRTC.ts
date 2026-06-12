@@ -4,6 +4,7 @@ interface UseWebRTCProps {
   sendMessage: (message: any) => void;
   onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
   onError: (message: string) => void;
+  isInitiatorRef?: React.RefObject<boolean>;
 }
 
 interface UseWebRTCResult {
@@ -24,6 +25,7 @@ export const useWebRTC = ({
   sendMessage,
   onConnectionStateChange,
   onError,
+  isInitiatorRef: externalIsInitiatorRef,
 }: UseWebRTCProps): UseWebRTCResult => {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -35,6 +37,7 @@ export const useWebRTC = ({
   
   const iceRestartAttemptsRef = useRef(0);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -124,6 +127,7 @@ export const useWebRTC = ({
   }, []);
 
   const initializePeerConnection = useCallback(async (localStream: MediaStream, isInitiator: boolean) => {
+    localStreamRef.current = localStream;
     if (peerConnectionRef.current) {
       console.warn('[useWebRTC] PeerConnection already exists, closing it.');
       closePeerConnection();
@@ -157,16 +161,24 @@ export const useWebRTC = ({
       }
 
       if (pc.connectionState === 'failed') {
-        // Simple retry logic
         if (iceRestartAttemptsRef.current < 3) {
           console.warn('[useWebRTC] Connection failed, attempting ICE restart...');
           iceRestartAttemptsRef.current++;
-          // Trigger restart via createOffer(true)
-          if (isInitiator) { // Only initiator should restart? Or whoever detects it?
-             // Logic to restart can be complex.
+          const isInitiatorNow = externalIsInitiatorRef?.current ?? isInitiator;
+          if (isInitiatorNow) {
+            void (async () => {
+              try {
+                pc.restartIce();
+                const offer = await pc.createOffer({ iceRestart: true });
+                await pc.setLocalDescription(offer);
+                sendMessage({ type: 'offer', offer });
+              } catch (err: any) {
+                console.error('[useWebRTC] ICE restart failed:', err.message);
+              }
+            })();
           }
         } else {
-            onError('Connection failed and could not be restored.');
+          onError('Connection failed and could not be restored.');
         }
       } else if (pc.connectionState === 'connected') {
         iceRestartAttemptsRef.current = 0;

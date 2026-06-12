@@ -128,6 +128,7 @@ const VideoSession: React.FC = () => {
   } = useWebRTC({
     sendMessage,
     onError: showError,
+    isInitiatorRef,
   });
 
   // Fetch session details
