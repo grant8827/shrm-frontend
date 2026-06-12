@@ -30,6 +30,7 @@ export const useWebRTC = ({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   
   const [isRemoteVideoReady, setIsRemoteVideoReady] = useState(false);
   const [isRemotePlaybackBlocked, setIsRemotePlaybackBlocked] = useState(false);
@@ -117,6 +118,7 @@ export const useWebRTC = ({
       peerConnectionRef.current = null;
     }
     
+    remoteStreamRef.current = null;
     setRemoteStream(null);
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
@@ -185,24 +187,62 @@ export const useWebRTC = ({
       }
     };
 
-    // Handle Remote Track - Defer play() to avoid interruption errors
-    let lastRemoteStream: MediaStream | null = null;
+    const playRemoteStream = () => {
+      if (!remoteVideoRef.current || !remoteStreamRef.current) return;
+
+      remoteVideoRef.current.muted = false;
+      remoteVideoRef.current.volume = 1;
+
+      const playPromise = remoteVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[useWebRTC] Remote stream playing');
+            setIsRemotePlaybackBlocked(false);
+          })
+          .catch((err) => {
+            console.warn('[useWebRTC] Autoplay issue:', err.message);
+            setIsRemotePlaybackBlocked(true);
+
+            const playAfterInteraction = () => {
+              void remoteVideoRef.current?.play()
+                .then(() => setIsRemotePlaybackBlocked(false))
+                .catch(() => setIsRemotePlaybackBlocked(true));
+              document.removeEventListener('click', playAfterInteraction);
+              document.removeEventListener('touchend', playAfterInteraction);
+            };
+
+            document.addEventListener('click', playAfterInteraction, { once: true });
+            document.addEventListener('touchend', playAfterInteraction, { once: true });
+          });
+      }
+    };
+
+    // Handle Remote Track - keep one stream so audio and video do not replace each other.
     let playAttemptTimeout: NodeJS.Timeout | null = null;
 
     pc.ontrack = (event) => {
-      console.log('[useWebRTC] Received remote track:', event.track.kind);
+      console.log('[useWebRTC] Received remote track:', event.track.kind, event.streams);
       
-      const stream = event.streams[0] || new MediaStream();
-      if (!event.streams[0]) {
+      const incomingStream = event.streams[0];
+      let stream = incomingStream ?? remoteStreamRef.current;
+
+      if (!stream) {
+        stream = new MediaStream();
+      }
+
+      if (!incomingStream && !stream.getTracks().some((track) => track.id === event.track.id)) {
         stream.addTrack(event.track);
       }
 
-      lastRemoteStream = stream;
+      remoteStreamRef.current = stream;
       setRemoteStream(stream);
-      setIsRemoteVideoReady(true);
+      setIsRemoteVideoReady(stream.getVideoTracks().some((track) => track.readyState === 'live'));
 
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
+        if (remoteVideoRef.current.srcObject !== stream) {
+          remoteVideoRef.current.srcObject = stream;
+        }
       }
 
       // Debounce play() to allow both audio and video tracks to arrive
@@ -210,21 +250,16 @@ export const useWebRTC = ({
         clearTimeout(playAttemptTimeout);
       }
       playAttemptTimeout = setTimeout(() => {
-        if (remoteVideoRef.current && lastRemoteStream) {
-          const playPromise = remoteVideoRef.current.play();
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                console.log('[useWebRTC] Remote stream playing');
-              })
-              .catch((err) => {
-                // Don't treat play errors as fatal
-                console.warn('[useWebRTC] Autoplay issue:', err.message);
-                setIsRemotePlaybackBlocked(true);
-              });
-          }
-        }
+        playRemoteStream();
       }, 100);
+
+      event.track.onended = () => {
+        const activeStream = remoteStreamRef.current;
+        if (!activeStream) return;
+
+        const hasLiveVideo = activeStream.getVideoTracks().some((track) => track.readyState === 'live');
+        setIsRemoteVideoReady(hasLiveVideo);
+      };
     };
 
     // Process any pending candidates
