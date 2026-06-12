@@ -708,7 +708,18 @@ const VideoSession: React.FC = () => {
           )}
           {isRemoteVideoReady && isRemotePlaybackBlocked && (
             <Box sx={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
-              <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (remoteVideoRef.current) {
+                    remoteVideoRef.current.muted = false;
+                    remoteVideoRef.current.volume = 1;
+                    void remoteVideoRef.current.play();
+                  }
+                }}
+              >
+                Tap to start video
+              </Button>
             </Box>
           )}
 

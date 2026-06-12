@@ -204,7 +204,20 @@ export const useWebRTC = ({
             console.warn('[useWebRTC] Autoplay issue:', err.message);
             setIsRemotePlaybackBlocked(true);
 
+            // Some browsers block unmuted autoplay entirely. Keep video visible
+            // while waiting for a user tap/click to unlock remote audio.
+            if (remoteVideoRef.current) {
+              remoteVideoRef.current.muted = true;
+              void remoteVideoRef.current.play().catch((mutedPlayError) => {
+                console.warn('[useWebRTC] Muted remote autoplay also failed:', mutedPlayError.message);
+              });
+            }
+
             const playAfterInteraction = () => {
+              if (remoteVideoRef.current) {
+                remoteVideoRef.current.muted = false;
+                remoteVideoRef.current.volume = 1;
+              }
               void remoteVideoRef.current?.play()
                 .then(() => setIsRemotePlaybackBlocked(false))
                 .catch(() => setIsRemotePlaybackBlocked(true));
@@ -225,17 +238,24 @@ export const useWebRTC = ({
       console.log('[useWebRTC] Received remote track:', event.track.kind, event.streams);
       
       const incomingStream = event.streams[0];
-      let stream = incomingStream ?? remoteStreamRef.current;
+      let stream = remoteStreamRef.current;
 
       if (!stream) {
         stream = new MediaStream();
+        remoteStreamRef.current = stream;
       }
 
-      if (!incomingStream && !stream.getTracks().some((track) => track.id === event.track.id)) {
+      const incomingTracks = incomingStream?.getTracks() ?? [event.track];
+      incomingTracks.forEach((track) => {
+        if (!stream.getTracks().some((existingTrack) => existingTrack.id === track.id)) {
+          stream.addTrack(track);
+        }
+      });
+
+      if (!stream.getTracks().some((track) => track.id === event.track.id)) {
         stream.addTrack(event.track);
       }
 
-      remoteStreamRef.current = stream;
       setRemoteStream(stream);
       setIsRemoteVideoReady(stream.getVideoTracks().some((track) => track.readyState === 'live'));
 
