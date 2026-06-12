@@ -182,27 +182,20 @@ export const useWebRTC = ({
         stream.addTrack(event.track);
       }
 
-      const nextRemoteStream = new MediaStream(stream.getTracks());
-      const hasVideoTrack = nextRemoteStream
-        .getVideoTracks()
-        .some((track) => track.readyState === 'live');
-
-      setRemoteStream(nextRemoteStream);
+      setRemoteStream(stream);
 
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = nextRemoteStream;
+        remoteVideoRef.current.srcObject = stream;
         
         const playPromise = remoteVideoRef.current.play();
         if (playPromise !== undefined) {
-          playPromise
-            .then(() => setIsRemotePlaybackBlocked(false))
-            .catch((err) => {
-              console.warn('[useWebRTC] Remote autoplay blocked:', err);
-              setIsRemotePlaybackBlocked(true);
-            });
+          playPromise.catch((err) => {
+            console.warn('[useWebRTC] Remote autoplay blocked:', err);
+            setIsRemotePlaybackBlocked(true);
+          });
         }
       }
-      setIsRemoteVideoReady(hasVideoTrack);
+      setIsRemoteVideoReady(true);
     };
 
     // Process any pending candidates

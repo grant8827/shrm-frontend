@@ -28,7 +28,6 @@ import {
   Close as CloseIcon,
   ChevronLeft,
   ChevronRight,
-  AspectRatio,
 } from '@mui/icons-material';
 import PeopleIcon from '@mui/icons-material/People';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -60,8 +59,6 @@ const VideoSession: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<SessionDetails | null>(null);
   const [sessionError, setSessionError] = useState<'not_found' | 'forbidden' | 'not_started' | null>(null);
-  const [videoFitMode, setVideoFitMode] = useState<'cover' | 'contain'>('cover');
-  const [remoteVideoPlayable, setRemoteVideoPlayable] = useState(false);
 
   // Recording and Transcription
   const [isRecording, setIsRecording] = useState(false);
@@ -111,7 +108,6 @@ const VideoSession: React.FC = () => {
     toggleCamera,
     toggleMicrophone,
     retryMediaAccess,
-    refreshVideoConstraints,
   } = useTelehealthMedia(showError);
 
   const sendMessage = useCallback((msg: WebSocketMessage) => {
@@ -122,7 +118,6 @@ const VideoSession: React.FC = () => {
     remoteVideoRef,
     isRemoteVideoReady,
     isRemotePlaybackBlocked,
-    remoteStream,
     initializePeerConnection,
     createOffer,
     handleOffer,
@@ -133,9 +128,6 @@ const VideoSession: React.FC = () => {
     sendMessage,
     onError: showError,
   });
-
-  const remoteHasVideoTrack = Boolean(remoteStream?.getVideoTracks().some((track) => track.readyState === 'live'));
-  const hasRemoteVideo = remoteHasVideoTrack && remoteVideoPlayable;
 
   // Fetch session details
   useEffect(() => {
@@ -185,38 +177,6 @@ const VideoSession: React.FC = () => {
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
   useEffect(() => { isTranscribingRef.current = isTranscribing; }, [isTranscribing]);
-
-  useEffect(() => {
-    const handleViewportChange = () => {
-      void refreshVideoConstraints();
-    };
-
-    window.addEventListener('orientationchange', handleViewportChange);
-    window.addEventListener('resize', handleViewportChange);
-
-    return () => {
-      window.removeEventListener('orientationchange', handleViewportChange);
-      window.removeEventListener('resize', handleViewportChange);
-    };
-  }, [refreshVideoConstraints]);
-
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      const playPromise = remoteVideoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          console.warn('[VIDEO] Remote playback retry blocked:', error);
-        });
-      }
-    }
-  }, [remoteStream, remoteVideoRef]);
-
-  useEffect(() => {
-    if (!remoteHasVideoTrack) {
-      setRemoteVideoPlayable(false);
-    }
-  }, [remoteHasVideoTrack]);
 
   // Stops recognition, saves accumulated entries, clears state
   const stopAndSaveTranscription = useCallback(async () => {
@@ -653,7 +613,7 @@ const VideoSession: React.FC = () => {
     }[sessionError];
 
     return (
-      <Box sx={{ height: '100dvh', minHeight: '-webkit-fill-available', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#1a1a1a', overflow: 'hidden' }}>
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#1a1a1a' }}>
         <Box sx={{ textAlign: 'center', maxWidth: 480, p: 4 }}>
           <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: errorConfig.color, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 3 }}>
             <Typography variant="h3" sx={{ color: 'white' }}>
@@ -679,44 +639,14 @@ const VideoSession: React.FC = () => {
   }
 
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100dvh',
-        minHeight: '-webkit-fill-available',
-        overflow: 'hidden',
-        bgcolor: '#050505',
-        color: 'white',
-        touchAction: 'manipulation',
-      }}
-    >
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#1a1a1a' }}>
       {/* Header */}
-      <Paper
-        elevation={0}
-        sx={{
-          position: 'absolute',
-          top: { xs: 6, sm: 12 },
-          left: { xs: 6, sm: 12 },
-          right: { xs: 6, sm: 12 },
-          zIndex: 10,
-          p: { xs: 1, sm: 1.5 },
-          bgcolor: 'rgba(0, 0, 0, 0.58)',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderRadius: 2,
-          backdropFilter: 'blur(12px)',
-          pointerEvents: 'auto',
-        }}
-      >
+      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.8)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, overflow: 'hidden', flex: 1 }}>
-          <Box sx={{ flexShrink: 1, minWidth: 0 }}>
-            <Typography variant="h6" noWrap sx={{ fontSize: { xs: '0.85rem', sm: '1.1rem' } }}>{sessionData?.title || 'Telehealth Session'}</Typography>
+          <Box sx={{ flexShrink: 0 }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '0.85rem', sm: '1.25rem' } }}>{sessionData?.title || 'Telehealth Session'}</Typography>
             {user && ['admin', 'therapist', 'staff'].includes(user.role) && sessionData?.patient_details && (
-              <Typography variant="caption" noWrap sx={{ opacity: 0.8, display: 'block' }}>
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>
                 Client: {sessionData.patient_details.first_name} {sessionData.patient_details.last_name}
               </Typography>
             )}
@@ -736,141 +666,67 @@ const VideoSession: React.FC = () => {
       </Paper>
 
       {/* Main Video Area */}
-      <Box
-        sx={{
-          position: 'absolute',
-          inset: 0,
-          display: 'grid',
-          gridTemplateColumns: hasRemoteVideo ? { xs: '1fr', sm: '1fr 1fr' } : '1fr',
-          gridTemplateRows: hasRemoteVideo ? { xs: '1fr 1fr', sm: '1fr' } : '1fr',
-          gap: 0,
-          overflow: 'hidden',
-          ...(hasRemoteVideo
-            ? {
-                '@media (max-width: 639px) and (orientation: landscape)': {
-                  gridTemplateColumns: '1fr 1fr',
-                  gridTemplateRows: '1fr',
-                },
-                '@media (min-width: 640px) and (max-width: 1024px) and (orientation: portrait)': {
-                  gridTemplateColumns: '1fr',
-                  gridTemplateRows: '1fr 1fr',
-                },
-              }
-            : {}),
-        }}
-      >
-        <Box
-          ref={remoteContainerRef}
-          sx={hasRemoteVideo
-            ? { position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }
-            : { position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', overflow: 'hidden' }}
-        >
+      <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000', display: 'flex' }}>
+        <Box ref={remoteContainerRef} sx={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            onLoadedMetadata={() => {
-              if (remoteVideoRef.current && remoteVideoRef.current.videoWidth > 0 && remoteVideoRef.current.videoHeight > 0) {
-                setRemoteVideoPlayable(true);
-              }
-              remoteVideoRef.current?.play().catch((error) => {
-                console.warn('[VIDEO] Remote playback blocked after metadata:', error);
-              });
-            }}
-            onPlaying={() => {
-              if (remoteVideoRef.current && remoteVideoRef.current.videoWidth > 0 && remoteVideoRef.current.videoHeight > 0) {
-                setRemoteVideoPlayable(true);
-              }
-            }}
-            style={{ width: '100%', height: '100%', objectFit: videoFitMode, backgroundColor: '#000' }}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', backgroundColor: '#000' }}
           />
-          {hasRemoteVideo && isRemotePlaybackBlocked && (
-            <Box sx={{ position: 'absolute', bottom: { xs: 92, sm: 104 }, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
+          {!isRemoteVideoReady && (
+            <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'white' }}>
+              <Typography variant="h6">
+                {participantCount > 1 
+                  ? `Establishing connection with ${participantName || 'participant'}...`
+                  : 'Waiting for other participant to join...'}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.7 }}>
+                {participantCount > 1 
+                  ? 'Setting up video and audio...'
+                  : 'Share the session link or wait for them to connect'}
+              </Typography>
+            </Box>
+          )}
+          {isRemoteVideoReady && isRemotePlaybackBlocked && (
+            <Box sx={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)' }}>
               <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
             </Box>
           )}
-        </Box>
 
-        <Box sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
-          <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: videoFitMode, transform: 'scaleX(-1)', backgroundColor: '#000' }} />
-          {!hasRemoteVideo && (
-            <Box sx={{ position: 'absolute', inset: 0, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'white', bgcolor: 'linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.62))', pointerEvents: 'none' }}>
-              <Box sx={{ maxWidth: 520, mt: { xs: 8, sm: 10 } }}>
-                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, textShadow: '0 1px 12px rgba(0,0,0,0.75)' }}>
-                  {participantCount > 1
-                    ? `Establishing connection with ${participantName || 'participant'}...`
-                    : 'Waiting for other participant to join...'}
-                </Typography>
-                <Typography variant="body2" sx={{ mt: 1, opacity: 0.82, textShadow: '0 1px 10px rgba(0,0,0,0.75)' }}>
-                  {participantCount > 1
-                    ? 'Setting up video and audio...'
-                    : 'Share the session link or wait for them to connect'}
-                </Typography>
+          {/* Local Video */}
+          <Paper elevation={4} sx={{ position: 'absolute', bottom: { xs: 8, sm: 20 }, right: { xs: 40, sm: 20 }, width: { xs: 80, sm: 240 }, height: { xs: 60, sm: 180 }, overflow: 'hidden', bgcolor: '#000' }}>
+            <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+            {!isCameraOn && (
+              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.8)', color: 'white', width: '100%', height: '100%' }}>
+                <VideocamOff />
               </Box>
-            </Box>
-          )}
-          {!isCameraOn && (
-            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.82)', color: 'white', width: '100%', height: '100%' }}>
-              <VideocamOff sx={{ fontSize: 48 }} />
-            </Box>
-          )}
-          <Chip
-            size="small"
-            label="You"
-            sx={{ position: 'absolute', left: { xs: 10, sm: 14 }, bottom: { xs: 82, sm: 96 }, bgcolor: 'rgba(0,0,0,0.62)', color: 'white', backdropFilter: 'blur(8px)' }}
-          />
+            )}
+          </Paper>
         </Box>
       </Box>
 
       {/* Controls */}
-      <Paper
-        elevation={0}
-        sx={{
-          position: 'absolute',
-          left: '50%',
-          bottom: { xs: 10, sm: 18 },
-          transform: 'translateX(-50%)',
-          zIndex: 11,
-          px: { xs: 1, sm: 1.5 },
-          py: 1,
-          maxWidth: 'calc(100vw - 16px)',
-          bgcolor: 'rgba(0, 0, 0, 0.62)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: { xs: 0.75, sm: 1.25 },
-          flexWrap: 'nowrap',
-          overflowX: 'auto',
-          borderRadius: 999,
-          backdropFilter: 'blur(14px)',
-        }}
-      >
-        <IconButton onClick={toggleMicrophone} sx={{ width: 44, height: 44, bgcolor: isMicOn ? 'rgba(255,255,255,0.14)' : 'error.main', color: 'white', flex: '0 0 auto' }}>
+      <Paper elevation={0} sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'rgba(0, 0, 0, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'nowrap', overflowX: 'auto', flexShrink: 0 }}>
+        <IconButton onClick={toggleMicrophone} sx={{ bgcolor: isMicOn ? 'rgba(255,255,255,0.1)' : 'error.main', color: 'white' }}>
           {isMicOn ? <Mic /> : <MicOff />}
         </IconButton>
-        <IconButton onClick={toggleCamera} sx={{ width: 44, height: 44, bgcolor: isCameraOn ? 'rgba(255,255,255,0.14)' : 'error.main', color: 'white', flex: '0 0 auto' }}>
+        <IconButton onClick={toggleCamera} sx={{ bgcolor: isCameraOn ? 'rgba(255,255,255,0.1)' : 'error.main', color: 'white' }}>
           {isCameraOn ? <Videocam /> : <VideocamOff />}
-        </IconButton>
-        <IconButton
-          onClick={() => setVideoFitMode((mode) => mode === 'cover' ? 'contain' : 'cover')}
-          sx={{ width: 44, height: 44, bgcolor: videoFitMode === 'contain' ? 'primary.main' : 'rgba(255,255,255,0.14)', color: 'white', flex: '0 0 auto' }}
-          aria-label={videoFitMode === 'cover' ? 'Show full camera frame' : 'Fill camera frame'}
-        >
-          <AspectRatio />
         </IconButton>
         
         {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
           <>
-            <IconButton onClick={toggleRecording} sx={{ width: 44, height: 44, bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.14)', color: 'white', flex: '0 0 auto' }}>
+            <IconButton onClick={toggleRecording} sx={{ bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               {isRecording ? <StopCircle /> : <FiberManualRecord />}
             </IconButton>
-            <IconButton onClick={() => setShowTranscript(prev => !prev)} sx={{ width: 44, height: 44, bgcolor: showTranscript ? 'primary.main' : isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.14)', color: 'white', flex: '0 0 auto' }}>
+            <IconButton onClick={() => setShowTranscript(prev => !prev)} sx={{ bgcolor: showTranscript ? 'primary.main' : isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Transcribe />
             </IconButton>
           </>
         )}
 
-        <IconButton onClick={() => setShowEndDialog(true)} sx={{ width: 48, height: 48, bgcolor: 'error.main', color: 'white', flex: '0 0 auto' }}>
+        <IconButton onClick={() => setShowEndDialog(true)} sx={{ bgcolor: 'error.main', color: 'white' }}>
           <CallEnd />
         </IconButton>
         

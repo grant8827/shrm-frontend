@@ -12,7 +12,6 @@ interface UseTelehealthMediaResult {
   toggleCamera: () => void;
   toggleMicrophone: () => void;
   retryMediaAccess: () => Promise<void>;
-  refreshVideoConstraints: () => Promise<void>;
 }
 
 export const useTelehealthMedia = (
@@ -20,46 +19,11 @@ export const useTelehealthMedia = (
 ): UseTelehealthMediaResult => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [mediaInitFailed, setMediaInitFailed] = useState(false);
   const [isRetryingMedia, setIsRetryingMedia] = useState(false);
-
-  const isMobileOrTablet = () => (
-    /Mobi|Android|iPad|iPhone/i.test(navigator.userAgent) ||
-    window.matchMedia('(pointer: coarse)').matches ||
-    window.innerWidth < 1024
-  );
-
-  const buildOptimizedVideoConstraints = (): MediaTrackConstraints => {
-    const mobileOrTablet = isMobileOrTablet();
-    const isPortrait = window.innerHeight >= window.innerWidth;
-
-    if (!mobileOrTablet) {
-      return {
-        facingMode: 'user',
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        aspectRatio: { ideal: 16 / 9 },
-      };
-    }
-
-    return {
-      facingMode: 'user',
-      width: isPortrait ? { ideal: 480, max: 720 } : { ideal: 720, max: 1280 },
-      height: isPortrait ? { ideal: 640, max: 1280 } : { ideal: 480, max: 720 },
-      aspectRatio: { ideal: isPortrait ? 0.75 : 16 / 9 },
-      frameRate: { ideal: 24, max: 30 },
-    };
-  };
-
-  const buildOptimizedAudioConstraints = (): MediaTrackConstraints => ({
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-  });
 
   // Force strict cleanup on unmount
   useEffect(() => {
@@ -71,12 +35,20 @@ export const useTelehealthMedia = (
   const getMediaStreamWithFallback = async (): Promise<MediaStream> => {
     const attempts: MediaStreamConstraints[] = [
       {
-        video: buildOptimizedVideoConstraints(),
-        audio: buildOptimizedAudioConstraints(),
+        video: {
+          facingMode: 'user',
+          width: { ideal: 720, max: 1080 },
+          height: { ideal: 1280, max: 1920 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       },
       {
         video: { facingMode: 'user' },
-        audio: buildOptimizedAudioConstraints(),
+        audio: true,
       },
       { video: true, audio: true },
       { video: true, audio: false },
@@ -121,7 +93,6 @@ export const useTelehealthMedia = (
 
       const stream = await getMediaStreamWithFallback();
       localStreamRef.current = stream;
-      setLocalStream(stream);
 
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
@@ -166,42 +137,11 @@ export const useTelehealthMedia = (
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
-      setLocalStream(null);
     }
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
   }, []);
-
-  const refreshVideoConstraints = useCallback(async () => {
-    const videoTrack = localStreamRef.current?.getVideoTracks()[0];
-    if (!videoTrack || videoTrack.readyState !== 'live') return;
-
-    try {
-      await videoTrack.applyConstraints(buildOptimizedVideoConstraints());
-    } catch (error) {
-      console.warn('[useTelehealthMedia] Could not apply orientation video constraints:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    let timeoutId: number | undefined;
-    const handleViewportChange = () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        void refreshVideoConstraints();
-      }, 250);
-    };
-
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('orientationchange', handleViewportChange);
-
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('orientationchange', handleViewportChange);
-    };
-  }, [refreshVideoConstraints]);
 
   const retryMediaAccess = useCallback(async () => {
     try {
@@ -237,7 +177,7 @@ export const useTelehealthMedia = (
 
   return {
     localVideoRef,
-    localStream,
+    localStream: localStreamRef.current,
     isCameraOn,
     isMicOn,
     mediaInitFailed,
@@ -247,6 +187,5 @@ export const useTelehealthMedia = (
     toggleCamera,
     toggleMicrophone,
     retryMediaAccess,
-    refreshVideoConstraints,
   };
 };
