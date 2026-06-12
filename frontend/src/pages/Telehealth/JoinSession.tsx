@@ -35,24 +35,31 @@ const JoinSession: React.FC = () => {
   }, [roomId, user]);
 
   const fetchSessionDetails = async () => {
+    if (!roomId) {
+      setError('Missing room ID in the session link.');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      // Search for session by room_id
+      // Search for session by room_id (backend now supports this filter).
       const response = await apiClient.get(`/telehealth/sessions/`, {
         params: { room_id: roomId }
       });
 
       const sessions = response.data.results || response.data;
-      
-      if (!sessions || sessions.length === 0) {
+      const sessionData = Array.isArray(sessions)
+        ? sessions.find((session: SessionDetails) => session.room_id === roomId)
+        : null;
+
+      if (!sessionData) {
         setError('Session not found. The link may be invalid or expired.');
         setLoading(false);
         return;
       }
-
-      const sessionData = sessions[0];
 
       // Verify user is authorized to join this session (only for registered patients)
       if (user?.role === 'client' && sessionData.patient_details) {
