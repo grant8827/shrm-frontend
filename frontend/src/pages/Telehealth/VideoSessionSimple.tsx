@@ -121,7 +121,7 @@ const VideoSession: React.FC = () => {
     remoteVideoRef,
     isRemoteVideoReady,
     isRemotePlaybackBlocked,
-    remoteStream: _remoteStream,
+    remoteStream,
     initializePeerConnection,
     createOffer,
     handleOffer,
@@ -132,6 +132,8 @@ const VideoSession: React.FC = () => {
     sendMessage,
     onError: showError,
   });
+
+  const hasRemoteVideo = isRemoteVideoReady;
 
   // Fetch session details
   useEffect(() => {
@@ -195,6 +197,18 @@ const VideoSession: React.FC = () => {
       window.removeEventListener('resize', handleViewportChange);
     };
   }, [refreshVideoConstraints]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream && remoteVideoRef.current.srcObject !== remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      const playPromise = remoteVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.warn('[VIDEO] Remote playback retry blocked:', error);
+        });
+      }
+    }
+  }, [remoteStream, remoteVideoRef, hasRemoteVideo]);
 
   // Stops recognition, saves accumulated entries, clears state
   const stopAndSaveTranscription = useCallback(async () => {
@@ -719,45 +733,53 @@ const VideoSession: React.FC = () => {
           position: 'absolute',
           inset: 0,
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-          gridTemplateRows: { xs: '1fr 1fr', sm: '1fr' },
+          gridTemplateColumns: hasRemoteVideo ? { xs: '1fr', sm: '1fr 1fr' } : '1fr',
+          gridTemplateRows: hasRemoteVideo ? { xs: '1fr 1fr', sm: '1fr' } : '1fr',
           gap: 0,
           overflow: 'hidden',
-          '@media (max-width: 639px) and (orientation: landscape)': {
-            gridTemplateColumns: '1fr 1fr',
-            gridTemplateRows: '1fr',
-          },
-          '@media (min-width: 640px) and (max-width: 1024px) and (orientation: portrait)': {
-            gridTemplateColumns: '1fr',
-            gridTemplateRows: '1fr 1fr',
-          },
+          ...(hasRemoteVideo
+            ? {
+                '@media (max-width: 639px) and (orientation: landscape)': {
+                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateRows: '1fr',
+                },
+                '@media (min-width: 640px) and (max-width: 1024px) and (orientation: portrait)': {
+                  gridTemplateColumns: '1fr',
+                  gridTemplateRows: '1fr 1fr',
+                },
+              }
+            : {}),
         }}
       >
-        <Box ref={remoteContainerRef} sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
-          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: videoFitMode, backgroundColor: '#000' }} />
-          {!isRemoteVideoReady && (
-            <Box sx={{ position: 'absolute', inset: 0, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'white', bgcolor: 'radial-gradient(circle at center, rgba(30,30,30,0.72), rgba(0,0,0,0.95))' }}>
-              <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
-                {participantCount > 1
-                  ? `Establishing connection with ${participantName || 'participant'}...`
-                  : 'Waiting for other participant to join...'}
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1, opacity: 0.72 }}>
-                {participantCount > 1
-                  ? 'Setting up video and audio...'
-                  : 'Share the session link or wait for them to connect'}
-              </Typography>
-            </Box>
-          )}
-          {isRemoteVideoReady && isRemotePlaybackBlocked && (
-            <Box sx={{ position: 'absolute', bottom: { xs: 92, sm: 104 }, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
-              <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
-            </Box>
-          )}
-        </Box>
+        {hasRemoteVideo && (
+          <Box ref={remoteContainerRef} sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
+            <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: videoFitMode, backgroundColor: '#000' }} />
+            {isRemotePlaybackBlocked && (
+              <Box sx={{ position: 'absolute', bottom: { xs: 92, sm: 104 }, left: '50%', transform: 'translateX(-50%)', zIndex: 4 }}>
+                <Button variant="contained" onClick={() => remoteVideoRef.current?.play()}>Tap to start video</Button>
+              </Box>
+            )}
+          </Box>
+        )}
 
         <Box sx={{ position: 'relative', overflow: 'hidden', minWidth: 0, minHeight: 0, bgcolor: '#000' }}>
           <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: videoFitMode, transform: 'scaleX(-1)', backgroundColor: '#000' }} />
+          {!hasRemoteVideo && (
+            <Box sx={{ position: 'absolute', inset: 0, px: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'white', bgcolor: 'linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.62))', pointerEvents: 'none' }}>
+              <Box sx={{ maxWidth: 520, mt: { xs: 8, sm: 10 } }}>
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, textShadow: '0 1px 12px rgba(0,0,0,0.75)' }}>
+                  {participantCount > 1
+                    ? `Establishing connection with ${participantName || 'participant'}...`
+                    : 'Waiting for other participant to join...'}
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 1, opacity: 0.82, textShadow: '0 1px 10px rgba(0,0,0,0.75)' }}>
+                  {participantCount > 1
+                    ? 'Setting up video and audio...'
+                    : 'Share the session link or wait for them to connect'}
+                </Typography>
+              </Box>
+            </Box>
+          )}
           {!isCameraOn && (
             <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.82)', color: 'white', width: '100%', height: '100%' }}>
               <VideocamOff sx={{ fontSize: 48 }} />
