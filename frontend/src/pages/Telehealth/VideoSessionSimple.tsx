@@ -49,7 +49,7 @@ interface TranscriptEntry {
 const VideoSession: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError, showInfo } = useNotification();
   const { state } = useAuth();
   const user = state.user;
 
@@ -215,9 +215,14 @@ const VideoSession: React.FC = () => {
   // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
   const startLocalTranscription = useCallback((speakerRole: 'therapist' | 'patient') => {
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) return;
-    // Already running — nothing to do
-    if (keepTranscribingRef.current && recognitionRef.current) return;
+    if (!SpeechRecognitionAPI) {
+      showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
+      return false;
+    }
+    if (keepTranscribingRef.current && recognitionRef.current) {
+      showInfo('Transcription is already running.');
+      return true;
+    }
 
     const u = userRef.current;
     const speakerName = `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || u?.username || speakerRole;
@@ -267,12 +272,24 @@ const VideoSession: React.FC = () => {
       recognition.onspeechend = () => setIsSpeechDetected(false);
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (event.error === 'no-speech') {
+          setIsSpeechDetected(false);
+          return;
+        }
         console.error('[TRANSCRIBE] Error:', event.error);
         // Permanent permission errors — stop the restart loop
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           keepTranscribingRef.current = false;
           setIsTranscribing(false);
           recognitionRef.current = null;
+          showError('Microphone permission is blocked. Allow microphone access, then try transcription again.');
+        } else if (event.error === 'audio-capture') {
+          keepTranscribingRef.current = false;
+          setIsTranscribing(false);
+          recognitionRef.current = null;
+          showError('No microphone was detected for transcription.');
+        } else if (event.error === 'network') {
+          showError('Speech recognition network error. Please check your connection and try again.');
         }
         // All other errors fall through to onend which handles the restart
       };
@@ -294,6 +311,8 @@ const VideoSession: React.FC = () => {
       } catch (err) {
         console.error('[TRANSCRIBE] Failed to start recognition:', err);
         recognitionRef.current = null;
+        setIsTranscribing(false);
+        showError('Failed to start transcription. Please allow microphone access and try again.');
         if (keepTranscribingRef.current) {
           setTimeout(createAndStartRecognition, 1000);
         }
@@ -301,7 +320,8 @@ const VideoSession: React.FC = () => {
     };
 
     createAndStartRecognition();
-  }, []);
+    return true;
+  }, [showError, showInfo]);
 
   // Patient side: auto-start/stop recognition when therapist broadcasts
   useEffect(() => {
@@ -577,15 +597,21 @@ const VideoSession: React.FC = () => {
   };
 
   const startTranscription = async () => {
-    if (!sessionId) return;
+    const activeSessionId = sessionId ?? (sessionData?.id != null ? String(sessionData.id) : undefined);
+    if (!activeSessionId) {
+      showError('Cannot start transcription because this session was not loaded correctly.');
+      return;
+    }
     try {
       if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
-        showError('Speech recognition not supported in this browser');
+        showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
         return;
       }
       const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
-      startLocalTranscription(speakerRole);
-      webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
+      const started = startLocalTranscription(speakerRole);
+      if (!started) return;
+      webSocketService.sendMessage({ type: 'start-transcription', sessionId: activeSessionId, timestamp: new Date() });
+      showSuccess('Transcription started');
     } catch (error) {
       console.error('Transcription error:', error);
       showError('Failed to start transcription');
@@ -593,9 +619,13 @@ const VideoSession: React.FC = () => {
   };
 
   const stopTranscription = async () => {
-    if (!sessionId) return;
+    const activeSessionId = sessionId ?? (sessionData?.id != null ? String(sessionData.id) : undefined);
+    if (!activeSessionId) {
+      showError('Cannot stop transcription because this session was not loaded correctly.');
+      return;
+    }
     try {
-      webSocketService.sendMessage({ type: 'stop-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
+      webSocketService.sendMessage({ type: 'stop-transcription', sessionId: activeSessionId, timestamp: new Date() });
       await stopAndSaveTranscription();
     } catch (error) {
       console.error('Transcription error:', error);

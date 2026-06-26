@@ -40,6 +40,7 @@ import {
   Settings,
   Download,
   Replay,
+  Article,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -271,7 +272,11 @@ const VideoSession: React.FC = () => {
 
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) return;
+    if (!SpeechRecognitionAPI) {
+      showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
+      setIsTranscribing(false);
+      return;
+    }
 
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true;
@@ -309,6 +314,12 @@ const VideoSession: React.FC = () => {
             try { recognition.start(); } catch { /* ignore */ }
           }
         }, 1000);
+      } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        showError('Microphone access denied for transcription. Please allow microphone access and try again.');
+        recognitionRef.current = null;
+        setIsTranscribing(false);
+      } else {
+        showError(`Transcription error: ${event.error}. Try restarting transcription.`);
       }
     };
 
@@ -424,6 +435,7 @@ const VideoSession: React.FC = () => {
       // Auto-start transcription if enabled
       if (autoTranscribe) {
         setIsTranscribing(true);
+        setShowTranscript(true);
       }
     } catch (error: any) {
       console.error('[VIDEO] Media error:', error);
@@ -939,10 +951,13 @@ const VideoSession: React.FC = () => {
   };
 
   const toggleTranscription = () => {
-    setIsTranscribing(!isTranscribing);
     if (!isTranscribing) {
+      setIsTranscribing(true);
+      setShowTranscript(true);
+      setShowChat(false);
       showSuccess('Transcription started');
     } else {
+      setIsTranscribing(false);
       showInfo('Transcription paused');
     }
   };
@@ -1419,7 +1434,7 @@ const VideoSession: React.FC = () => {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Transcript">
+            <Tooltip title="View Transcript Panel">
               <IconButton
                 onClick={() => {
                   setShowTranscript(!showTranscript);
@@ -1431,7 +1446,7 @@ const VideoSession: React.FC = () => {
                   '&:hover': { bgcolor: showTranscript ? 'primary.dark' : 'rgba(255,255,255,0.1)' },
                 }}
               >
-                <ClosedCaption />
+                <Article />
               </IconButton>
             </Tooltip>
 
