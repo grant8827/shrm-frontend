@@ -180,9 +180,8 @@ const VideoSession: React.FC = () => {
   useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
   useEffect(() => { isTranscribingRef.current = isTranscribing; }, [isTranscribing]);
 
-  // Stops recognition, saves accumulated entries, clears state
+  // Stops recognition and clears state. Entries are already saved individually as they come in.
   const stopAndSaveTranscription = useCallback(async () => {
-    // Cancel any pending auto-restart BEFORE stopping recognition
     keepTranscribingRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
@@ -194,22 +193,9 @@ const VideoSession: React.FC = () => {
     }
     setIsTranscribing(false);
     setIsSpeechDetected(false);
-    const sid = sessionIdRef.current;
-    if (transcriptEntriesRef.current.length > 0 && sid) {
-      try {
-        await apiClient.post('/api/telehealth/transcripts', {
-          sessionId: sid,
-          entries: transcriptEntriesRef.current,
-        });
-        showSuccess('Transcript saved');
-      } catch (error) {
-        console.error('Failed to save transcript:', error);
-        showError('Failed to save transcript');
-      }
-    }
     transcriptEntriesRef.current = [];
     setTranscriptEntries([]);
-  }, [showSuccess, showError]);
+  }, []);
 
   // Starts Web Speech API on the local mic, labeling entries by role.
   // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
@@ -259,12 +245,21 @@ const VideoSession: React.FC = () => {
           transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
           setTranscriptEntries(prev => [...prev, entry]);
           setInterimTranscript('');
+          // Broadcast to remote participant
           webSocketService.sendMessage({
             type: 'transcript-entry',
             sessionId: sessionIdRef.current ?? '',
             timestamp: new Date(),
             entry: entry as unknown as Record<string, unknown>,
           });
+          // Save immediately — one DB insert per chunk
+          const sid = sessionIdRef.current;
+          if (sid) {
+            apiClient.post('/api/telehealth/transcripts', {
+              sessionId: sid,
+              entries: [entry],
+            }).catch((err) => console.error('[TRANSCRIBE] Failed to save entry:', err));
+          }
         }
       };
 
