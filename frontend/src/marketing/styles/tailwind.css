@@ -1,0 +1,10 @@
+/* Tailwind layers for the SHRM marketing site, alongside MUI.
+   @tailwind base is required — it's not just the reset, it also initializes
+   the CSS custom properties gradients/transforms/ring utilities depend on
+   (--tw-gradient-stops, --tw-translate-x, etc). corePlugins.preflight:false
+   in tailwind.config.js strips just the actual reset rules (margin/h1-h6/...)
+   from that layer so it can't leak into the MUI-based EHR app sharing this
+   bundle; base.css supplies the scoped .shrm-site reset instead. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

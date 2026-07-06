@@ -12,6 +12,16 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout/Layout';
 
+// Marketing site (SHRM public pages)
+import { MarketingLayout } from './marketing/MarketingLayout';
+import MarketingHome from './marketing/pages/Home';
+import MarketingAbout from './marketing/pages/About';
+import MarketingServices from './marketing/pages/Services';
+import MarketingContact from './marketing/pages/Contact';
+import MarketingRequestAppointment from './marketing/pages/Appointments';
+import MarketingPrivacy from './marketing/pages/Privacy';
+import MarketingTerms from './marketing/pages/Terms';
+
 // Pages
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -76,6 +86,17 @@ function App() {
           <NotificationProvider>
             <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
+                {/* Public marketing site (SHRM) — the homepage for the whole webapp */}
+                <Route element={<MarketingLayout />}>
+                  <Route index element={<MarketingHome />} />
+                  <Route path="/about" element={<MarketingAbout />} />
+                  <Route path="/services" element={<MarketingServices />} />
+                  <Route path="/request-appointment" element={<MarketingRequestAppointment />} />
+                  <Route path="/contact" element={<MarketingContact />} />
+                  <Route path="/privacy" element={<MarketingPrivacy />} />
+                  <Route path="/terms" element={<MarketingTerms />} />
+                </Route>
+
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/admin/login" element={<Navigate to="/login" replace />} />
@@ -83,10 +104,9 @@ function App() {
                 <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="/complete-registration/:token" element={<CompleteRegistration />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                
-                {/* Protected Routes */}
+
+                {/* Protected Routes — paths unchanged from before the marketing site was added */}
                 <Route
-                  path="/"
                   element={
                     <ProtectedRoute>
                       <Layout />
@@ -186,8 +206,7 @@ function App() {
                     }
                   />
                   
-                  {/* Smart Dashboard Redirect */}
-                  <Route index element={<DashboardRedirect />} />
+                  {/* Smart Dashboard Redirect — lands authenticated users on their role's dashboard */}
                   <Route path="/dashboard" element={<DashboardRedirect />} />
                 </Route>
 
@@ -212,8 +231,8 @@ function App() {
                 {/* Unauthorized Access */}
                 <Route path="/unauthorized" element={<Unauthorized />} />
 
-                {/* 404 - Redirect to login */}
-                <Route path="*" element={<Navigate to="/login" replace />} />
+                {/* 404 - Redirect to the public homepage */}
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Router>
           </NotificationProvider>

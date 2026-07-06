@@ -1,0 +1,331 @@
+/* CSS Reset and Base Styles for SHRM Counseling Website.
+   Scoped under .shrm-site so it can't leak into the MUI-based EHR app that
+   shares this frontend bundle — the original file used bare element
+   selectors (*, body, a, h1-h6, button, input...) which would otherwise
+   apply globally. */
+
+/* :where() keeps the .shrm-site scoping from adding specificity — these
+   rules must stay exactly as weak as the bare-element selectors they scope
+   (h1, p, a...) so that Tailwind utility classes (e.g. text-shrm-secondary)
+   can still override them, same as in the original unscoped stylesheet. */
+:where(.shrm-site),
+:where(.shrm-site) * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Base body styles, applied to the site root instead of <body> */
+.shrm-site {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  color: #374151;
+  background-color: #fafafa;
+}
+
+/* Link styles */
+:where(.shrm-site) a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* List styles */
+:where(.shrm-site) ul,
+:where(.shrm-site) ol {
+  list-style: none;
+}
+
+/* Button styles */
+:where(.shrm-site) button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Focus styles for accessibility */
+:where(.shrm-site) button:focus,
+:where(.shrm-site) a:focus {
+  outline: 2px solid #3c4535;
+  outline-offset: 2px;
+}
+
+/* Heading styles */
+:where(.shrm-site) h1,
+:where(.shrm-site) h2,
+:where(.shrm-site) h3,
+:where(.shrm-site) h4,
+:where(.shrm-site) h5,
+:where(.shrm-site) h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  color: #111827;
+}
+
+:where(.shrm-site) h1 {
+  font-size: 2.25rem;
+}
+
+:where(.shrm-site) h2 {
+  font-size: 1.875rem;
+}
+
+:where(.shrm-site) h3 {
+  font-size: 1.5rem;
+}
+
+:where(.shrm-site) h4 {
+  font-size: 1.25rem;
+}
+
+/* Paragraph styles */
+:where(.shrm-site) p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+/* Container utility */
+.shrm-site .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .shrm-site .container {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shrm-site .container {
+    padding: 0 2rem;
+  }
+}
+
+/* Main app container */
+.shrm-site.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shrm-site .main-content {
+  flex: 1;
+}
+
+/* Page sections */
+.shrm-site .page-section {
+  padding: 4rem 0;
+}
+
+.shrm-site .page-section.hero {
+  padding: 6rem 0;
+  background: linear-gradient(135deg, #f7f8f5 0%, #fefce8 100%);
+}
+
+/* Utility classes */
+.shrm-site .text-center {
+  text-align: center;
+}
+
+.shrm-site .text-primary {
+  color: #3c4535;
+}
+
+.shrm-site .text-secondary {
+  color: #fac800;
+}
+
+.shrm-site .text-muted {
+  color: #6b7280;
+}
+
+.shrm-site .bg-white {
+  background-color: white;
+}
+
+.shrm-site .shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shrm-site .rounded {
+  border-radius: 0.5rem;
+}
+
+.shrm-site .rounded-lg {
+  border-radius: 0.75rem;
+}
+
+.shrm-site .p-4 {
+  padding: 1rem;
+}
+
+.shrm-site .p-6 {
+  padding: 1.5rem;
+}
+
+.shrm-site .m-4 {
+  margin: 1rem;
+}
+
+.shrm-site .mb-4 {
+  margin-bottom: 1rem;
+}
+
+.shrm-site .mb-6 {
+  margin-bottom: 1.5rem;
+}
+
+.shrm-site .mt-8 {
+  margin-top: 2rem;
+}
+
+/* Grid utilities */
+.shrm-site .grid {
+  display: grid;
+}
+
+.shrm-site .grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.shrm-site .gap-4 {
+  gap: 1rem;
+}
+
+.shrm-site .gap-6 {
+  gap: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .shrm-site .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .shrm-site .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shrm-site .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .shrm-site .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shrm-site .lg\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Button styles */
+.shrm-site .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.shrm-site .btn-primary {
+  background: linear-gradient(135deg, #3c4535, #fac800);
+  color: white;
+  box-shadow: 0 4px 8px rgba(60, 69, 53, 0.3);
+}
+
+.shrm-site .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 12px rgba(60, 69, 53, 0.4);
+}
+
+.shrm-site .btn-secondary {
+  background-color: white;
+  color: #3c4535;
+  border: 2px solid #3c4535;
+}
+
+.shrm-site .btn-secondary:hover {
+  background-color: #f7f8f5;
+}
+
+.shrm-site .btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+}
+
+/* Card styles */
+.shrm-site .card {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.shrm-site .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+}
+
+.shrm-site .card-body {
+  padding: 1.5rem;
+}
+
+/* Form styles */
+.shrm-site .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.shrm-site .form-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #374151;
+}
+
+.shrm-site .form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.shrm-site .form-input:focus {
+  outline: none;
+  border-color: #3c4535;
+  box-shadow: 0 0 0 3px rgba(60, 69, 53, 0.1);
+}
+
+.shrm-site .form-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* Responsive text */
+@media (min-width: 640px) {
+  :where(.shrm-site) h1 { font-size: 3rem; }
+  :where(.shrm-site) h2 { font-size: 2.25rem; }
+  :where(.shrm-site) h3 { font-size: 1.875rem; }
+}
+
+@media (min-width: 1024px) {
+  :where(.shrm-site) h1 { font-size: 3.75rem; }
+  :where(.shrm-site) h2 { font-size: 3rem; }
+  :where(.shrm-site) h3 { font-size: 2.25rem; }
+}
