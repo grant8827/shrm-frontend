@@ -38,6 +38,8 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Add,
@@ -84,6 +86,8 @@ interface Appointment {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  isRecurring?: boolean;
+  seriesId?: string;
 }
 
 interface Patient {
@@ -125,6 +129,7 @@ interface AppointmentFormData {
   notes: string;
   location: string;
   reminderEnabled: boolean;
+  repeatWeekly: boolean;
 }
 
 const getPersonName = (person: Patient | Therapist) =>
@@ -263,6 +268,7 @@ const AppointmentScheduling: React.FC = () => {
     notes: '',
     location: '',
     reminderEnabled: true,
+    repeatWeekly: false,
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -351,7 +357,7 @@ const AppointmentScheduling: React.FC = () => {
       const endDateTime = new Date(startDateTime);
       endDateTime.setMinutes(endDateTime.getMinutes() + formData.duration);
 
-      const appointmentPayload = {
+      const appointmentPayload: Record<string, unknown> = {
         patientId: formData.patientId,
         therapistId: formData.therapistId,
         type: appointmentType || 'therapy_session',
@@ -362,14 +368,25 @@ const AppointmentScheduling: React.FC = () => {
         location: formData.location,
       };
 
+      // Repeat only applies to brand-new appointments — it seeds a weekly
+      // series from this one, so it can't be toggled on an existing row.
+      if (!editingAppointment && formData.repeatWeekly) {
+        appointmentPayload.repeat = true;
+      }
+
       if (editingAppointment) {
         // Update existing appointment
         await apiClient.put(`/api/appointments/${editingAppointment.id}`, appointmentPayload);
         alert('Appointment updated successfully!');
       } else {
         // Create new appointment
-        await apiClient.post('/api/appointments/', appointmentPayload);
-        alert('Appointment scheduled successfully!');
+        const createRes = await apiClient.post('/api/appointments/', appointmentPayload);
+        const generatedCount = createRes.data?.repeat_generated_count;
+        alert(
+          generatedCount
+            ? `Appointment scheduled and repeated weekly for the next ${generatedCount} weeks!`
+            : 'Appointment scheduled successfully!'
+        );
       }
 
       // Reload appointments after save
@@ -454,6 +471,8 @@ const AppointmentScheduling: React.FC = () => {
           createdBy: apt.created_by || '',
           createdAt: apt.created_at,
           updatedAt: apt.updated_at,
+          isRecurring: !!apt.is_recurring,
+          seriesId: apt.series_id || undefined,
         }));
       
       setAppointments(mappedAppointments);
@@ -483,6 +502,9 @@ const AppointmentScheduling: React.FC = () => {
         notes: appointment.notes,
         location: appointment.location || '',
         reminderEnabled: appointment.reminderSent,
+        // Repeat can only be set when creating a new appointment, not when
+        // editing one that already exists (see createAppointment backend).
+        repeatWeekly: false,
       });
     } else {
       setEditingAppointment(null);
@@ -497,6 +519,7 @@ const AppointmentScheduling: React.FC = () => {
         notes: '',
         location: '',
         reminderEnabled: true,
+        repeatWeekly: false,
       });
     }
     setFormErrors({});
@@ -543,6 +566,21 @@ const AppointmentScheduling: React.FC = () => {
     } catch (error: any) {
       console.error(`Failed to ${status} appointment:`, error);
       alert(`Failed to ${status} appointment. Please try again.`);
+    }
+  };
+
+  // Stops a recurring series: cancels all its not-yet-occurred appointments
+  // and marks the series inactive so it stops generating future weeks.
+  const stopRepeating = async (seriesId: string) => {
+    if (!window.confirm('Stop this weekly repeat? Upcoming occurrences will be cancelled.')) return;
+    try {
+      const res = await apiClient.post(`/api/appointments/series/${seriesId}/stop`);
+      await loadAppointments();
+      handleMenuClose();
+      alert(`Repeat stopped — ${res.data.cancelled_count} upcoming occurrence(s) cancelled.`);
+    } catch (error: any) {
+      console.error('Failed to stop repeating series:', error);
+      alert('Failed to stop repeating. Please try again.');
     }
   };
 
@@ -733,6 +771,9 @@ const AppointmentScheduling: React.FC = () => {
                                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
                                   <Chip label={appointment.type} size="small" variant="outlined" />
                                   <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
+                                  {appointment.isRecurring && (
+                                    <Chip label="Repeats weekly" color="secondary" size="small" variant="outlined" />
+                                  )}
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                                   <IconButton size="small" onClick={(e) => handleMenuOpen(e, appointment.id)}>
@@ -922,6 +963,9 @@ const AppointmentScheduling: React.FC = () => {
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
                         <Chip label={appointment.type} size="small" variant="outlined" />
                         <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
+                        {appointment.isRecurring && (
+                          <Chip label="Repeats weekly" color="secondary" size="small" variant="outlined" />
+                        )}
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                         {isPatient && appointment.status === 'scheduled' ? (
@@ -988,15 +1032,20 @@ const AppointmentScheduling: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={appointment.status}
-                          color={getStatusColor(appointment.status) as any}
-                          size="small"
-                        />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Chip
+                            label={appointment.status}
+                            color={getStatusColor(appointment.status) as any}
+                            size="small"
+                          />
+                          {appointment.isRecurring && (
+                            <Chip label="Repeats weekly" color="secondary" size="small" variant="outlined" />
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell align="center">
                         {isPatient && appointment.status === 'scheduled' ? (
-                          <Button 
+                          <Button
                             size="small"
                             variant="contained"
                             color="success"
@@ -1005,7 +1054,7 @@ const AppointmentScheduling: React.FC = () => {
                             Confirm
                           </Button>
                         ) : (
-                          <IconButton 
+                          <IconButton
                             size="small"
                             onClick={(e) => handleMenuOpen(e, appointment.id)}
                           >
@@ -1046,6 +1095,9 @@ const AppointmentScheduling: React.FC = () => {
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
                         <Chip label={appointment.type} size="small" variant="outlined" />
                         <Chip label={appointment.status} color={getStatusColor(appointment.status) as any} size="small" />
+                        {appointment.isRecurring && (
+                          <Chip label="Repeats weekly" color="secondary" size="small" variant="outlined" />
+                        )}
                       </Box>
                       {appointment.notes && (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -1124,11 +1176,16 @@ const AppointmentScheduling: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={appointment.status}
-                          color={getStatusColor(appointment.status) as any}
-                          size="small"
-                        />
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Chip
+                            label={appointment.status}
+                            color={getStatusColor(appointment.status) as any}
+                            size="small"
+                          />
+                          {appointment.isRecurring && (
+                            <Chip label="Repeats weekly" color="secondary" size="small" variant="outlined" />
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Tooltip title={appointment.notes || 'No notes'}>
@@ -1215,6 +1272,15 @@ const AppointmentScheduling: React.FC = () => {
           <ListItemIcon><Cancel color="error" /></ListItemIcon>
           Cancel Appointment
         </MenuItem>
+        {(() => {
+          const selected = appointments.find(a => a.id === selectedAppointmentId);
+          return selected?.isRecurring && selected.seriesId ? (
+            <MenuItem onClick={() => stopRepeating(selected.seriesId!)}>
+              <ListItemIcon><Cancel color="error" /></ListItemIcon>
+              Stop Repeating (cancels future weeks)
+            </MenuItem>
+          ) : null;
+        })()}
       </Menu>
 
       {/* New/Edit Appointment Dialog */}
@@ -1377,6 +1443,22 @@ const AppointmentScheduling: React.FC = () => {
                 placeholder="Session notes, special requirements, etc."
               />
             </Grid>
+
+            {/* Repeat only applies when creating a brand-new appointment —
+                it seeds a weekly series from this one. */}
+            {!editingAppointment && (
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.repeatWeekly}
+                      onChange={(e) => setFormData(prev => ({ ...prev, repeatWeekly: e.target.checked }))}
+                    />
+                  }
+                  label="Repeat weekly on this same day and time (creates the next 8 weeks)"
+                />
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>
