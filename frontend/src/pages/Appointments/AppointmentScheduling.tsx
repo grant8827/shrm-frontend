@@ -381,10 +381,9 @@ const AppointmentScheduling: React.FC = () => {
       } else {
         // Create new appointment
         const createRes = await apiClient.post('/api/appointments/', appointmentPayload);
-        const generatedCount = createRes.data?.repeat_generated_count;
         alert(
-          generatedCount
-            ? `Appointment scheduled and repeated weekly for the next ${generatedCount} weeks!`
+          createRes.data?.is_recurring
+            ? 'Appointment scheduled! It will repeat weekly — the next occurrence appears once this one has passed.'
             : 'Appointment scheduled successfully!'
         );
       }
@@ -1455,7 +1454,7 @@ const AppointmentScheduling: React.FC = () => {
                       onChange={(e) => setFormData(prev => ({ ...prev, repeatWeekly: e.target.checked }))}
                     />
                   }
-                  label="Repeat weekly on this same day and time (creates the next 8 weeks)"
+                  label="Repeat weekly on this same day and time"
                 />
               </Grid>
             )}
