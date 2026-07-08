@@ -72,6 +72,7 @@ const VideoSession: React.FC = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const participantCountRef = useRef(0);
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
@@ -548,32 +549,54 @@ const VideoSession: React.FC = () => {
     try {
       if (!isRecording) {
         if (localStream) {
-          const mediaRecorder = new MediaRecorder(localStream);
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+            ? 'video/webm;codecs=vp9,opus'
+            : 'video/webm';
+          const mediaRecorder = new MediaRecorder(localStream, { mimeType });
           const chunks: BlobPart[] = [];
-          
+
           mediaRecorder.ondataavailable = (e) => {
             if (e.data.size > 0) chunks.push(e.data);
           };
-          
+
           mediaRecorder.onstop = async () => {
-            const blob = new Blob(chunks, { type: 'video/webm' });
-            const blobUrl = URL.createObjectURL(blob);
+            const blob = new Blob(chunks, { type: mimeType });
+            const durationSeconds = recordingStartedAtRef.current
+              ? Math.round((Date.now() - recordingStartedAtRef.current) / 1000)
+              : 0;
+            recordingStartedAtRef.current = null;
+
             try {
-              await apiClient.post('/api/telehealth/recordings', {
-                sessionId,
-                fileUrl: blobUrl,
-                fileSize: blob.size,
-                storageProvider: 'local',
+              const formData = new FormData();
+              formData.append('recording', blob, `session-${sessionId}-${Date.now()}.webm`);
+              formData.append('sessionId', sessionId);
+              formData.append('duration', String(durationSeconds));
+
+              // Raw fetch, not apiClient — apiClient defaults to a JSON
+              // Content-Type header, which would break multer's multipart
+              // parsing. Leaving Content-Type unset lets the browser add
+              // the correct "multipart/form-data; boundary=..." itself.
+              const baseUrl = (apiClient.defaults.baseURL as string) || '';
+              const token = localStorage.getItem('access_token');
+              const response = await fetch(`${baseUrl}/api/telehealth/recordings`, {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                body: formData,
               });
+              if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.error || `Upload failed (${response.status})`);
+              }
               showSuccess('Recording saved successfully');
             } catch (error) {
               console.error('Failed to save recording:', error);
-              showError('Failed to save recording');
+              showError(error instanceof Error ? error.message : 'Failed to save recording');
             }
           };
-          
+
           mediaRecorder.start(1000);
           mediaRecorderRef.current = mediaRecorder;
+          recordingStartedAtRef.current = Date.now();
           setIsRecording(true);
           showSuccess('Recording started');
         }
@@ -583,7 +606,7 @@ const VideoSession: React.FC = () => {
           mediaRecorderRef.current = null;
         }
         setIsRecording(false);
-        showSuccess('Recording stopped');
+        showSuccess('Recording stopped — saving...');
       }
     } catch (error) {
       console.error('Recording error:', error);
