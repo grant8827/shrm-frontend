@@ -201,6 +201,7 @@ const VideoSession: React.FC = () => {
   // Starts Web Speech API on the local mic, labeling entries by role.
   // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
   const startLocalTranscription = useCallback((speakerRole: 'therapist' | 'patient') => {
+    console.log('[TRANSCRIBE] startLocalTranscription called for role:', speakerRole);
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
       showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
@@ -304,6 +305,7 @@ const VideoSession: React.FC = () => {
         recognition.start();
         recognitionRef.current = recognition;
         setIsTranscribing(true);
+        console.log('[TRANSCRIBE] recognition.start() succeeded, mic is now listening');
       } catch (err) {
         console.error('[TRANSCRIBE] Failed to start recognition:', err);
         recognitionRef.current = null;
@@ -615,6 +617,17 @@ const VideoSession: React.FC = () => {
   };
 
   const startTranscription = async () => {
+    // Unconditional — proves the click actually reached this handler at all,
+    // regardless of what happens next (extension interference, disabled
+    // state, etc. would all prevent even this line from running).
+    console.log('[TRANSCRIBE] Start Transcription clicked', {
+      sessionId,
+      sessionDataId: sessionData?.id,
+      isTranscribing,
+      hasSpeechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+      isSecureContext: window.isSecureContext,
+      userRole: user?.role,
+    });
     const activeSessionId = sessionId ?? (sessionData?.id != null ? String(sessionData.id) : undefined);
     if (!activeSessionId) {
       showError('Cannot start transcription because this session was not loaded correctly.');
