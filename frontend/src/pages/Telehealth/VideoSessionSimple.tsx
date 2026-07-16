@@ -74,6 +74,9 @@ const VideoSession: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStartedAtRef = useRef<number | null>(null);
   const participantCountRef = useRef(0);
+  // Stable refs so connectWebSocket closures always call the latest version without stale-closure issues
+  const startLocalTranscriptionRef = useRef<((speakerRole: 'therapist' | 'patient') => boolean) | null>(null);
+  const stopAndSaveTranscriptionRef = useRef<(() => Promise<void>) | null>(null);
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
   const isTranscribingRef = useRef(false); // mirrors isTranscribing for use inside WS callbacks
@@ -90,8 +93,6 @@ const VideoSession: React.FC = () => {
 
   // Dialogs
   const [showEndDialog, setShowEndDialog] = useState(false);
-  // Auto-transcription: patient side tracks whether therapist triggered transcription
-  const [autoTranscribeRequested, setAutoTranscribeRequested] = useState(false);
   // Stable refs so WS closures always read latest values without stale-closure issues
   const userRef = useRef(user);
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
@@ -197,6 +198,8 @@ const VideoSession: React.FC = () => {
     transcriptEntriesRef.current = [];
     setTranscriptEntries([]);
   }, []);
+  // Update ref on every render so connectWebSocket closures always call the latest version
+  stopAndSaveTranscriptionRef.current = stopAndSaveTranscription;
 
   // Starts Web Speech API on the local mic, labeling entries by role.
   // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
@@ -320,19 +323,8 @@ const VideoSession: React.FC = () => {
     createAndStartRecognition();
     return true;
   }, [showError, showInfo]);
-
-  // Patient side: auto-start/stop recognition when therapist broadcasts
-  useEffect(() => {
-    const u = userRef.current;
-    if (!u || ['admin', 'therapist', 'staff'].includes(u.role)) return;
-    if (autoTranscribeRequested) {
-      startLocalTranscription('patient');
-    } else {
-      // Always call stop — keepTranscribingRef=false inside guards against double-stop
-      void stopAndSaveTranscription();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoTranscribeRequested]);
+  // Update ref on every render so connectWebSocket closures always call the latest version
+  startLocalTranscriptionRef.current = startLocalTranscription;
 
   const connectWebSocket = useCallback(async () => {
     if (!roomId || !user) return;
@@ -457,15 +449,18 @@ const VideoSession: React.FC = () => {
     });
 
     // start-transcription: therapist broadcast → patients auto-start their mic
+    // Call directly via ref to avoid stale-closure issues from async state → useEffect chain
     webSocketService.on('start-transcription', () => {
       const u = userRef.current;
       if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
-      setAutoTranscribeRequested(true);
+      startLocalTranscriptionRef.current?.('patient');
     });
 
-    // stop-transcription: therapist stopped → patients save and stop
+    // stop-transcription: therapist stopped → patients stop their recognition
     webSocketService.on('stop-transcription', () => {
-      setAutoTranscribeRequested(false);
+      const u = userRef.current;
+      if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
+      void stopAndSaveTranscriptionRef.current?.();
     });
 
     // transcript-entry: remote participant's final speech result → append to local view
@@ -541,9 +536,25 @@ const VideoSession: React.FC = () => {
     }
     // Save our own side
     await stopAndSaveTranscription();
-    cleanupSession();
-    showSuccess('Session ended');
-    navigate('/telehealth/dashboard');
+    try {
+      if (sessionId) {
+        if (user && ['admin', 'therapist', 'staff'].includes(user.role)) {
+          await apiClient.post(`/api/telehealth/sessions/${sessionId}/end`);
+        } else {
+          await apiClient.post(`/api/telehealth/sessions/${sessionId}/leave`);
+        }
+      }
+      cleanupSession();
+      showSuccess(
+        user && ['admin', 'therapist', 'staff'].includes(user.role)
+          ? 'Session ended and the next appointment is now scheduled'
+          : 'You left the session'
+      );
+      navigate('/telehealth/dashboard');
+    } catch (error) {
+      console.error('Failed to end session:', error);
+      showError('The session could not be ended. Please try again.');
+    }
   };
 
   const toggleRecording = async () => {

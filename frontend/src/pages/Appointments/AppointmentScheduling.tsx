@@ -36,10 +36,10 @@ import {
   Menu,
   ListItemIcon,
   Tooltip,
-  useTheme,
-  useMediaQuery,
   Checkbox,
   FormControlLabel,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Add,
@@ -129,7 +129,7 @@ interface AppointmentFormData {
   notes: string;
   location: string;
   reminderEnabled: boolean;
-  repeatWeekly: boolean;
+  isRecurring: boolean;
 }
 
 const getPersonName = (person: Patient | Therapist) =>
@@ -268,7 +268,7 @@ const AppointmentScheduling: React.FC = () => {
     notes: '',
     location: '',
     reminderEnabled: true,
-    repeatWeekly: false,
+    isRecurring: false,
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -366,13 +366,9 @@ const AppointmentScheduling: React.FC = () => {
         status: 'scheduled',
         notes: formData.notes,
         location: formData.location,
+        isRecurring: formData.isRecurring,
+        recurrenceIntervalWeeks: 1,
       };
-
-      // Repeat only applies to brand-new appointments — it seeds a weekly
-      // series from this one, so it can't be toggled on an existing row.
-      if (!editingAppointment && formData.repeatWeekly) {
-        appointmentPayload.repeat = true;
-      }
 
       if (editingAppointment) {
         // Update existing appointment
@@ -383,7 +379,7 @@ const AppointmentScheduling: React.FC = () => {
         const createRes = await apiClient.post('/api/appointments/', appointmentPayload);
         alert(
           createRes.data?.is_recurring
-            ? 'Appointment scheduled! It will repeat weekly — the next occurrence appears once this one has passed.'
+            ? 'Recurring appointment scheduled. This row will move to the next week when the session ends.'
             : 'Appointment scheduled successfully!'
         );
       }
@@ -474,7 +470,26 @@ const AppointmentScheduling: React.FC = () => {
           seriesId: apt.series_id || undefined,
         }));
       
-      setAppointments(mappedAppointments);
+      // The appointment page is the live schedule, not appointment history.
+      // Keep only current/future rows; ended occurrences are rolled forward by
+      // the telehealth end-session endpoint using the same database row.
+      const now = new Date();
+      const currentAppointments = mappedAppointments.filter((appointment) => {
+        const end = new Date(`${appointment.date}T${appointment.time}:00`);
+        end.setMinutes(end.getMinutes() + appointment.duration);
+        return end >= now && !['completed', 'cancelled', 'no-show'].includes(appointment.status);
+      }).sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
+
+      // Defensive display guard for legacy duplicate recurring rows. New
+      // duplicates are rejected by the API, but old data is left untouched.
+      const recurringKeys = new Set<string>();
+      setAppointments(currentAppointments.filter((appointment) => {
+        if (!appointment.isRecurring) return true;
+        const key = `${appointment.patientId}:${appointment.therapistId}`;
+        if (recurringKeys.has(key)) return false;
+        recurringKeys.add(key);
+        return true;
+      }));
     } catch (error: any) {
       console.error('Failed to load appointments:', error);
       setAppointments([]);
@@ -501,9 +516,7 @@ const AppointmentScheduling: React.FC = () => {
         notes: appointment.notes,
         location: appointment.location || '',
         reminderEnabled: appointment.reminderSent,
-        // Repeat can only be set when creating a new appointment, not when
-        // editing one that already exists (see createAppointment backend).
-        repeatWeekly: false,
+        isRecurring: Boolean(appointment.isRecurring),
       });
     } else {
       setEditingAppointment(null);
@@ -518,7 +531,7 @@ const AppointmentScheduling: React.FC = () => {
         notes: '',
         location: '',
         reminderEnabled: true,
-        repeatWeekly: false,
+        isRecurring: false,
       });
     }
     setFormErrors({});
@@ -1432,6 +1445,18 @@ const AppointmentScheduling: React.FC = () => {
             )}
 
             <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.isRecurring}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
+                  />
+                }
+                label="Repeat weekly using the same appointment and telehealth session"
+              />
+            </Grid>
+
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
@@ -1443,21 +1468,6 @@ const AppointmentScheduling: React.FC = () => {
               />
             </Grid>
 
-            {/* Repeat only applies when creating a brand-new appointment —
-                it seeds a weekly series from this one. */}
-            {!editingAppointment && (
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formData.repeatWeekly}
-                      onChange={(e) => setFormData(prev => ({ ...prev, repeatWeekly: e.target.checked }))}
-                    />
-                  }
-                  label="Repeat weekly on this same day and time"
-                />
-              </Grid>
-            )}
           </Grid>
         </DialogContent>
         <DialogActions>

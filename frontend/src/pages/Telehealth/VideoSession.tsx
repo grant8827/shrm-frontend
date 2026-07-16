@@ -1014,9 +1014,25 @@ const VideoSession: React.FC = () => {
     }
     // Save transcript to DB if there are entries
     await saveTranscriptToBackend(transcriptRef.current);
-    cleanupSession();
-    showSuccess('Session ended');
-    navigate('/telehealth/dashboard');
+    try {
+      if (sessionId) {
+        if (user && ['admin', 'therapist', 'staff'].includes(user.role)) {
+          await apiClient.post(`/api/telehealth/sessions/${sessionId}/end`);
+        } else {
+          await apiClient.post(`/api/telehealth/sessions/${sessionId}/leave`);
+        }
+      }
+      cleanupSession();
+      showSuccess(
+        user && ['admin', 'therapist', 'staff'].includes(user.role)
+          ? 'Session ended and the next appointment is now scheduled'
+          : 'You left the session'
+      );
+      navigate('/telehealth/dashboard');
+    } catch (error) {
+      console.error('Failed to end session:', error);
+      showError('The session could not be ended. Please try again.');
+    }
   };
 
   const downloadTranscript = () => {

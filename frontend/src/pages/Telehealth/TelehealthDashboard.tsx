@@ -81,6 +81,7 @@ interface TelehealthSession {
   duration: number;
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
   isEmergency: boolean;
+  isRecurring: boolean;
   sessionUrl?: string;
   hasRecording: boolean;
   hasTranscript: boolean;
@@ -237,6 +238,7 @@ const TelehealthDashboard: React.FC = () => {
         duration: session.duration,
         status: session.status,
         isEmergency: session.is_emergency || false,
+        isRecurring: Boolean(session.is_recurring),
         sessionUrl: session.session_url,
         hasRecording: session.has_recording,
         hasTranscript: session.has_transcript,
@@ -360,7 +362,17 @@ const TelehealthDashboard: React.FC = () => {
     return sessions.filter(s => s.status === status);
   };
 
-  const upcomingSessions = filterSessions('scheduled');
+  const scheduledSessions = filterSessions('scheduled')
+    .filter((session) => new Date(session.scheduledAt) >= new Date())
+    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  const recurringKeys = new Set<string>();
+  const upcomingSessions = scheduledSessions.filter((session) => {
+    if (!session.isRecurring) return true;
+    const key = `${session.patient.id}:${session.therapist.id}`;
+    if (recurringKeys.has(key)) return false;
+    recurringKeys.add(key);
+    return true;
+  });
   const completedSessions = filterSessions('completed');
   const emergencySessions = sessions.filter(s => s.isEmergency);
 

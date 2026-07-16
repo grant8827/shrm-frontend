@@ -19,6 +19,8 @@ import {
   CircularProgress,
   useTheme,
   useMediaQuery,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   NavigateBefore,
@@ -64,6 +66,7 @@ interface BookingForm {
   patientId: string;
   type: 'initial' | 'follow-up' | 'group' | 'assessment' | 'emergency';
   notes: string;
+  isRecurring: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -139,6 +142,7 @@ export default function ScheduleCalendar() {
     patientId: '',
     type: 'follow-up',
     notes: '',
+    isRecurring: false,
   });
   const [booking, setBooking] = useState(false);
 
@@ -262,7 +266,7 @@ export default function ScheduleCalendar() {
 
   const handleOpenBooking = (date: string, slot: string) => {
     setBookingTarget({ date, slot });
-    setBookingForm({ patientId: '', type: 'follow-up', notes: '' });
+    setBookingForm({ patientId: '', type: 'follow-up', notes: '', isRecurring: false });
   };
 
   const handleCloseBooking = () => {
@@ -280,6 +284,7 @@ export default function ScheduleCalendar() {
         patientId: bookingForm.patientId,
         type: bookingForm.type,
         notes: bookingForm.notes || undefined,
+        isRecurring: bookingForm.isRecurring,
       });
       showSuccess('Appointment booked successfully!');
       handleCloseBooking();
@@ -616,6 +621,17 @@ export default function ScheduleCalendar() {
                 ))}
               </Select>
             </FormControl>
+
+            {/* Notes */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={bookingForm.isRecurring}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, isRecurring: e.target.checked }))}
+                />
+              }
+              label="Repeat weekly using the same appointment"
+            />
 
             {/* Notes */}
             <TextField
