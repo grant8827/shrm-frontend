@@ -378,7 +378,9 @@ const AppointmentScheduling: React.FC = () => {
         // Create new appointment
         const createRes = await apiClient.post('/api/appointments/', appointmentPayload);
         alert(
-          createRes.data?.is_recurring
+          createRes.data?.updated_existing
+            ? 'The existing recurring appointment and telehealth session were updated to the selected date.'
+            : createRes.data?.is_recurring
             ? 'Recurring appointment scheduled. This row will move to the next week when the session ends.'
             : 'Appointment scheduled successfully!'
         );
