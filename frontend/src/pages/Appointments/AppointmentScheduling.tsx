@@ -63,6 +63,7 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { format as formatDate } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/apiClient';
 
@@ -141,6 +142,13 @@ const appointmentTypeMap: Record<Appointment['type'], string> = {
   group: 'group_therapy',
   assessment: 'assessment',
   emergency: 'therapy_session',
+};
+
+const toLocalDateKey = (date: Date): string => formatDate(date, 'yyyy-MM-dd');
+
+const fromLocalDateKey = (date: string): Date => {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
 };
 
 const normalizeAppointmentStatus = (status: string): Appointment['status'] =>
@@ -275,7 +283,7 @@ const AppointmentScheduling: React.FC = () => {
 
   // Filter appointments by selected date (use filteredAppointments for role-based access)
   const todaysAppointments = filteredAppointments.filter(
-    apt => apt.date === selectedDate.toISOString().split('T')[0]
+    apt => apt.date === toLocalDateKey(selectedDate)
   );
 
   const upcomingAppointments = filteredAppointments.filter(
@@ -350,9 +358,17 @@ const AppointmentScheduling: React.FC = () => {
       }
 
       // Combine date and time into ISO datetime strings
-      const startDateTime = new Date(formData.date!);
+      const selectedDay = formData.date!;
       const timeDate = new Date(formData.time!);
-      startDateTime.setHours(timeDate.getHours(), timeDate.getMinutes(), 0, 0);
+      const startDateTime = new Date(
+        selectedDay.getFullYear(),
+        selectedDay.getMonth(),
+        selectedDay.getDate(),
+        timeDate.getHours(),
+        timeDate.getMinutes(),
+        0,
+        0
+      );
       
       const endDateTime = new Date(startDateTime);
       endDateTime.setMinutes(endDateTime.getMinutes() + formData.duration);
@@ -456,7 +472,7 @@ const AppointmentScheduling: React.FC = () => {
           patientName: apt.patient_name || 'Unknown Client',
           therapistId: apt.therapist,
           therapistName: apt.therapist_name || 'Unknown Therapist',
-          date: apt.start_datetime.split('T')[0],
+          date: toLocalDateKey(new Date(apt.start_datetime)),
           time: new Date(apt.start_datetime).toTimeString().substring(0, 5),
           duration: Math.round((new Date(apt.end_datetime).getTime() - new Date(apt.start_datetime).getTime()) / 60000),
           type: 'follow-up' as const,
@@ -510,7 +526,7 @@ const AppointmentScheduling: React.FC = () => {
       setFormData({
         patientId: appointment.patientId,
         therapistId: appointment.therapistId,
-        date: new Date(appointment.date),
+        date: fromLocalDateKey(appointment.date),
         time: new Date(`2025-01-01T${appointment.time}:00`),
         duration: appointment.duration,
         type: appointment.type,

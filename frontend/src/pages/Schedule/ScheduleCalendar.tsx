@@ -93,7 +93,10 @@ function getWeekStart(date: Date): Date {
 
 /** Format a Date as YYYY-MM-DD */
 function toISO(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /** Format date range label, e.g. "Apr 28 – May 4, 2025" */
