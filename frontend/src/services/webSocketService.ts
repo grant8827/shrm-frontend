@@ -47,6 +47,7 @@ class WebSocketService {
     role?: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      let hasConnectedOnce = false;
       // Close any existing connection cleanly
       if (this.socket) {
         this.socket.removeAllListeners();
@@ -110,6 +111,16 @@ class WebSocketService {
 
       this.socket.on('connect', () => {
         console.log('[WS] Socket.io connected:', this.socket?.id);
+        // Socket.IO reconnects transport automatically after a server restart,
+        // but room membership is server-side state and must be restored.
+        if (hasConnectedOnce && this.roomId) {
+          this.socket?.emit('join-room', {
+            roomId: this.roomId,
+            sessionId: this.sessionId ?? this.roomId,
+          });
+          console.log('[WS] Rejoined room after reconnect:', this.roomId);
+        }
+        hasConnectedOnce = true;
         resolve();
       });
 
