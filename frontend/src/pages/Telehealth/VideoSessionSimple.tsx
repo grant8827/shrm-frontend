@@ -68,6 +68,12 @@ const VideoSession: React.FC = () => {
   const [showTranscript, setShowTranscript] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSpeechDetected, setIsSpeechDetected] = useState(false);
+  const [transcriptionStatus, setTranscriptionStatus] = useState<
+    'idle' | 'starting' | 'listening' | 'error'
+  >('idle');
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [showTranscriptionConsent, setShowTranscriptionConsent] = useState(false);
+  const [transcriptionRequester, setTranscriptionRequester] = useState('Your therapist');
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -182,7 +188,8 @@ const VideoSession: React.FC = () => {
   useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
   useEffect(() => { isTranscribingRef.current = isTranscribing; }, [isTranscribing]);
 
-  // Stops recognition and clears state. Entries are already saved individually as they come in.
+  // Stops recognition but deliberately preserves visible entries. Entries are
+  // already saved individually as they arrive.
   const stopAndSaveTranscription = useCallback(async () => {
     keepTranscribingRef.current = false;
     if (recognitionRef.current) {
@@ -195,8 +202,8 @@ const VideoSession: React.FC = () => {
     }
     setIsTranscribing(false);
     setIsSpeechDetected(false);
-    transcriptEntriesRef.current = [];
-    setTranscriptEntries([]);
+    setInterimTranscript('');
+    setTranscriptionStatus('idle');
   }, []);
   // Update ref on every render so connectWebSocket closures always call the latest version
   stopAndSaveTranscriptionRef.current = stopAndSaveTranscription;
@@ -207,7 +214,10 @@ const VideoSession: React.FC = () => {
     console.log('[TRANSCRIBE] startLocalTranscription called for role:', speakerRole);
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
-      showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
+      const message = 'Live transcription is not supported in this browser. Please use desktop Chrome.';
+      setTranscriptionStatus('error');
+      setTranscriptionError(message);
+      showError(message);
       return false;
     }
     if (keepTranscribingRef.current && recognitionRef.current) {
@@ -219,6 +229,8 @@ const VideoSession: React.FC = () => {
     const speakerName = `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || u?.username || speakerRole;
 
     keepTranscribingRef.current = true;
+    setTranscriptionStatus('starting');
+    setTranscriptionError(null);
 
     const createAndStartRecognition = () => {
       if (!keepTranscribingRef.current) return;
@@ -268,7 +280,10 @@ const VideoSession: React.FC = () => {
         }
       };
 
-      recognition.onspeechstart = () => setIsSpeechDetected(true);
+      recognition.onspeechstart = () => {
+        setIsSpeechDetected(true);
+        setTranscriptionStatus('listening');
+      };
       recognition.onspeechend = () => setIsSpeechDetected(false);
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -279,17 +294,26 @@ const VideoSession: React.FC = () => {
         console.error('[TRANSCRIBE] Error:', event.error);
         // Permanent permission errors — stop the restart loop
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          const message = 'Microphone permission is blocked for transcription. Allow microphone access, then click Start Transcription again.';
           keepTranscribingRef.current = false;
           setIsTranscribing(false);
           recognitionRef.current = null;
-          showError('Microphone permission is blocked. Allow microphone access, then try transcription again.');
+          setTranscriptionStatus('error');
+          setTranscriptionError(message);
+          showError(message);
         } else if (event.error === 'audio-capture') {
+          const message = 'No microphone was detected for transcription.';
           keepTranscribingRef.current = false;
           setIsTranscribing(false);
           recognitionRef.current = null;
-          showError('No microphone was detected for transcription.');
+          setTranscriptionStatus('error');
+          setTranscriptionError(message);
+          showError(message);
         } else if (event.error === 'network') {
-          showError('Speech recognition network error. Please check your connection and try again.');
+          const message = 'The browser speech-recognition service could not be reached. Check your connection and try again.';
+          setTranscriptionStatus('error');
+          setTranscriptionError(message);
+          showError(message);
         }
         // All other errors fall through to onend which handles the restart
       };
@@ -308,15 +332,18 @@ const VideoSession: React.FC = () => {
         recognition.start();
         recognitionRef.current = recognition;
         setIsTranscribing(true);
+        setTranscriptionStatus('listening');
+        setTranscriptionError(null);
         console.log('[TRANSCRIBE] recognition.start() succeeded, mic is now listening');
       } catch (err) {
+        const message = 'Failed to start transcription. Allow microphone access, then click Start Transcription again.';
         console.error('[TRANSCRIBE] Failed to start recognition:', err);
         recognitionRef.current = null;
         setIsTranscribing(false);
-        showError('Failed to start transcription. Please allow microphone access and try again.');
-        if (keepTranscribingRef.current) {
-          setTimeout(createAndStartRecognition, 1000);
-        }
+        keepTranscribingRef.current = false;
+        setTranscriptionStatus('error');
+        setTranscriptionError(message);
+        showError(message);
       }
     };
 
@@ -448,19 +475,41 @@ const VideoSession: React.FC = () => {
       showError('Connection to session server lost');
     });
 
+    webSocketService.on('request-transcription', (data) => {
+      const u = userRef.current;
+      if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
+      setTranscriptionRequester((data.initiatedByName as string) || 'Your therapist');
+      setShowTranscriptionConsent(true);
+      setShowTranscript(true);
+    });
+
+    webSocketService.on('transcription-response', (data) => {
+      const u = userRef.current;
+      if (!u || !['admin', 'therapist', 'staff'].includes(u.role)) return;
+      if (data.accepted === true) {
+        const started = startLocalTranscriptionRef.current?.('therapist');
+        if (started) showSuccess('Client approved transcription. Transcription started.');
+      } else {
+        setTranscriptionStatus('idle');
+        showInfo('The client declined transcription.');
+      }
+    });
+
     // start-transcription: therapist broadcast → patients auto-start their mic
     // Call directly via ref to avoid stale-closure issues from async state → useEffect chain
     webSocketService.on('start-transcription', () => {
       const u = userRef.current;
       if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
+      // Open the panel so the client can see the listening state or complete a
+      // local permission gesture if their browser blocks the remote start.
+      setShowTranscript(true);
       startLocalTranscriptionRef.current?.('patient');
     });
 
     // stop-transcription: therapist stopped → patients stop their recognition
     webSocketService.on('stop-transcription', () => {
-      const u = userRef.current;
-      if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
       void stopAndSaveTranscriptionRef.current?.();
+      showInfo('Transcription was stopped by the other participant.');
     });
 
     // transcript-entry: remote participant's final speech result → append to local view
@@ -646,17 +695,77 @@ const VideoSession: React.FC = () => {
     }
     try {
       if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
-        showError('Live transcription is not supported in this browser. Please use Chrome or Safari.');
+        const message = 'Live transcription is not supported in this browser. Please use desktop Chrome.';
+        setTranscriptionStatus('error');
+        setTranscriptionError(message);
+        showError(message);
         return;
       }
+
+      if (user && ['admin', 'therapist', 'staff'].includes(user.role)) {
+        setTranscriptionStatus('starting');
+        setTranscriptionError(null);
+        webSocketService.sendMessage({
+          type: 'request-transcription',
+          sessionId: activeSessionId,
+          timestamp: new Date(),
+        });
+        showInfo('Transcription request sent to the client.');
+        return;
+      }
+
       const speakerRole: 'therapist' | 'patient' = user?.role === 'client' ? 'patient' : 'therapist';
       const started = startLocalTranscription(speakerRole);
       if (!started) return;
-      webSocketService.sendMessage({ type: 'start-transcription', sessionId: activeSessionId, timestamp: new Date() });
       showSuccess('Transcription started');
     } catch (error) {
       console.error('Transcription error:', error);
       showError('Failed to start transcription');
+    }
+  };
+
+  const recordTranscriptionConsent = (accepted: boolean) => {
+    const activeSessionId = sessionId ?? (sessionData?.id != null ? String(sessionData.id) : undefined);
+    if (!activeSessionId) return;
+    apiClient.post('/api/audit/logs/batch/', {
+      logs: [{
+        action: accepted ? 'TRANSCRIPTION_CONSENT_GRANTED' : 'TRANSCRIPTION_CONSENT_DECLINED',
+        resource: 'telehealth_session',
+        resourceId: activeSessionId,
+        newValues: { accepted, decidedAt: new Date().toISOString() },
+      }],
+    }).catch((error) => console.error('[TRANSCRIBE] Failed to record consent decision:', error));
+  };
+
+  const respondToTranscriptionRequest = (accepted: boolean) => {
+    setShowTranscriptionConsent(false);
+    recordTranscriptionConsent(accepted);
+
+    if (accepted) {
+      const started = startLocalTranscription('patient');
+      if (!started) {
+        webSocketService.sendMessage({
+          type: 'transcription-response',
+          sessionId: sessionIdRef.current ?? '',
+          accepted: false,
+          timestamp: new Date(),
+        });
+        showError('You allowed transcription, but it could not start in this browser.');
+        return;
+      }
+    }
+
+    webSocketService.sendMessage({
+      type: 'transcription-response',
+      sessionId: sessionIdRef.current ?? '',
+      accepted,
+      timestamp: new Date(),
+    });
+
+    if (!accepted) {
+      setTranscriptionStatus('idle');
+      showInfo('Transcription request declined.');
+      return;
     }
   };
 
@@ -816,11 +925,13 @@ const VideoSession: React.FC = () => {
           {isCameraOn ? <Videocam /> : <VideocamOff />}
         </IconButton>
         
-        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
+        {user && (
           <>
+            {['admin', 'therapist', 'staff'].includes(user.role) && (
             <IconButton onClick={toggleRecording} sx={{ bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               {isRecording ? <StopCircle /> : <FiberManualRecord />}
             </IconButton>
+            )}
             <IconButton onClick={() => setShowTranscript(prev => !prev)} sx={{ bgcolor: showTranscript ? 'primary.main' : isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Transcribe />
             </IconButton>
@@ -847,9 +958,36 @@ const VideoSession: React.FC = () => {
           <Button onClick={endSession} color="error" variant="contained">End Session</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={showTranscriptionConsent}
+        onClose={() => respondToTranscriptionRequest(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Transcription Request</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {transcriptionRequester} would like to transcribe this session.
+          </Alert>
+          <Typography variant="body2">
+            If you allow, your spoken conversation will appear as a labeled session transcript and
+            will be saved with the session. You can stop transcription at any time.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => respondToTranscriptionRequest(false)} color="inherit">
+            Decline
+          </Button>
+          <Button onClick={() => respondToTranscriptionRequest(true)} variant="contained">
+            Allow Transcription
+          </Button>
+        </DialogActions>
+      </Dialog>
       
-      {/* Floating sidebar toggle tab — visible to staff/therapist/admin only */}
-      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Box
+      {/* Both participants need access: browsers may require a local click before
+          allowing speech recognition to use the microphone. */}
+      {user && <Box
         onClick={() => setShowTranscript(prev => !prev)}
         sx={{
           position: 'fixed',
@@ -874,8 +1012,8 @@ const VideoSession: React.FC = () => {
         {showTranscript ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
       </Box>}
 
-      {/* Transcript Drawer — visible to staff/therapist/admin only */}
-      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
+      {/* Transcript Drawer */}
+      {user && <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="h6">Session Transcript</Typography>
           <IconButton size="small" onClick={() => setShowTranscript(false)} aria-label="Close panel">
@@ -886,8 +1024,23 @@ const VideoSession: React.FC = () => {
           <Chip size="small" label="Therapist" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
           <Chip size="small" label="Client" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
         </Box>
+        {transcriptionError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {transcriptionError}
+          </Alert>
+        )}
+        {!isTranscribing && !transcriptionError && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Each participant should click Start Transcription once so their browser can authorize speech recognition.
+          </Alert>
+        )}
         <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
-          {isTranscribing && isSpeechDetected && <Typography variant="caption" color="success.main">Listening...</Typography>}
+          {transcriptionStatus === 'starting' && <Typography variant="caption">Starting transcription…</Typography>}
+          {isTranscribing && (
+            <Typography variant="caption" color="success.main">
+              {isSpeechDetected ? 'Speech detected…' : 'Listening…'}
+            </Typography>
+          )}
           <List disablePadding>
             {transcriptEntries.map((entry, idx) => {
               const isTherapist = entry.speakerRole === 'therapist';
@@ -934,7 +1087,7 @@ const VideoSession: React.FC = () => {
             variant="contained"
             color="primary"
             onClick={startTranscription}
-            disabled={isTranscribing}
+            disabled={isTranscribing || transcriptionStatus === 'starting'}
           >
             Start Transcription
           </Button>

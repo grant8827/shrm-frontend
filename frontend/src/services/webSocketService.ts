@@ -85,6 +85,8 @@ class WebSocketService {
         'answer',
         'ice-candidate',
         'buffered-candidates',
+        'request-transcription',
+        'transcription-response',
         'start-transcription',
         'stop-transcription',
         'transcript-entry',
