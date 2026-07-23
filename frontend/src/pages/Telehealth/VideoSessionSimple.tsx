@@ -428,15 +428,6 @@ const VideoSession: React.FC = () => {
       setTranscriptEntries((previous) => [...previous, entry]);
       setInterimTranscript('');
       setIsSpeechDetected(false);
-
-      const currentUser = userRef.current;
-      const sid = sessionIdRef.current;
-      if (sid && currentUser && ['admin', 'therapist', 'staff'].includes(currentUser.role)) {
-        apiClient.post('/api/telehealth/transcripts', {
-          sessionId: sid,
-          entries: [entry],
-        }).catch((error) => console.error('[TRANSCRIBE] Failed to save Deepgram entry:', error));
-      }
     });
 
     webSocketService.on('deepgram-error', (data) => {
