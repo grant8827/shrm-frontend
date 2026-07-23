@@ -75,9 +75,8 @@ const VideoSession: React.FC = () => {
   const [showTranscriptionConsent, setShowTranscriptionConsent] = useState(false);
   const [transcriptionRequester, setTranscriptionRequester] = useState('Your therapist');
   
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const transcriptionRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStartedAtRef = useRef<number | null>(null);
   const participantCountRef = useRef(0);
   // Stable refs so connectWebSocket closures always call the latest version without stale-closure issues
@@ -85,8 +84,6 @@ const VideoSession: React.FC = () => {
   const stopAndSaveTranscriptionRef = useRef<(() => Promise<void>) | null>(null);
   // webSocketService is a module-level singleton – no ref needed
   const isInitiatorRef = useRef(false);
-  const isTranscribingRef = useRef(false); // mirrors isTranscribing for use inside WS callbacks
-  const keepTranscribingRef = useRef(false); // true = recognition should auto-restart after onend
   // Ref keeps the stream alive in closures registered BEFORE re-renders propagate
   const localStreamRef = useRef<MediaStream | null>(null);
   
@@ -186,19 +183,15 @@ const VideoSession: React.FC = () => {
   // Keep refs current on every render
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { sessionIdRef.current = sessionId ?? null; }, [sessionId]);
-  useEffect(() => { isTranscribingRef.current = isTranscribing; }, [isTranscribing]);
 
   // Stops recognition but deliberately preserves visible entries. Entries are
   // already saved individually as they arrive.
   const stopAndSaveTranscription = useCallback(async () => {
-    keepTranscribingRef.current = false;
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
+    if (transcriptionRecorderRef.current) {
+      const recorder = transcriptionRecorderRef.current;
+      transcriptionRecorderRef.current = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+      webSocketService.sendMessage({ type: 'stop-deepgram-transcription' });
     }
     setIsTranscribing(false);
     setIsSpeechDetected(false);
@@ -208,147 +201,60 @@ const VideoSession: React.FC = () => {
   // Update ref on every render so connectWebSocket closures always call the latest version
   stopAndSaveTranscriptionRef.current = stopAndSaveTranscription;
 
-  // Starts Web Speech API on the local mic, labeling entries by role.
-  // Auto-restarts on onend so mobile timeouts/no-speech events don't silently kill the mic.
+  // Starts a backend-proxied Deepgram stream using only the local microphone.
+  // The API key remains on the server and is never exposed to the browser.
   const startLocalTranscription = useCallback((speakerRole: 'therapist' | 'patient') => {
     console.log('[TRANSCRIBE] startLocalTranscription called for role:', speakerRole);
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
-      const message = 'Live transcription is not supported in this browser. Please use desktop Chrome.';
+    const stream = localStreamRef.current;
+    const audioTrack = stream?.getAudioTracks()[0];
+    if (!audioTrack) {
+      const message = 'No active microphone is available for transcription.';
       setTranscriptionStatus('error');
       setTranscriptionError(message);
       showError(message);
       return false;
     }
-    if (keepTranscribingRef.current && recognitionRef.current) {
+    if (transcriptionRecorderRef.current) {
       showInfo('Transcription is already running.');
       return true;
     }
 
-    const u = userRef.current;
-    const speakerName = `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || u?.username || speakerRole;
-
-    keepTranscribingRef.current = true;
-    setTranscriptionStatus('starting');
-    setTranscriptionError(null);
-
-    const createAndStartRecognition = () => {
-      if (!keepTranscribingRef.current) return;
-
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let interimText = '';
-        let finalText = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const text = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalText += text + ' ';
-          } else {
-            interimText += text;
-          }
-        }
-        setInterimTranscript(interimText);
-        if (finalText) {
-          const entry: TranscriptEntry = {
-            speakerName,
-            speakerRole,
-            text: finalText.trim(),
-            timestamp: Date.now(),
-          };
-          transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
-          setTranscriptEntries(prev => [...prev, entry]);
-          setInterimTranscript('');
-          // Broadcast to remote participant
-          webSocketService.sendMessage({
-            type: 'transcript-entry',
-            sessionId: sessionIdRef.current ?? '',
-            timestamp: new Date(),
-            entry: entry as unknown as Record<string, unknown>,
-          });
-          // Save immediately — one DB insert per chunk
-          const sid = sessionIdRef.current;
-          if (sid) {
-            apiClient.post('/api/telehealth/transcripts', {
-              sessionId: sid,
-              entries: [entry],
-            }).catch((err) => console.error('[TRANSCRIBE] Failed to save entry:', err));
-          }
-        }
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : 'audio/webm';
+    try {
+      const recorder = new MediaRecorder(new MediaStream([audioTrack]), { mimeType });
+      recorder.ondataavailable = async (event) => {
+        if (event.data.size === 0) return;
+        webSocketService.sendMessage({
+          type: 'deepgram-audio',
+          audio: await event.data.arrayBuffer(),
+        });
       };
-
-      recognition.onspeechstart = () => {
-        setIsSpeechDetected(true);
-        setTranscriptionStatus('listening');
-      };
-      recognition.onspeechend = () => setIsSpeechDetected(false);
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === 'no-speech') {
-          setIsSpeechDetected(false);
-          return;
-        }
-        console.error('[TRANSCRIBE] Error:', event.error);
-        // Permanent permission errors — stop the restart loop
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          const message = 'Microphone permission is blocked for transcription. Allow microphone access, then click Start Transcription again.';
-          keepTranscribingRef.current = false;
-          setIsTranscribing(false);
-          recognitionRef.current = null;
-          setTranscriptionStatus('error');
-          setTranscriptionError(message);
-          showError(message);
-        } else if (event.error === 'audio-capture') {
-          const message = 'No microphone was detected for transcription.';
-          keepTranscribingRef.current = false;
-          setIsTranscribing(false);
-          recognitionRef.current = null;
-          setTranscriptionStatus('error');
-          setTranscriptionError(message);
-          showError(message);
-        } else if (event.error === 'network') {
-          const message = 'The browser speech-recognition service could not be reached. Check your connection and try again.';
-          setTranscriptionStatus('error');
-          setTranscriptionError(message);
-          showError(message);
-        }
-        // All other errors fall through to onend which handles the restart
-      };
-
-      // onend fires on every session end: silence timeout, no-speech, network blip, manual stop.
-      // If keepTranscribingRef is still true, schedule a fresh session.
-      recognition.onend = () => {
-        recognitionRef.current = null;
-        setIsSpeechDetected(false);
-        if (keepTranscribingRef.current) {
-          setTimeout(createAndStartRecognition, 500);
-        }
-      };
-
-      try {
-        recognition.start();
-        recognitionRef.current = recognition;
-        setIsTranscribing(true);
-        setTranscriptionStatus('listening');
-        setTranscriptionError(null);
-        console.log('[TRANSCRIBE] recognition.start() succeeded, mic is now listening');
-      } catch (err) {
-        const message = 'Failed to start transcription. Allow microphone access, then click Start Transcription again.';
-        console.error('[TRANSCRIBE] Failed to start recognition:', err);
-        recognitionRef.current = null;
-        setIsTranscribing(false);
-        keepTranscribingRef.current = false;
+      recorder.onerror = () => {
+        const message = 'The browser could not capture microphone audio for transcription.';
         setTranscriptionStatus('error');
         setTranscriptionError(message);
+        setIsTranscribing(false);
         showError(message);
-      }
-    };
-
-    createAndStartRecognition();
-    return true;
+      };
+      transcriptionRecorderRef.current = recorder;
+      setTranscriptionStatus('starting');
+      setTranscriptionError(null);
+      webSocketService.sendMessage({
+        type: 'start-deepgram-transcription',
+        sessionId: sessionIdRef.current ?? '',
+        speakerRole,
+      });
+      return true;
+    } catch (error) {
+      console.error('[TRANSCRIBE] Failed to create audio stream:', error);
+      const message = 'Failed to prepare microphone audio for transcription.';
+      setTranscriptionStatus('error');
+      setTranscriptionError(message);
+      showError(message);
+      return false;
+    }
   }, [showError, showInfo]);
   // Update ref on every render so connectWebSocket closures always call the latest version
   startLocalTranscriptionRef.current = startLocalTranscription;
@@ -422,8 +328,7 @@ const VideoSession: React.FC = () => {
 
       void createOffer();
       // If therapist was already transcribing when the participant joined, re-signal them to start.
-      // Use keepTranscribingRef (set synchronously) not isTranscribingRef (set via React effect, async)
-      if (keepTranscribingRef.current && userRef.current && ['admin', 'therapist', 'staff'].includes(userRef.current.role)) {
+      if (transcriptionRecorderRef.current && userRef.current && ['admin', 'therapist', 'staff'].includes(userRef.current.role)) {
         webSocketService.sendMessage({ type: 'start-transcription', sessionId: sessionIdRef.current ?? '', timestamp: new Date() });
       }
     });
@@ -492,6 +397,66 @@ const VideoSession: React.FC = () => {
         setTranscriptionStatus('idle');
         showInfo('The client declined transcription.');
       }
+    });
+
+    webSocketService.on('deepgram-ready', () => {
+      const recorder = transcriptionRecorderRef.current;
+      if (recorder && recorder.state === 'inactive') {
+        recorder.start(250);
+        setIsTranscribing(true);
+        setTranscriptionStatus('listening');
+        setTranscriptionError(null);
+      }
+    });
+
+    webSocketService.on('deepgram-transcript', (data) => {
+      const incoming = data.entry as (TranscriptEntry & { isFinal?: boolean }) | undefined;
+      if (!incoming?.text) return;
+      if (!incoming.isFinal) {
+        setInterimTranscript(incoming.text);
+        setIsSpeechDetected(true);
+        return;
+      }
+
+      const entry: TranscriptEntry = {
+        speakerName: incoming.speakerName,
+        speakerRole: incoming.speakerRole,
+        text: incoming.text,
+        timestamp: incoming.timestamp,
+      };
+      transcriptEntriesRef.current = [...transcriptEntriesRef.current, entry];
+      setTranscriptEntries((previous) => [...previous, entry]);
+      setInterimTranscript('');
+      setIsSpeechDetected(false);
+
+      const currentUser = userRef.current;
+      const sid = sessionIdRef.current;
+      if (sid && currentUser && ['admin', 'therapist', 'staff'].includes(currentUser.role)) {
+        apiClient.post('/api/telehealth/transcripts', {
+          sessionId: sid,
+          entries: [entry],
+        }).catch((error) => console.error('[TRANSCRIBE] Failed to save Deepgram entry:', error));
+      }
+    });
+
+    webSocketService.on('deepgram-error', (data) => {
+      const message = (data.message as string) || 'The transcription service failed.';
+      if (transcriptionRecorderRef.current?.state === 'recording') {
+        transcriptionRecorderRef.current.stop();
+      }
+      transcriptionRecorderRef.current = null;
+      setIsTranscribing(false);
+      setTranscriptionStatus('error');
+      setTranscriptionError(message);
+      showError(message);
+    });
+
+    webSocketService.on('deepgram-stopped', () => {
+      transcriptionRecorderRef.current = null;
+      setIsTranscribing(false);
+      setIsSpeechDetected(false);
+      setInterimTranscript('');
+      setTranscriptionStatus('idle');
     });
 
     // start-transcription: therapist broadcast → patients auto-start their mic
@@ -563,17 +528,15 @@ const VideoSession: React.FC = () => {
   // Note: Added localStream check to prevent re-running if stream exists
 
   const cleanupSession = useCallback(() => {
+    if (transcriptionRecorderRef.current?.state !== 'inactive') {
+      transcriptionRecorderRef.current?.stop();
+    }
+    transcriptionRecorderRef.current = null;
     stopLocalMedia();
     closePeerConnection();
     webSocketService.disconnect();
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
     }
   }, [stopLocalMedia, closePeerConnection]);
 
@@ -683,7 +646,6 @@ const VideoSession: React.FC = () => {
       sessionId,
       sessionDataId: sessionData?.id,
       isTranscribing,
-      hasSpeechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
       isSecureContext: window.isSecureContext,
       userRole: user?.role,
     });
@@ -693,14 +655,6 @@ const VideoSession: React.FC = () => {
       return;
     }
     try {
-      if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
-        const message = 'Live transcription is not supported in this browser. Please use desktop Chrome.';
-        setTranscriptionStatus('error');
-        setTranscriptionError(message);
-        showError(message);
-        return;
-      }
-
       if (user && ['admin', 'therapist', 'staff'].includes(user.role)) {
         setTranscriptionStatus('starting');
         setTranscriptionError(null);

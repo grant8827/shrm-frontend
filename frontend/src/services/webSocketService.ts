@@ -20,6 +20,7 @@ export interface WebSocketMessage {
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
+  audio?: ArrayBuffer;
   // Allow arbitrary extra keys
   [key: string]: unknown;
 }
@@ -87,6 +88,10 @@ class WebSocketService {
         'buffered-candidates',
         'request-transcription',
         'transcription-response',
+        'deepgram-ready',
+        'deepgram-transcript',
+        'deepgram-error',
+        'deepgram-stopped',
         'start-transcription',
         'stop-transcription',
         'transcript-entry',
@@ -164,6 +169,9 @@ class WebSocketService {
         this.socket.emit('ice-candidate', { roomId, candidate });
         break;
       }
+      case 'deepgram-audio':
+        this.socket.emit('deepgram-audio', { roomId, audio: message.audio });
+        break;
       default:
         this.socket.emit(message.type, { roomId, ...message });
     }
