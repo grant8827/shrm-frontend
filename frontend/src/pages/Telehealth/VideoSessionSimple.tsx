@@ -480,7 +480,6 @@ const VideoSession: React.FC = () => {
       if (u && ['admin', 'therapist', 'staff'].includes(u.role)) return;
       setTranscriptionRequester((data.initiatedByName as string) || 'Your therapist');
       setShowTranscriptionConsent(true);
-      setShowTranscript(true);
     });
 
     webSocketService.on('transcription-response', (data) => {
@@ -925,13 +924,11 @@ const VideoSession: React.FC = () => {
           {isCameraOn ? <Videocam /> : <VideocamOff />}
         </IconButton>
         
-        {user && (
+        {user && ['admin', 'therapist', 'staff'].includes(user.role) && (
           <>
-            {['admin', 'therapist', 'staff'].includes(user.role) && (
             <IconButton onClick={toggleRecording} sx={{ bgcolor: isRecording ? 'error.main' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               {isRecording ? <StopCircle /> : <FiberManualRecord />}
             </IconButton>
-            )}
             <IconButton onClick={() => setShowTranscript(prev => !prev)} sx={{ bgcolor: showTranscript ? 'primary.main' : isTranscribing ? 'primary.dark' : 'rgba(255,255,255,0.1)', color: 'white' }}>
               <Transcribe />
             </IconButton>
@@ -972,7 +969,7 @@ const VideoSession: React.FC = () => {
           </Alert>
           <Typography variant="body2">
             If you allow, your spoken conversation will appear as a labeled session transcript and
-            will be saved with the session. You can stop transcription at any time.
+            will be saved with the session. Tell your therapist if you want transcription stopped.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -985,9 +982,8 @@ const VideoSession: React.FC = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Both participants need access: browsers may require a local click before
-          allowing speech recognition to use the microphone. */}
-      {user && <Box
+      {/* Transcript controls and content are restricted to clinical staff. */}
+      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Box
         onClick={() => setShowTranscript(prev => !prev)}
         sx={{
           position: 'fixed',
@@ -1013,7 +1009,7 @@ const VideoSession: React.FC = () => {
       </Box>}
 
       {/* Transcript Drawer */}
-      {user && <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
+      {user && ['admin', 'therapist', 'staff'].includes(user.role) && <Drawer anchor="left" open={showTranscript} sx={{ '& .MuiDrawer-paper': { width: { xs: '85vw', sm: 400 }, p: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
           <Typography variant="h6">Session Transcript</Typography>
           <IconButton size="small" onClick={() => setShowTranscript(false)} aria-label="Close panel">
