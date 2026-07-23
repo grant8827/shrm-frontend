@@ -111,8 +111,13 @@ class WebSocketService {
 
       this.socket.on('connect', () => {
         console.log('[WS] Socket.io connected:', this.socket?.id);
+      });
+
+      this.socket.on('signaling-ready', () => {
+        console.log('[WS] Signaling server handlers ready');
         // Socket.IO reconnects transport automatically after a server restart,
-        // but room membership is server-side state and must be restored.
+        // but room membership is server-side state and must be restored only
+        // after the new server connection has registered its room handlers.
         if (hasConnectedOnce && this.roomId) {
           this.socket?.emit('join-room', {
             roomId: this.roomId,
