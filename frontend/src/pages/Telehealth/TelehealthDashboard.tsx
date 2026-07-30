@@ -296,16 +296,13 @@ const TelehealthDashboard: React.FC = () => {
   };
 
   const handleJoinSession = async (sessionId: string) => {
-    // Start the session (sets status to active) so VideoSession page doesn't block entry
-    const session = sessions.find(s => s.id === sessionId);
-    if (session && session.status === 'scheduled') {
-      try {
-        await apiClient.post(`/api/telehealth/sessions/${sessionId}/start`);
-      } catch (err) {
-        console.warn('Could not start session (may already be active):', err);
-      }
+    try {
+      await apiClient.post(`/api/telehealth/sessions/${sessionId}/join`);
+      navigate(`/telehealth/session/${sessionId}`);
+    } catch (err) {
+      console.error('Could not join session:', err);
+      showError('You could not join this session. Please try again.');
     }
-    navigate(`/telehealth/session/${sessionId}`);
   };
 
   const handleOpenTranscriptsPage = (sessionId?: string) => {
@@ -362,8 +359,10 @@ const TelehealthDashboard: React.FC = () => {
     return sessions.filter(s => s.status === status);
   };
 
-  const scheduledSessions = filterSessions('scheduled')
-    .filter((session) => new Date(session.scheduledAt) >= new Date())
+  const threeHoursMs = 3 * 60 * 60 * 1000;
+  const scheduledSessions = sessions
+    .filter((session) => ['scheduled', 'active', 'ended'].includes(session.status))
+    .filter((session) => new Date(session.scheduledAt).getTime() + threeHoursMs >= Date.now())
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
   const recurringKeys = new Set<string>();
   const upcomingSessions = scheduledSessions.filter((session) => {

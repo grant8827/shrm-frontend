@@ -140,13 +140,11 @@ const VideoSession: React.FC = () => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
+        // Joining is authorized for either assigned participant and promotes a
+        // scheduled session to active before the room is loaded.
+        await apiClient.post(`/api/telehealth/sessions/${sessionId}/join`);
         const response = await apiClient.get(`/api/telehealth/sessions/${sessionId}/`);
         const session = response.data as SessionDetails;
-        // Block entry if session hasn't started (still scheduled)
-        if (session.status === 'scheduled') {
-          setSessionError('not_started');
-          return;
-        }
         setRoomId(session.room_id);
         setSessionData(session);
         console.log('[VIDEO] Session loaded:', session);
