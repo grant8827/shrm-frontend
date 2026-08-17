@@ -34,7 +34,7 @@ const Appointments: React.FC = () => {
     serviceType: '',
     preferredDate: '',
     preferredTime: '',
-    sessionType: 'in-person',
+    sessionType: 'video-call',
     hasInsurance: false,
     insuranceProvider: '',
     policyNumber: '',
@@ -74,7 +74,7 @@ const Appointments: React.FC = () => {
 
     try {
       // Validate required fields
-      const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'serviceType', 'preferredDate', 'preferredTime', 'reasonForCounseling'];
+      const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'serviceType', 'preferredDate', 'preferredTime', 'sessionType', 'reasonForCounseling'];
       
       for (const field of requiredFields) {
         const value = formData[field as keyof AppointmentForm];
@@ -112,7 +112,7 @@ const Appointments: React.FC = () => {
         serviceType: '',
         preferredDate: '',
         preferredTime: '',
-        sessionType: 'in-person',
+        sessionType: 'video-call',
         hasInsurance: false,
         insuranceProvider: '',
         policyNumber: '',
@@ -330,8 +330,8 @@ const Appointments: React.FC = () => {
                       className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
                       required
                     >
-                      <option value="in-person">💼 In-Person at Our Office</option>
                       <option value="video-call">💻 Video Call (Telehealth)</option>
+                      <option value="in-person" disabled>💼 In-Person at Our Office — Coming Soon</option>
                       {/* <option value="phone-call">📞 Phone Call</option> */}
                     </select>
                   </div>
