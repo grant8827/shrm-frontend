@@ -989,8 +989,8 @@ const PatientManagement: React.FC = () => {
                     onChange={(e) => setEditPatientData(prev => ({ ...prev, gender: e.target.value }))}
                   >
                     <MenuItem value=""><em>Not specified</em></MenuItem>
-                    <MenuItem value="Male">Male</MenuItem>
-                    <MenuItem value="Female">Female</MenuItem>
+                    <MenuItem value="M">Male</MenuItem>
+                    <MenuItem value="F">Female</MenuItem>
                     <MenuItem value="Non-binary">Non-binary</MenuItem>
                     <MenuItem value="Prefer not to say">Prefer not to say</MenuItem>
                   </Select>

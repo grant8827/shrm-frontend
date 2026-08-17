@@ -49,6 +49,7 @@ import {
 import axios from 'axios';
 import AddPatientForm from '../../components/AddPatientForm';
 import { apiService } from '../../services/apiService';
+import { PatientFormData, mapPatientFormDataToApiPayload } from '../../utils/patientFormMapper';
 
 // Backend patient interface - matches Django API response
 interface BackendPatient {
@@ -88,50 +89,6 @@ type PatientUpdatePayload = {
   dateOfBirth: string;
   gender: string;
 };
-
-// Form data interface
-interface PatientFormData {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: Date | null;
-  gender: string;
-  phone: string;
-  email: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-    email: string;
-  };
-  insurance: {
-    provider: string;
-    policyNumber: string;
-    groupNumber: string;
-    memberID: string;
-    effectiveDate: Date | null;
-  };
-  medical: {
-    primaryDiagnosis: string;
-    secondaryDiagnoses: string[];
-    allergies: string[];
-    medications: string[];
-    primaryTherapist: string;
-    referringPhysician: string;
-    medicalHistory: string;
-  };
-  compliance: {
-    consentForms: boolean;
-    privacyPolicy: boolean;
-    treatmentAgreement: boolean;
-    hipaaAuthorization: boolean;
-  };
-}
 
 const AdminPatientManagement: React.FC = () => {
   const theme = useTheme();
@@ -259,20 +216,20 @@ const AdminPatientManagement: React.FC = () => {
       if (formData.gender) payload.gender = formData.gender;
       if (formData.phone) payload.phone = formData.phone;
       if (formData.dateOfBirth) payload.dateOfBirth = formData.dateOfBirth;
-      await apiService.patch(`/patients/${selectedPatient.id}/`, payload);
-      // Update local state immediately so the table refreshes without a full reload
-      setPatients(prev => prev.map(p =>
-        p.id === selectedPatient.id
-          ? { ...p, phone: formData.phone, date_of_birth: formData.dateOfBirth, gender: formData.gender }
-          : p
-      ));
+      const response = await apiService.patch(`/patients/${selectedPatient.id}/`, payload);
+      if (response && typeof response === 'object' && 'success' in response && response.success === false) {
+        throw new Error(response.message || 'Failed to update client');
+      }
+
+      // Reload the persisted server value instead of assuming the update worked.
+      await loadPatients();
       setSuccessMessage('Client updated successfully');
       setShowSuccess(true);
       setEditPatientOpen(false);
       setSelectedPatient(null);
     } catch (error: unknown) {
       console.error('❌ Error updating patient:', error);
-      setErrorMessage('Failed to update client');
+      setErrorMessage(getErrorMessage(error, error instanceof Error ? error.message : 'Failed to update client'));
       setShowError(true);
     }
   };
@@ -441,50 +398,8 @@ const AdminPatientManagement: React.FC = () => {
   // Handle add patient
   const handleAddPatient = async (formData: PatientFormData) => {
     try {
-      const genderMap: Record<string, string> = {
-        male: 'M',
-        female: 'F',
-      };
-
-      // Generate username from first + last name
-      const username = `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`.replace(/[^a-z0-9.]/g, '');
-
       // Transform form data to backend format (camelCase to match Node.js controller)
-      const patientData = {
-        // Required user fields
-        username,
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phoneNumber: formData.phone,
-
-        // Patient fields
-        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth).toISOString().split('T')[0] : '',
-        gender: genderMap[formData.gender] || 'M',
-
-        // Address
-        street: formData.address.street,
-        city: formData.address.city,
-        state: formData.address.state,
-        zipCode: formData.address.zipCode,
-
-        // Emergency contact
-        emergencyContactName: formData.emergencyContact.name,
-        emergencyContactPhone: formData.emergencyContact.phone,
-        emergencyContactRelationship: formData.emergencyContact.relationship,
-        emergencyContactEmail: formData.emergencyContact.email,
-
-        // Insurance
-        insuranceProvider: formData.insurance.provider,
-        insurancePolicyNumber: formData.insurance.policyNumber,
-        insuranceGroupNumber: formData.insurance.groupNumber,
-        insuranceMemberID: formData.insurance.memberID,
-
-        // Medical
-        medicalHistory: formData.medical.medicalHistory,
-        allergies: formData.medical.allergies.join(', '),
-        primaryDiagnosis: formData.medical.primaryDiagnosis,
-      };
+      const patientData = mapPatientFormDataToApiPayload(formData);
 
       console.log('📤 Sending patient data to API:', patientData);
 

@@ -290,6 +290,39 @@ export interface MessageAttachment {
   uploadedAt: Date;
 }
 
+// Counseling Request Types — submissions from the public "Request an
+// Appointment" / Counseling Request Form (marketing site), reviewed by
+// admin/staff in the EHR app.
+export type LeadStatus = 'new' | 'contacted' | 'converted' | 'closed';
+
+export interface CounselingRequest {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string | null;
+  serviceType: string;
+  preferredDate: string;
+  preferredTime: string;
+  sessionType: string;
+  hasInsurance: boolean;
+  insuranceProvider: string | null;
+  policyNumber: string | null;
+  isEmergency: boolean;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  reasonForCounseling: string;
+  previousCounseling: boolean;
+  medications: string | null;
+  additionalInfo: string | null;
+  status: LeadStatus;
+  archivedAt: string | null;
+  convertedPatientId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Audit Types
 export interface AuditLog {
   id: string;

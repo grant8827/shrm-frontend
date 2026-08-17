@@ -79,7 +79,7 @@ interface TelehealthSession {
   };
   scheduledAt: string;
   duration: number;
-  status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'waiting_room' | 'connecting' | 'active' | 'on_hold' | 'ended' | 'cancelled' | 'failed';
   isEmergency: boolean;
   isRecurring: boolean;
   sessionUrl?: string;
@@ -337,8 +337,8 @@ const TelehealthDashboard: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return 'info';
-      case 'in-progress': return 'success';
-      case 'completed': return 'default';
+      case 'active': return 'success';
+      case 'ended': return 'default';
       case 'cancelled': return 'error';
       default: return 'default';
     }
@@ -347,22 +347,26 @@ const TelehealthDashboard: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'scheduled': return <Pending />;
-      case 'in-progress': return <PlayArrow />;
-      case 'completed': return <CheckCircle />;
+      case 'active': return <PlayArrow />;
+      case 'ended': return <CheckCircle />;
       case 'cancelled': return <Cancel />;
       default: return null;
     }
   };
 
-  const filterSessions = (status?: string) => {
-    if (!status) return sessions;
-    return sessions.filter(s => s.status === status);
-  };
-
-  const threeHoursMs = 3 * 60 * 60 * 1000;
+  const clinicDateKey = (date: Date | string): string =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(date));
+  const todayKey = clinicDateKey(new Date());
+  const isCurrentOrFutureClinicDay = (session: TelehealthSession) => clinicDateKey(session.scheduledAt) >= todayKey;
+  const isPastClinicDay = (session: TelehealthSession) => clinicDateKey(session.scheduledAt) < todayKey;
   const scheduledSessions = sessions
     .filter((session) => ['scheduled', 'active', 'ended'].includes(session.status))
-    .filter((session) => new Date(session.scheduledAt).getTime() + threeHoursMs >= Date.now())
+    .filter(isCurrentOrFutureClinicDay)
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
   const recurringKeys = new Set<string>();
   const upcomingSessions = scheduledSessions.filter((session) => {
@@ -372,7 +376,9 @@ const TelehealthDashboard: React.FC = () => {
     recurringKeys.add(key);
     return true;
   });
-  const completedSessions = filterSessions('completed');
+  const completedSessions = sessions
+    .filter((session) => session.status === 'ended' && isPastClinicDay(session))
+    .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
   const emergencySessions = sessions.filter(s => s.isEmergency);
 
   return (
@@ -808,8 +814,9 @@ const TelehealthDashboard: React.FC = () => {
                       size="small"
                       startIcon={<VideoCall />}
                       onClick={() => handleJoinSession(session.id)}
+                      disabled={session.status === 'cancelled' || (session.status === 'ended' && isPastClinicDay(session))}
                     >
-                      {session.status === 'completed' ? 'View' : 'Join'}
+                      {session.status === 'ended' && isPastClinicDay(session) ? 'Completed' : 'Join'}
                     </Button>
                   </Box>
                 }

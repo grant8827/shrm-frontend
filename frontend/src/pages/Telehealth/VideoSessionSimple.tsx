@@ -547,7 +547,7 @@ const VideoSession: React.FC = () => {
       cleanupSession();
       showSuccess(
         user && ['admin', 'therapist', 'staff'].includes(user.role)
-          ? 'Session ended and the next appointment is now scheduled'
+          ? 'Session ended. You can rejoin this room until midnight.'
           : 'You left the session'
       );
       navigate('/telehealth/dashboard');

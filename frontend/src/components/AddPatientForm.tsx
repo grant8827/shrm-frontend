@@ -36,63 +36,20 @@ import {
   Remove,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { PatientFormData } from '../utils/patientFormMapper';
 
-interface PatientFormData {
-  // Personal Information
-  firstName: string;
-  lastName: string;
-  dateOfBirth: Date | null;
-  gender: string;
-  phone: string;
-  email: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  
-  // Emergency Contact
-  emergencyContact: {
-    name: string;
-    phone: string;
-    relationship: string;
-    email: string;
-  };
-  
-  // Insurance Information
-  insurance: {
-    provider: string;
-    policyNumber: string;
-    groupNumber: string;
-    memberID: string;
-    effectiveDate: Date | null;
-  };
-  
-  // Medical Information
-  medical: {
-    primaryDiagnosis: string;
-    secondaryDiagnoses: string[];
-    allergies: string[];
-    medications: string[];
-    primaryTherapist: string;
-    referringPhysician: string;
-    medicalHistory: string;
-  };
-  
-  // Compliance
-  compliance: {
-    consentForms: boolean;
-    privacyPolicy: boolean;
-    treatmentAgreement: boolean;
-    hipaaAuthorization: boolean;
-  };
-}
+export type { PatientFormData };
 
 interface AddPatientFormProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (patientData: PatientFormData) => void;
+  // Pre-fills the form — e.g. when converting a Counseling Request into a
+  // client, so staff only need to fill in what the request didn't capture.
+  initialData?: Partial<PatientFormData>;
+  // Overrides the dialog title/submit label for that same "convert" flow.
+  title?: string;
+  submitLabel?: string;
 }
 
 const steps = [
@@ -114,50 +71,71 @@ const insuranceProviders = [
   'Other'
 ];
 
-const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit }) => {
-  const [activeStep, setActiveStep] = useState(0);
-  const [formData, setFormData] = useState<PatientFormData>({
-    firstName: '',
-    lastName: '',
-    dateOfBirth: null,
-    gender: '',
+const defaultFormData: PatientFormData = {
+  firstName: '',
+  lastName: '',
+  dateOfBirth: null,
+  gender: '',
+  phone: '',
+  email: '',
+  address: {
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+  },
+  emergencyContact: {
+    name: '',
     phone: '',
+    relationship: '',
     email: '',
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      zipCode: '',
-    },
-    emergencyContact: {
-      name: '',
-      phone: '',
-      relationship: '',
-      email: '',
-    },
-    insurance: {
-      provider: '',
-      policyNumber: '',
-      groupNumber: '',
-      memberID: '',
-      effectiveDate: null,
-    },
-    medical: {
-      primaryDiagnosis: '',
-      secondaryDiagnoses: [],
-      allergies: [],
-      medications: [],
-      primaryTherapist: '',
-      referringPhysician: '',
-      medicalHistory: '',
-    },
-    compliance: {
-      consentForms: false,
-      privacyPolicy: false,
-      treatmentAgreement: false,
-      hipaaAuthorization: false,
-    },
-  });
+  },
+  insurance: {
+    provider: '',
+    policyNumber: '',
+    groupNumber: '',
+    memberID: '',
+    effectiveDate: null,
+  },
+  medical: {
+    primaryDiagnosis: '',
+    secondaryDiagnoses: [],
+    allergies: [],
+    medications: [],
+    primaryTherapist: '',
+    referringPhysician: '',
+    medicalHistory: '',
+  },
+  compliance: {
+    consentForms: false,
+    privacyPolicy: false,
+    treatmentAgreement: false,
+    hipaaAuthorization: false,
+  },
+};
+
+const buildInitialFormData = (initialData?: Partial<PatientFormData>): PatientFormData => ({
+  ...defaultFormData,
+  ...initialData,
+  address: { ...defaultFormData.address, ...(initialData?.address || {}) },
+  emergencyContact: { ...defaultFormData.emergencyContact, ...(initialData?.emergencyContact || {}) },
+  insurance: { ...defaultFormData.insurance, ...(initialData?.insurance || {}) },
+  medical: { ...defaultFormData.medical, ...(initialData?.medical || {}) },
+  compliance: { ...defaultFormData.compliance, ...(initialData?.compliance || {}) },
+});
+
+const AddPatientForm: React.FC<AddPatientFormProps> = ({
+  open,
+  onClose,
+  onSubmit,
+  initialData,
+  title = 'Add New Client',
+  submitLabel = 'Add Client',
+}) => {
+  const [activeStep, setActiveStep] = useState(0);
+  // Lazy initializer — only runs once on mount, so parents that want fresh
+  // prefilled data for a different record should remount with a `key` prop.
+  const [formData, setFormData] = useState<PatientFormData>(() => buildInitialFormData(initialData));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -224,48 +202,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
 
   const handleReset = () => {
     setActiveStep(0);
-    setFormData({
-      firstName: '',
-      lastName: '',
-      dateOfBirth: null,
-      gender: '',
-      phone: '',
-      email: '',
-      address: {
-        street: '',
-        city: '',
-        state: '',
-        zipCode: '',
-      },
-      emergencyContact: {
-        name: '',
-        phone: '',
-        relationship: '',
-        email: '',
-      },
-      insurance: {
-        provider: '',
-        policyNumber: '',
-        groupNumber: '',
-        memberID: '',
-        effectiveDate: null,
-      },
-      medical: {
-        primaryDiagnosis: '',
-        secondaryDiagnoses: [],
-        allergies: [],
-        medications: [],
-        primaryTherapist: '',
-        referringPhysician: '',
-        medicalHistory: '',
-      },
-      compliance: {
-        consentForms: false,
-        privacyPolicy: false,
-        treatmentAgreement: false,
-        hipaaAuthorization: false,
-      },
-    });
+    setFormData(buildInitialFormData(initialData));
     setErrors({});
   };
 
@@ -859,7 +796,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Typography variant="h5" component="div">
-          Add New Client
+          {title}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Complete all required information to register a new client
@@ -895,7 +832,7 @@ const AddPatientForm: React.FC<AddPatientFormProps> = ({ open, onClose, onSubmit
             onClick={handleSubmit}
             color="primary"
           >
-            Add Client
+            {submitLabel}
           </Button>
         ) : (
           <Button

@@ -37,6 +37,7 @@ import TherapistSettings from './pages/Therapist/TherapistSettings';
 import AdminSettings from './pages/Admin/AdminSettings';
 import PatientManagement from './pages/Patients/PatientManagement';
 import AdminPatientManagement from './pages/Admin/AdminPatientManagement';
+import CounselingRequests from './pages/Admin/CounselingRequests';
 import AppointmentScheduling from './pages/Appointments/AppointmentScheduling';
 import BillingManagement from './pages/BillingManagement';
 import PatientBilling from './pages/PatientBilling';
@@ -66,6 +67,7 @@ function AdminRoutes() {
       <Route index element={<AdminDashboard user={state.user!} />} />
       <Route path="billing" element={<BillingManagement />} />
       <Route path="patients" element={<AdminPatientManagement />} />
+      <Route path="counseling-requests" element={<CounselingRequests />} />
       <Route path="appointments" element={<AppointmentScheduling />} />
       <Route path="soap-notes" element={<SOAPNotes />} />
       <Route path="messages" element={<Messages />} />

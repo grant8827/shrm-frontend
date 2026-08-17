@@ -40,9 +40,11 @@ import {
   CalendarMonth,
   ChevronLeft,
   ChevronRight,
+  Assignment,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import { counselingRequestsService } from '../../services/counselingRequestsService';
 import { useIdleTimer } from '../../hooks/useIdleTimer';
 import IdleTimeoutDialog from '../IdleTimeoutDialog';
 
@@ -61,6 +63,33 @@ export const Layout: React.FC = () => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = React.useState<null | HTMLElement>(null);
   const { notifications, unreadCount, unreadMessageCount, loading, fetchNotifications, markAsRead, markAllAsRead } = useNotifications();
+
+  // Badge count of new (unreviewed) Counseling Request Form submissions —
+  // admin/staff only, polled the same way unread message counts are.
+  const [newCounselingRequestsCount, setNewCounselingRequestsCount] = React.useState(0);
+  React.useEffect(() => {
+    const userRole = state.user?.role as string;
+    if (userRole !== 'admin' && userRole !== 'staff') {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchNewRequestsCount = async () => {
+      try {
+        const page = await counselingRequestsService.list({ status: 'new', limit: 1 });
+        if (!cancelled) setNewCounselingRequestsCount(page.count || 0);
+      } catch (err) {
+        console.error('Failed to fetch new counseling requests count:', err);
+      }
+    };
+
+    fetchNewRequestsCount();
+    const interval = setInterval(fetchNewRequestsCount, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [state.user?.role]);
 
   // Suppress idle auto-logout while the user is in an active telehealth video session
   const isInTelehealthSession = /^\/telehealth\/(session|join)\//.test(location.pathname);
@@ -169,6 +198,7 @@ export const Layout: React.FC = () => {
       items.push(
         { text: 'Admin Dashboard', icon: <Dashboard />, path: '/admin' },
         { text: 'Client Management', icon: <People />, path: '/admin/patients' },
+        { text: 'Counseling Requests', icon: <Badge badgeContent={newCounselingRequestsCount} color="error"><Assignment /></Badge>, path: '/admin/counseling-requests' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },
