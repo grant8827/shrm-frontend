@@ -11,7 +11,7 @@ interface UseTelehealthMediaResult {
   stopLocalMedia: () => void;
   toggleCamera: () => void;
   toggleMicrophone: () => void;
-  retryMediaAccess: () => Promise<void>;
+  retryMediaAccess: () => Promise<MediaStream | null>;
 }
 
 export const useTelehealthMedia = (
@@ -143,13 +143,14 @@ export const useTelehealthMedia = (
     }
   }, []);
 
-  const retryMediaAccess = useCallback(async () => {
+  const retryMediaAccess = useCallback(async (): Promise<MediaStream | null> => {
     try {
       setIsRetryingMedia(true);
       setMediaInitFailed(false);
-      await startLocalMedia();
+      return await startLocalMedia();
     } catch (err) {
       console.error('[useTelehealthMedia] Retry failed', err);
+      return null;
     } finally {
       setIsRetryingMedia(false);
     }

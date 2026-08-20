@@ -482,6 +482,34 @@ const VideoSession: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, sessionId, user, showSuccess, showError, createOffer, handleOffer, handleAnswer, addIceCandidate, closePeerConnection, connectionState, initializePeerConnection]);
 
+  // A failed initial getUserMedia attempt prevents initSession from creating the
+  // peer connection or joining signaling. Retry must resume that whole startup
+  // sequence; merely replacing the local <video> srcObject leaves both users
+  // visible in presence while no media can ever be negotiated.
+  const handleRetryMediaAccess = useCallback(async () => {
+    const stream = await retryMediaAccess();
+    if (!stream) return;
+
+    localStreamRef.current = stream;
+
+    try {
+      await initializePeerConnection(stream, false);
+      if (!webSocketService.isWebSocketConnected()) {
+        await connectWebSocket();
+      } else if (participantCountRef.current > 0) {
+        // This path covers a stream that was recovered while signaling stayed
+        // connected. Renegotiate so the peer receives the replacement tracks.
+        isInitiatorRef.current = true;
+        await createOffer();
+      }
+      setSessionStartTime((startedAt) => startedAt ?? new Date());
+      showSuccess('Camera and microphone connected');
+    } catch (error) {
+      console.error('[VIDEO] Failed to resume session after media retry:', error);
+      showError('Camera opened, but the video connection could not be resumed. Please retry.');
+    }
+  }, [retryMediaAccess, initializePeerConnection, connectWebSocket, createOffer, showSuccess, showError]);
+
   // Start Session Effect
   useEffect(() => {
     const initSession = async () => {
@@ -883,11 +911,25 @@ const VideoSession: React.FC = () => {
         </IconButton>
         
         {mediaInitFailed && (
-          <Button onClick={retryMediaAccess} disabled={isRetryingMedia} variant="contained" color="warning" sx={{ ml: 1 }}>
+          <Button onClick={() => void handleRetryMediaAccess()} disabled={isRetryingMedia} variant="contained" color="warning" sx={{ ml: 1 }}>
             {isRetryingMedia ? 'Retrying...' : 'Retry Camera'}
           </Button>
         )}
       </Paper>
+
+      {participantCount > 1 && (connectionState === 'failed' || connectionState === 'disconnected') && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => void createOffer(true)}>
+              Reconnect
+            </Button>
+          }
+          sx={{ borderRadius: 0 }}
+        >
+          The participant is online, but the secure video connection failed. Check your network or retry the connection.
+        </Alert>
+      )}
       
       {/* End Dialog */}
       <Dialog open={showEndDialog} onClose={() => setShowEndDialog(false)}>
