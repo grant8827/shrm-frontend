@@ -14,6 +14,11 @@ export interface AppointmentRequestData {
   email: string;
   phone: string;
   dateOfBirth: string;
+  gender: string;
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
   serviceType: string;
   preferredDate: string;
   preferredTime: string;
@@ -30,6 +35,15 @@ export interface AppointmentRequestData {
   additionalInfo?: string;
 }
 
+export interface ClientConsentData {
+  fullName: string;
+  email: string;
+  privacyPolicyAccepted: boolean;
+  treatmentAgreementAccepted: boolean;
+  hipaaAuthorizationAccepted: boolean;
+  signatureImage: string;
+}
+
 export const publicApi = {
   sendContactMessage: async (data: ContactFormData) => {
     const response = await apiClient.post('/api/contact', data);
@@ -38,6 +52,11 @@ export const publicApi = {
 
   createAppointmentRequest: async (data: AppointmentRequestData) => {
     const response = await apiClient.post('/api/appointment-requests', data);
+    return response.data;
+  },
+
+  submitClientConsent: async (data: ClientConsentData) => {
+    const response = await apiClient.post('/api/v1/client-consents', data);
     return response.data;
   },
 };

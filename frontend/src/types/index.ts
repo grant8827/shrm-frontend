@@ -302,6 +302,11 @@ export interface CounselingRequest {
   email: string;
   phone: string;
   dateOfBirth: string | null;
+  gender: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
   serviceType: string;
   preferredDate: string;
   preferredTime: string;

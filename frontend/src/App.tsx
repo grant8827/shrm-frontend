@@ -21,6 +21,7 @@ import MarketingContact from './marketing/pages/Contact';
 import MarketingRequestAppointment from './marketing/pages/Appointments';
 import MarketingPrivacy from './marketing/pages/Privacy';
 import MarketingTerms from './marketing/pages/Terms';
+import ClientConsent from './marketing/pages/ClientConsent';
 
 // Pages
 import Login from './pages/Auth/Login';
@@ -38,6 +39,7 @@ import AdminSettings from './pages/Admin/AdminSettings';
 import PatientManagement from './pages/Patients/PatientManagement';
 import AdminPatientManagement from './pages/Admin/AdminPatientManagement';
 import CounselingRequests from './pages/Admin/CounselingRequests';
+import ClientConsents from './pages/Admin/ClientConsents';
 import AppointmentScheduling from './pages/Appointments/AppointmentScheduling';
 import BillingManagement from './pages/BillingManagement';
 import PatientBilling from './pages/PatientBilling';
@@ -68,6 +70,7 @@ function AdminRoutes() {
       <Route path="billing" element={<BillingManagement />} />
       <Route path="patients" element={<AdminPatientManagement />} />
       <Route path="counseling-requests" element={<CounselingRequests />} />
+      <Route path="client-consents" element={<ClientConsents />} />
       <Route path="appointments" element={<AppointmentScheduling />} />
       <Route path="soap-notes" element={<SOAPNotes />} />
       <Route path="messages" element={<Messages />} />
@@ -94,6 +97,7 @@ function App() {
                   <Route path="/about" element={<MarketingAbout />} />
                   <Route path="/services" element={<MarketingServices />} />
                   <Route path="/request-appointment" element={<MarketingRequestAppointment />} />
+                  <Route path="/consent-forms" element={<ClientConsent />} />
                   <Route path="/contact" element={<MarketingContact />} />
                   <Route path="/privacy" element={<MarketingPrivacy />} />
                   <Route path="/terms" element={<MarketingTerms />} />
@@ -133,6 +137,7 @@ function App() {
                         <Routes>
                           <Route index element={<TherapistDashboard />} />
                           <Route path="patients" element={<PatientManagement />} />
+                          <Route path="client-consents" element={<ClientConsents />} />
                           <Route path="appointments" element={<AppointmentScheduling />} />
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />
@@ -154,6 +159,7 @@ function App() {
                         <Routes>
                           <Route index element={<TherapistDashboard />} />
                           <Route path="patients" element={<PatientManagement />} />
+                          <Route path="client-consents" element={<ClientConsents />} />
                           <Route path="appointments" element={<AppointmentScheduling />} />
                           <Route path="soap-notes" element={<SOAPNotes />} />
                           <Route path="messages" element={<Messages />} />

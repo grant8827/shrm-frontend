@@ -45,6 +45,8 @@ import {
   EmailOutlined,
   DeleteOutline,
   CheckCircleOutline,
+  DescriptionOutlined,
+  CancelOutlined,
 } from '@mui/icons-material';
 import axios from 'axios';
 import AddPatientForm from '../../components/AddPatientForm';
@@ -67,6 +69,20 @@ interface BackendPatient {
   admission_date: string;
   created_at: string;
   updated_at: string;
+
+  // Agreements & consent — signed status/signature/date for each required form
+  consent_form_signed?: boolean;
+  consent_form_signature?: string | null;
+  consent_form_date?: string | null;
+  treatment_agreement_signed?: boolean;
+  treatment_agreement_signature?: string | null;
+  treatment_agreement_date?: string | null;
+  hipaa_authorized?: boolean;
+  hipaa_signature?: string | null;
+  hipaa_date?: string | null;
+  privacy_policy_acknowledged?: boolean;
+  privacy_policy_signature?: string | null;
+  privacy_policy_date?: string | null;
 }
 
 // Paginated API response interface
@@ -110,6 +126,7 @@ const AdminPatientManagement: React.FC = () => {
   const [removePatientOpen, setRemovePatientOpen] = useState(false);
   const [completePatientOpen, setCompletePatientOpen] = useState(false);
   const [assignTherapistOpen, setAssignTherapistOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({ phone: '', dateOfBirth: '', gender: '' });
   const [selectedTherapistId, setSelectedTherapistId] = useState<string>('');
   const [therapists, setTherapists] = useState<{ id: string; name: string }[]>([]);
@@ -279,6 +296,13 @@ const AdminPatientManagement: React.FC = () => {
 
   const handleMenuRemovePatient = () => {
     setRemovePatientOpen(true);
+    handleCloseActionsMenu();
+  };
+
+  const handleMenuViewDocuments = () => {
+    if (!actionPatient) return;
+    setSelectedPatient(actionPatient);
+    setDocumentsOpen(true);
     handleCloseActionsMenu();
   };
 
@@ -743,6 +767,12 @@ const AdminPatientManagement: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Edit Client</ListItemText>
         </MenuItem>
+        <MenuItem onClick={handleMenuViewDocuments}>
+          <ListItemIcon>
+            <DescriptionOutlined fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>View Signed Documents</ListItemText>
+        </MenuItem>
         <MenuItem onClick={handleMenuAssignTherapist}>
           <ListItemIcon>
             <PersonAdd fontSize="small" color="primary" />
@@ -879,6 +909,66 @@ const AdminPatientManagement: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setAssignTherapistOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={() => void handleConfirmAssignTherapist()}>Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Signed Documents Dialog */}
+      <Dialog
+        open={documentsOpen}
+        onClose={() => { setDocumentsOpen(false); setSelectedPatient(null); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Signed Documents
+          {selectedPatient && (
+            <Typography variant="body2" color="text.secondary">
+              {selectedPatient.first_name} {selectedPatient.last_name}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedPatient && (
+            <Grid container spacing={2}>
+              {[
+                { title: 'Consent for Treatment', signed: selectedPatient.consent_form_signed, signature: selectedPatient.consent_form_signature, date: selectedPatient.consent_form_date },
+                { title: 'Treatment Agreement', signed: selectedPatient.treatment_agreement_signed, signature: selectedPatient.treatment_agreement_signature, date: selectedPatient.treatment_agreement_date },
+                { title: 'HIPAA Authorization', signed: selectedPatient.hipaa_authorized, signature: selectedPatient.hipaa_signature, date: selectedPatient.hipaa_date },
+                { title: 'Privacy Policy', signed: selectedPatient.privacy_policy_acknowledged, signature: selectedPatient.privacy_policy_signature, date: selectedPatient.privacy_policy_date },
+              ].map((doc) => (
+                <Grid item xs={12} sm={6} key={doc.title}>
+                  <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Typography variant="subtitle2" fontWeight={500}>{doc.title}</Typography>
+                      <Chip
+                        icon={doc.signed ? <CheckCircleOutline /> : <CancelOutlined />}
+                        label={doc.signed ? 'Signed' : 'Pending'}
+                        color={doc.signed ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </Box>
+                    {doc.signed ? (
+                      <>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Signature:</strong> {doc.signature}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Date:</strong> {doc.date ? new Date(doc.date).toLocaleString() : 'N/A'}
+                        </Typography>
+                      </>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                        Awaiting client signature.
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setDocumentsOpen(false); setSelectedPatient(null); }}>Close</Button>
         </DialogActions>
       </Dialog>
 

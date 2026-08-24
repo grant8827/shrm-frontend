@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Typography, Tabs, Tab, CircularProgress } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Alert, Box, Typography, Tabs, Tab, CircularProgress, LinearProgress, IconButton, Tooltip } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAuth } from '../../contexts/AuthContext';
 import { Patient } from '../../types';
 import { apiClient } from '../../services/apiClient';
@@ -52,24 +53,28 @@ const PatientAgreementsView: React.FC = () => {
   const { state } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
 
-  useEffect(() => {
-    const fetchPatientData = async () => {
-      try {
-        // Assuming client sees their own data
-        const response = await apiClient.get('/api/patients/');
-        if (response.data.results && response.data.results.length > 0) {
-          setPatient(response.data.results[0]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch patient data", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPatientData();
+  const fetchPatientData = useCallback(async (isRefresh = false) => {
+    try {
+      if (!state.user?.id) return;
+      if (isRefresh) setRefreshing(true);
+      const response = await apiClient.get(`/api/patients/user/${state.user.id}`);
+      setPatient(response.data);
+    } catch (error) {
+      console.error("Failed to fetch patient data", error);
+      setLoadError('We could not load your consent forms. Please try again or contact the office.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [state.user?.id]);
+
+  useEffect(() => {
+    fetchPatientData();
+  }, [fetchPatientData]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -80,16 +85,45 @@ const PatientAgreementsView: React.FC = () => {
   };
 
   if (loading) return <CircularProgress />;
+  if (loadError) return <Alert severity="error">{loadError}</Alert>;
   if (!patient) return <Typography>No client record found.</Typography>;
+
+  const completedCount = [
+    patient.consentFormSigned,
+    patient.treatmentAgreementSigned,
+    patient.hipaaAuthorized,
+    patient.privacyPolicyAcknowledged
+  ].filter(Boolean).length;
 
   return (
     <Box>
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Consent forms</Typography>
+          <Tooltip title="Refresh status (after signing in the onboarding portal)">
+            <span>
+              <IconButton size="small" onClick={() => fetchPatientData(true)} disabled={refreshing}>
+                {refreshing ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {completedCount} of 4 required forms completed
+        </Typography>
+        <LinearProgress variant="determinate" value={(completedCount / 4) * 100} />
+        {completedCount === 4 && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            All required consent forms have been signed.
+          </Alert>
+        )}
+      </Box>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
-          <Tab label="Consent for Treatment" />
-          <Tab label="Treatment Agreement" />
-          <Tab label="HIPAA Authorization" />
-          <Tab label="Privacy Policy" />
+          <Tab label={`Consent for Treatment${patient.consentFormSigned ? ' ✓' : ''}`} />
+          <Tab label={`Treatment Agreement${patient.treatmentAgreementSigned ? ' ✓' : ''}`} />
+          <Tab label={`HIPAA Authorization${patient.hipaaAuthorized ? ' ✓' : ''}`} />
+          <Tab label={`Privacy Policy${patient.privacyPolicyAcknowledged ? ' ✓' : ''}`} />
         </Tabs>
       </Box>
 

@@ -187,6 +187,7 @@ export const Layout: React.FC = () => {
       items.push(
         { text: 'Dashboard', icon: <Dashboard />, path: '/therapist' },
         { text: 'My Clients', icon: <People />, path: '/therapist/patients' },
+        { text: 'Client Documents', icon: <Receipt />, path: '/therapist/client-consents' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Settings />, path: '/therapist/soap-notes' },
@@ -199,6 +200,7 @@ export const Layout: React.FC = () => {
         { text: 'Admin Dashboard', icon: <Dashboard />, path: '/admin' },
         { text: 'Client Management', icon: <People />, path: '/admin/patients' },
         { text: 'Counseling Requests', icon: <Badge badgeContent={newCounselingRequestsCount} color="error"><Assignment /></Badge>, path: '/admin/counseling-requests' },
+        { text: 'Client Documents', icon: <Receipt />, path: '/admin/client-consents' },
         { text: 'Appointments', icon: <Event />, path: '/appointments' },
         { text: 'Schedule', icon: <CalendarMonth />, path: '/schedule' },
         { text: 'SOAP Notes', icon: <Receipt />, path: '/admin/soap-notes' },

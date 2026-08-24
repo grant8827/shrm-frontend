@@ -1,16 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
-  TextField,
   Button,
   Paper,
-  Divider,
   Alert,
-  CircularProgress
 } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { Patient } from '../../types';
-import { apiClient } from '../../services/apiClient';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AgreementProps {
   patient: Patient;
@@ -25,11 +23,8 @@ const AgreementForm: React.FC<AgreementProps> = ({
   agreementType,
   title,
   content,
-  onSuccess
 }) => {
-  const [signature, setSignature] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { state } = useAuth();
 
   // Check if already signed
   const isSigned = () => {
@@ -66,30 +61,6 @@ const AgreementForm: React.FC<AgreementProps> = ({
     return { sig, date };
   };
 
-  const handleAccept = async () => {
-    if (!signature.trim()) {
-      setError('Please type your name as an electronic signature.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.put(`/api/patients/${patient.id}/agreements`, {
-        agreementType,
-        signature: signature.trim(),
-        date: new Date().toISOString()
-      });
-      onSuccess(response.data);
-    } catch (err: any) {
-      console.error('Error signing agreement:', err);
-      setError(err.response?.data?.error || 'Failed to submit agreement. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   if (isSigned()) {
     const details = getSignatureDetails();
     return (
@@ -110,16 +81,21 @@ const AgreementForm: React.FC<AgreementProps> = ({
     );
   }
 
+  const prefillParams = new URLSearchParams({
+    name: `${state.user?.firstName || ''} ${state.user?.lastName || ''}`.trim(),
+    email: state.user?.email || '',
+  });
+
   return (
     <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', mb: 3 }}>
       <Typography variant="h6" gutterBottom>{title}</Typography>
-      
-      <Box sx={{ 
-        maxHeight: '300px', 
-        overflowY: 'auto', 
-        p: 2, 
-        bgcolor: 'grey.50', 
-        border: '1px solid', 
+
+      <Box sx={{
+        maxHeight: '300px',
+        overflowY: 'auto',
+        p: 2,
+        bgcolor: 'grey.50',
+        border: '1px solid',
         borderColor: 'grey.200',
         borderRadius: 1,
         mb: 3
@@ -127,37 +103,26 @@ const AgreementForm: React.FC<AgreementProps> = ({
         {content}
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Divider sx={{ mb: 3 }} />
+      <Alert severity="info" sx={{ mb: 2 }}>
+        This document has not been signed yet.
+      </Alert>
 
       <Typography variant="body2" color="text.secondary" gutterBottom>
-        By typing my name below, I acknowledge that I have read and agree to the terms above. This serves as my electronic signature.
+        Signing is done through our secure onboarding portal, where you'll review this and the other required
+        documents and provide a drawn signature.
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mt: 2 }}>
-        <TextField
-          label="Type Full Name to Sign"
-          variant="outlined"
-          fullWidth
-          value={signature}
-          onChange={(e) => setSignature(e.target.value)}
-          disabled={isSubmitting}
-        />
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleAccept}
-          disabled={isSubmitting || !signature.trim()}
-          sx={{ height: '56px', px: 4 }}
-        >
-          {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Accept & Sign'}
-        </Button>
-      </Box>
+      <Button
+        variant="contained"
+        color="primary"
+        endIcon={<OpenInNewIcon />}
+        href={`/consent-forms?${prefillParams.toString()}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        sx={{ mt: 2 }}
+      >
+        Sign Consent Forms
+      </Button>
     </Paper>
   );
 };

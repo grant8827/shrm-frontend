@@ -113,6 +113,13 @@ export const buildPatientFormDataFromCounselingRequest = (
   email: request.email,
   phone: request.phone,
   dateOfBirth: request.dateOfBirth ? new Date(request.dateOfBirth) : null,
+  gender: request.gender || '',
+  address: {
+    street: request.street || '',
+    city: request.city || '',
+    state: request.state || '',
+    zipCode: request.zipCode || '',
+  },
   emergencyContact: {
     name: request.emergencyContactName || '',
     phone: request.emergencyContactPhone || '',

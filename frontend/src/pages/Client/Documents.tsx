@@ -449,15 +449,21 @@ const Documents: React.FC = () => {
           onChange={(_, newValue) => setActiveTab(newValue)}
           variant="fullWidth"
         >
+          <Tab icon={<CheckCircle />} label="Agreements" />
           <Tab icon={<Description />} label="All Documents" />
           <Tab icon={<FolderOpen />} label="Folders" />
           <Tab icon={<Assignment />} label="To Sign" />
-          <Tab icon={<CheckCircle />} label="Agreements" />
         </Tabs>
       </Paper>
 
-      {/* Tab Panels */}
+      {/* Agreements Tab — the required consent forms, shown first so clients
+          see them before anything else in "My Documents". */}
       <TabPanel value={activeTab} index={0}>
+        <PatientAgreementsView />
+      </TabPanel>
+
+      {/* Tab Panels */}
+      <TabPanel value={activeTab} index={1}>
         {loading ? (
           <Box display="flex" justifyContent="center" p={4}>
             <CircularProgress />
@@ -534,7 +540,7 @@ const Documents: React.FC = () => {
         )}
       </TabPanel>
 
-      <TabPanel value={activeTab} index={1}>
+      <TabPanel value={activeTab} index={2}>
         <Grid container spacing={2}>
           {folders.map((folder) => (
             <Grid item xs={12} sm={6} md={4} key={folder.id}>
@@ -583,7 +589,7 @@ const Documents: React.FC = () => {
         </Grid>
       </TabPanel>
 
-      <TabPanel value={activeTab} index={2}>
+      <TabPanel value={activeTab} index={3}>
         <List>
           {documents
             .filter(doc => doc.requiresSignature && doc.signatureStatus === SignatureStatus.PENDING)
@@ -615,11 +621,6 @@ const Documents: React.FC = () => {
             </Alert>
           )}
         </List>
-      </TabPanel>
-
-      {/* Agreements Tab */}
-      <TabPanel value={activeTab} index={3}>
-        <PatientAgreementsView />
       </TabPanel>
 
       {/* Upload Dialog */}

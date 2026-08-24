@@ -443,6 +443,26 @@ const CounselingRequests: React.FC = () => {
                     </Typography>
                   </Grid>
                 )}
+                {selected.gender && (
+                  <Grid item xs={12} sm={6}>
+                    <Typography variant="body2" color="text.secondary">
+                      Gender
+                    </Typography>
+                    <Typography variant="body1">{selected.gender}</Typography>
+                  </Grid>
+                )}
+                {(selected.street || selected.city || selected.state || selected.zipCode) && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Address
+                    </Typography>
+                    <Typography variant="body1">
+                      {[selected.street, selected.city, [selected.state, selected.zipCode].filter(Boolean).join(' ')]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </Typography>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2" color="text.secondary">
                     Service Type

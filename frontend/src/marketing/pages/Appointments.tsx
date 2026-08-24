@@ -8,6 +8,11 @@ interface AppointmentForm {
   email: string;
   phone: string;
   dateOfBirth: string;
+  gender: string;
+  street: string;
+  city: string;
+  state: string;
+  zipCode: string;
   serviceType: string;
   preferredDate: string;
   preferredTime: string;
@@ -31,6 +36,11 @@ const Appointments: React.FC = () => {
     email: '',
     phone: '',
     dateOfBirth: '',
+    gender: '',
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
     serviceType: '',
     preferredDate: '',
     preferredTime: '',
@@ -109,6 +119,11 @@ const Appointments: React.FC = () => {
         email: '',
         phone: '',
         dateOfBirth: '',
+        gender: '',
+        street: '',
+        city: '',
+        state: '',
+        zipCode: '',
         serviceType: '',
         preferredDate: '',
         preferredTime: '',
@@ -242,6 +257,80 @@ const Appointments: React.FC = () => {
                         onChange={handleChange}
                         className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
                         required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="gender" className="block text-sm font-semibold text-neutral-700 mb-2">
+                        Gender
+                      </label>
+                      <select
+                        id="gender"
+                        name="gender"
+                        value={formData.gender}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
+                      >
+                        <option value="">Select...</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label htmlFor="street" className="block text-sm font-semibold text-neutral-700 mb-2">
+                      Street Address
+                    </label>
+                    <input
+                      type="text"
+                      id="street"
+                      name="street"
+                      value={formData.street}
+                      onChange={handleChange}
+                      placeholder="123 Main St"
+                      className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-semibold text-neutral-700 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        id="city"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-semibold text-neutral-700 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        id="state"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        placeholder="e.g., TX"
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="zipCode" className="block text-sm font-semibold text-neutral-700 mb-2">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        id="zipCode"
+                        name="zipCode"
+                        value={formData.zipCode}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-shrm-secondary focus:border-shrm-primary transition-colors"
                       />
                     </div>
                   </div>
