@@ -146,14 +146,22 @@ class AuthService {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) return null;
 
-      const response = await apiService.post<RefreshTokenResponse & { refresh?: string }>('/auth/refresh/', { refresh: refreshToken });
-      
-      if (response.success && response.data) {
-        const token = response.data.access;
+      const response = await apiService.post<RefreshTokenResponse & { refresh?: string }>(
+        '/auth/refresh/',
+        { refresh: refreshToken }
+      );
+
+      // Express returns { access, refresh } directly. Some legacy API calls
+      // return { success, data }, so accept either response shape here.
+      const directResponse = response as unknown as RefreshTokenResponse & { refresh?: string };
+      const tokenData = response.data ?? directResponse;
+      const token = tokenData.access;
+
+      if (typeof token === 'string' && token) {
         // Store updated tokens
         localStorage.setItem('access_token', token);
-        if (response.data.refresh) {
-          localStorage.setItem('refresh_token', response.data.refresh);
+        if (tokenData.refresh) {
+          localStorage.setItem('refresh_token', tokenData.refresh);
         }
         apiService.setAuthToken(token);
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
