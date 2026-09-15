@@ -42,47 +42,25 @@
   color: inherit;
 }
 
-.logo-icon-container {
-  position: relative;
+.logo-image {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  background: white;
+  transition: transform 0.3s ease;
 }
 
-.logo-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  background: linear-gradient(135deg, #3c4535, #fac800);
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: bold;
-  font-size: 1.125rem;
-  box-shadow: 0 4px 8px rgba(60, 69, 53, 0.3);
-  transition: all 0.3s ease;
-}
-
-.logo-link:hover .logo-icon {
+.logo-link:hover .logo-image {
   transform: scale(1.05);
-  box-shadow: 0 6px 12px rgba(60, 69, 53, 0.4);
 }
 
 @media (min-width: 768px) {
-  .logo-icon {
-    width: 3rem;
-    height: 3rem;
-    font-size: 1.25rem;
+  .logo-image {
+    width: 4rem;
+    height: 4rem;
   }
-}
-
-.logo-accent {
-  position: absolute;
-  top: -0.25rem;
-  right: -0.25rem;
-  width: 1rem;
-  height: 1rem;
-  background: #fac800;
-  border-radius: 50%;
-  opacity: 0.8;
 }
 
 .logo-text {

@@ -37,12 +37,11 @@ const Header: React.FC = () => {
         {/* Logo Section */}
         <div className="logo">
           <Link to="/" className="logo-link">
-            <div className="logo-icon-container">
-              <div className="logo-icon">
-                <span>S</span>
-              </div>
-              <div className="logo-accent"></div>
-            </div>
+            <img
+              className="logo-image"
+              src="/Safe%20haven%20restoration%20minitry-logo.png"
+              alt="Safe Haven Restoration Ministries logo"
+            />
             <div className="logo-text">
               <h1>SHRM</h1>
               <span>Safe Haven Restoration Ministries</span>
