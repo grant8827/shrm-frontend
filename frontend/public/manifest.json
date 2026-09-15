@@ -1,7 +1,13 @@
 {
   "short_name": "SafeHaven",
   "name": "SafeHaven EHR - Therapeutic EHR System",
-  "icons": [],
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
   "start_url": "/",
   "display": "standalone",
   "theme_color": "#1976d2",
